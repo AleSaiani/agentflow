@@ -14,6 +14,7 @@ coverage/
 .iterate/
 .pipe/
 .reduce/
+.audit/
 .knowledge/
 .cache/
 

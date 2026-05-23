@@ -225,7 +225,7 @@ The Stop hook detects `/pipe` runs with `auto_continue=true` and residual work. 
 - **Pre-existing items file (`/group → /enumerate`)**: when a primitive stage's input is the output file of a prior stage, pass it via the appropriate flag of the child primitive — e.g. `/enumerate` init expects `--items <path>`. The orchestrator constructs `init_args` accordingly when building the stages.json.
 - **Idempotence**: re-running `/pipe` with the same run-id without `--force` resumes from where it left off.
 
-## Quick example: code-audit-deep pipeline
+## Quick example: audit pipeline
 
 stages.json:
 ```json

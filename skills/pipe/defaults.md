@@ -36,6 +36,6 @@ stop_on_failure: true       # if a stage fails, the pipe fails (rather than skip
 - **`stop_on_failure: true`** by default: a failed stage aborts the pipeline. Override only
   when downstream stages have meaningful behavior on partial input.
 
-- **Pipe vs recipe**: /pipe is the runtime. A layer-3 "recipe" (e.g. `/code-audit-deep`) is
+- **Pipe vs recipe**: /pipe is the runtime. A layer-3 "recipe" (e.g. `/flow:audit`) is
   a SKILL.md that constructs a stages.json and invokes /pipe. Recipes are documentation +
   defaults, not new primitives.

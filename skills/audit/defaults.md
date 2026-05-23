@@ -1,5 +1,5 @@
 ---
-# Default config for /code-audit-deep (a layer-3 recipe over /pipe).
+# Default config for /flow:audit (a layer-3 recipe over /pipe).
 
 target: "."                         # path to audit; user MUST override or pass --target
 file_glob: "**/*.cs"                # which files to include (comma-separated multiple globs allowed)
@@ -28,7 +28,7 @@ stop_on_failure: true               # if any stage fails, the audit aborts
 
 # Notes
 
-- `/code-audit-deep` is a **layer-3 recipe** — a thin shell over `/pipe` that wires
+- `/flow:audit` is a **layer-3 recipe** — a thin shell over `/pipe` that wires
   4 stages (find → review → group → digest). It introduces no new framework
   primitives; if you find yourself wanting to add one to make this recipe work,
   fix the underlying primitive instead.
@@ -47,5 +47,5 @@ stop_on_failure: true               # if any stage fails, the audit aborts
   layout. Adjust depth or switch to `jsonpath` if your project is flatter or carries
   component metadata in a field.
 
-- This recipe does NOT modify any files. Outputs land under `.code-audit-deep/<run-id>/`
+- This recipe does NOT modify any files. Outputs land under `.audit/<run-id>/`
   (the pipe run's directory) and the per-file review state under `.enumerate/<run-id>-s1-enumerate/`.

@@ -1,5 +1,5 @@
 {
-  "name": "code-audit-deep",
+  "name": "audit",
   "description": "Deep code audit: discover files → per-file LLM review (cached) → partition by component → executive digest. The first declarative workflow-file; compiles 1:1 into pipe.stages[]. Per-invocation inputs come from env: AUDIT_TARGET (required), AUDIT_GLOB, AUDIT_EXCLUDE, AUDIT_DISCOVER (path to discover.mjs). Tune review/digest models and group depth by editing this file or copying it into your project's workflows/.",
   "config": {
     "context_policy": "summary",

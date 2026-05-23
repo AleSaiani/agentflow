@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Stage-1 discover helper for the code-audit-deep workflow. Walks AUDIT_TARGET, matches
+ * Stage-1 discover helper for the audit workflow. Walks AUDIT_TARGET, matches
  * AUDIT_GLOB (comma-separated globs), skips AUDIT_EXCLUDE, and emits a /enumerate-compatible
  * items array — each item carries a sha256 content_hash so the review stage's --cache can
  * skip unchanged files on re-runs. Node builtins only.

@@ -1,5 +1,5 @@
 ---
-name: code-audit-deep
+name: audit
 description: |
   Deep code audit recipe: find files in a target tree, review each one (LLM), partition by component, then produce an executive digest with hotspot list and recurring patterns. A layer-3 recipe — a thin shell over /pipe that wires the framework primitives.
 
@@ -13,7 +13,7 @@ description: |
   - the request is exploratory ("what does this folder do?") rather than audit-oriented;
   - the user wants a security audit specifically — that calls for the `audit` kind on /enumerate, possibly via a separate `/security-audit-deep` recipe (not built yet).
 
-  Explicit user invocation (`/code-audit-deep ...`) bypasses these checks.
+  Explicit user invocation (`/flow:audit ...`) bypasses these checks.
 
   Pipeline (6 stages with declarative wiring): bash discover (with per-file content_hash) → /enumerate code-review with cache → bash build group-input → /group path-prefix → bash build digest-inputs → /reduce digest. No primitive logic added — the recipe is a thin shell over /pipe with wiring templates ({{stages.X.run_id}}, {{stages.X.result_pointer}}) so child run-ids are NOT hardcoded.
 
@@ -22,13 +22,13 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|sonnet|opus] [--review-concurrency N] [--group-depth N] [--digest-model opus|sonnet|haiku] [--run-id NAME]
 ---
 
-# /code-audit-deep
+# /flow:audit
 
-You are the orchestrator of a `/code-audit-deep` recipe. Your job is to **construct a 6-stage pipeline.json**, hand it to `/pipe`, and let the framework drive execution. The recipe itself adds no new primitives.
+You are the orchestrator of a `/flow:audit` recipe. Your job is to **construct a 6-stage pipeline.json**, hand it to `/pipe`, and let the framework drive execution. The recipe itself adds no new primitives.
 
 ## Step 0 — Resolve config + compute manifest hash for the run-id
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/code-audit-deep/defaults.md`. Apply override priority CLI > defaults.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/flow:audit/defaults.md`. Apply override priority CLI > defaults.
 
 Required: `--target <path>`. If missing → ask via `AskUserQuestion` or abort with a clear message.
 
@@ -46,12 +46,12 @@ Echo the resolved config + run-id in one line. If target has > 200 files, ask fo
 
 ## Step 1 — Working dirs
 
-Create `.code-audit-deep/<run-id>/` (recipe scratch) and `.pipe/<run-id>/` (pipeline state).
+Create `.audit/<run-id>/` (recipe scratch) and `.pipe/<run-id>/` (pipeline state).
 
 ## Step 2 — Export the discover env vars
 
 The 6-stage structure is shipped as a **declarative workflow-file** at
-`${CLAUDE_PLUGIN_ROOT}/workflows/code-audit-deep.json` (this is the canonical, reusable
+`${CLAUDE_PLUGIN_ROOT}/workflows/flow:audit.json` (this is the canonical, reusable
 artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the bundled
 `discover.mjs`, which reads the target/glob from the environment and emits a
 /enumerate-compatible items array with a per-file `content_hash` (for the review `--cache`).
@@ -80,7 +80,7 @@ resolved by /pipe at tick time. The stages are: `discover` (bash) → `review` (
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> \
-  --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/code-audit-deep.json" \
+  --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/flow:audit.json" \
   [--no-stop-on-failure if user passed --keep-going] \
   [--force if --run-id was explicitly provided and overrides existing]
 ```
@@ -126,14 +126,14 @@ When `drive` returns `done`:
 ## Important rules
 
 - **Idempotence**: re-running with the same `--run-id` (or the same `--target` if run-id is auto-derived) resumes. With the manifest hash in run-id derivation: a file content change → new run-id → fresh run. Pure resume of a half-completed run uses the SAME run-id.
-- **No file modification**: this recipe is read-only on the target. Outputs land under `.code-audit-deep/<run-id>/`, `.pipe/<run-id>/`, `.enumerate/<run-id>-s1-enumerate/`, `.group/<run-id>-s3-partition/`, `.reduce/<run-id>-s5-digest/`.
+- **No file modification**: this recipe is read-only on the target. Outputs land under `.audit/<run-id>/`, `.pipe/<run-id>/`, `.enumerate/<run-id>-s1-enumerate/`, `.group/<run-id>-s3-partition/`, `.reduce/<run-id>-s5-digest/`.
 - **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.cache/enumerate-code-review/`.
 - **Validate then drive**: trust the dry-run validation `/pipe init` performs. Catches recipe typos before any agent dispatch.
 
 ## Quick example
 
 ```
-/code-audit-deep --target examples/fake-repo
+/flow:audit --target examples/fake-repo
 ```
 
 Expected on the bundled fake-repo (8 files, 4 components, 6 with intentional bugs):

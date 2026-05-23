@@ -1,8 +1,8 @@
-# enumerate-skill
+# flow
 
 **Deterministic, composable iteration — and declarative workflows — inside a single Claude Code session.**
 
-`enumerate-skill` gives an LLM the control-flow primitives you'd reach for in code — `for each`,
+`flow` gives an LLM the control-flow primitives you'd reach for in code — `for each`,
 `reduce`, `group by`, `while`, and pipeline composition — as durable, resumable operations that
 survive across turns and context compaction. The state lives on disk; a Stop hook carries loops
 across turns; and a declarative workflow-file lets you wire the primitives into reusable pipelines.
@@ -21,14 +21,14 @@ feeds a deterministic predicate. The engine never branches on free text — that
 
 | Skill | Programming analog | What it does |
 |---|---|---|
-| `/enumerate-skill:enumerate` | `for each` / `map` | Apply one task to many items in parallel chunks across N subagents, with per-item overrides and a content-hash cache |
-| `/enumerate-skill:reduce` | `reduce` / fold | Collapse N inputs into 1 digest (markdown or JSON) via a single agent |
-| `/enumerate-skill:group` | `group by` | Partition N items into K groups by key — deterministic (path-prefix / regex / jsonpath) or LLM-classify. Output feeds `/enumerate` |
-| `/enumerate-skill:iterate` | `while` / `do…while` | Repeat a stage until a predicate is satisfied (or `while` it holds), with hard cap, convergence detection, and a clean kill switch |
-| `/enumerate-skill:pipe` | pipeline / DAG | Compose an ordered pipeline of stages (bash, json, or a primitive invocation), with declarative wiring templates and per-stage conditional guards |
-| `/enumerate-skill:inspect` | — | Read-only: list runs, show a run, draw a `/pipe` child tree, aggregate budget, print a timeline |
-| `/enumerate-skill:board` | — | Session-start dashboard: active runs, blockers, cumulative cost, suggested next actions |
-| `/enumerate-skill:code-audit-deep` | recipe | A layer-3 recipe: discover → per-file review → partition → executive digest, shipped as a declarative workflow-file |
+| `/flow:enumerate` | `for each` / `map` | Apply one task to many items in parallel chunks across N subagents, with per-item overrides and a content-hash cache |
+| `/flow:reduce` | `reduce` / fold | Collapse N inputs into 1 digest (markdown or JSON) via a single agent |
+| `/flow:group` | `group by` | Partition N items into K groups by key — deterministic (path-prefix / regex / jsonpath) or LLM-classify. Output feeds `/enumerate` |
+| `/flow:iterate` | `while` / `do…while` | Repeat a stage until a predicate is satisfied (or `while` it holds), with hard cap, convergence detection, and a clean kill switch |
+| `/flow:pipe` | pipeline / DAG | Compose an ordered pipeline of stages (bash, json, or a primitive invocation), with declarative wiring templates and per-stage conditional guards |
+| `/flow:inspect` | — | Read-only: list runs, show a run, draw a `/pipe` child tree, aggregate budget, print a timeline |
+| `/flow:board` | — | Session-start dashboard: active runs, blockers, cumulative cost, suggested next actions |
+| `/flow:audit` | recipe | A layer-3 recipe: discover → per-file review → partition → executive digest, shipped as a declarative workflow-file |
 
 ## The workflow layer
 
@@ -38,7 +38,7 @@ feeds a deterministic predicate. The engine never branches on free text — that
 - **Conditional steps** — a `/pipe` stage may carry a `when` guard (a bash predicate); exit 0 runs
   the stage, non-zero skips it. This is the "do only if" step.
 - **Workflow-files** — a declarative JSON `WorkflowSpec` compiles 1:1 into `pipe.stages[]`, so you
-  can version and reuse pipelines (see [`workflows/code-audit-deep.json`](workflows/code-audit-deep.json)).
+  can version and reuse pipelines (see [`workflows/flow:audit.json`](workflows/flow:audit.json)).
 - **Graph seam** — each stage carries a `next` edge. v1 traversal is linear; conditional branches
   and back-edges are schema-ready for v1.1.
 
@@ -59,28 +59,28 @@ This repository is both the plugin and its own marketplace.
 
 ```shell
 # from inside Claude Code
-/plugin marketplace add AleSaiani/enumerate-skill
-/plugin install enumerate-skill@enumerate-skill
+/plugin marketplace add AleSaiani/flow-cc
+/plugin install flow@flow-cc
 ```
 
 For local development, point Claude Code at the directory directly:
 
 ```shell
-claude --plugin-dir /path/to/enumerate-skill
+claude --plugin-dir /path/to/flow-cc
 ```
 
 ## Quickstart
 
 ```
 # Apply a review to every C# file under a folder, then digest the findings:
-/enumerate-skill:code-audit-deep --target examples/fake-repo
+/flow:audit --target examples/fake-repo
 
 # Or compose your own pipeline from a workflow-file:
-node "$CLAUDE_PLUGIN_ROOT/dist/state/pipe.js" init my-run --workflow workflows/code-audit-deep.json
+node "$CLAUDE_PLUGIN_ROOT/dist/state/pipe.js" init my-run --workflow workflows/flow:audit.json
 node "$CLAUDE_PLUGIN_ROOT/dist/state/pipe.js" drive my-run
 
 # Inspect what's in flight:
-/enumerate-skill:board
+/flow:board
 ```
 
 ## Architecture

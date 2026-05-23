@@ -101,11 +101,11 @@ test("pipe: deterministic group stage is auto-driven without an agent", () => {
   assert.equal(status.stages[0].child_cmd, "group");
 });
 
-test("pipe: the shipped code-audit-deep workflow-file validates and inits (dogfood)", () => {
+test("pipe: the shipped audit workflow-file validates and inits (dogfood)", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const repo = resolve(".");
   const env = { PIPE_STATE_DIR: dir, CLAUDE_PLUGIN_ROOT: repo };
-  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "code-audit-deep.json")]);
+  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit.json")]);
   assert.equal(init.stages, 6);
   const status = run(env, ["status", "audit-x"]);
   assert.deepEqual(
