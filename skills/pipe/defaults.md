@@ -14,12 +14,12 @@ stop_on_failure: true       # if a stage fails, the pipe fails (rather than skip
 # Notes
 
 - /pipe is a **pure composer**. It holds no loop semantics — use /iterate as a stage if
-  you need a loop. It holds no map semantics — use /enumerate. It holds no fold semantics —
+  you need a loop. It holds no map semantics — use /foreach. It holds no fold semantics —
   use /reduce. Each stage produces a `result_pointer`; the next stage consumes it via
   env vars (bash stages) or via `--from-run`/`--from-file` (primitive stages).
 
 - **Stage types in v1**: `bash` (synchronous, single command) and `primitive` (spawn one of
-  /enumerate, /group, /reduce, /iterate; /pipe waits for the child to be done, then advances).
+  /foreach, /group, /reduce, /iterate; /pipe waits for the child to be done, then advances).
   Bash stages run inside the same turn; primitive stages typically span multiple turns and
   rely on cross-turn auto-continue.
 
@@ -29,7 +29,7 @@ stop_on_failure: true       # if a stage fails, the pipe fails (rather than skip
   and the orchestrator advances the stage cursor.
 
 - **Auto_continues budget**: `max_auto_continues: 50` at the pipe level is on top of each
-  child's own cap. A pipeline with three /enumerate stages and one /iterate stage can
+  child's own cap. A pipeline with three /foreach stages and one /iterate stage can
   easily consume 100+ Stop-hook invocations across the whole pipe. Tune up if the pipeline
   is genuinely long; tune down if you want a tighter ceiling.
 

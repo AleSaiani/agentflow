@@ -22,6 +22,7 @@ import { PRIMITIVES, type ResidualWork, saveAtomic, stateDir } from "../common.j
 // Order matters: /pipe yields to its primitive children, so children must come FIRST
 // (children's residual work is detected before /pipe's "advance" residual).
 import "../state/enumerate.js";
+import "../state/foreach.js";
 import "../state/group.js";
 import "../state/iterate.js";
 import "../state/reduce.js";

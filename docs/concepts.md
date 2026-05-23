@@ -42,16 +42,25 @@ text.** That's what lets you call the engine "deterministic" with a straight fac
 
 ## Primitives
 
+The vocabulary is the functional-programming triad plus partition and loop:
+
 | Primitive | Role |
 |---|---|
-| **enumerate** | apply one task to many items, in parallel chunks across N subagents |
-| **reduce** | collapse N inputs into one digest via a single agent |
-| **group** | partition items into groups (deterministic methods, or one LLM-classify pass) |
-| **iterate** | repeat a stage until a predicate holds; hard cap + convergence + kill switch |
+| **enumerate** | *unfold* (1→N): generate a list of items from a spec (LLM or deterministic) |
+| **foreach** | *map* (N→N): apply one operation to each item — main-thread or parallel subagents |
+| **reduce** | *fold* (N→1): collapse N inputs into one digest via a single agent |
+| **group** | partition items into K groups (deterministic methods, or one LLM-classify pass) |
+| **iterate** | repeat a stage; surfaced as `repeat` (count), `until` (do…until), `while` (while…do); hard cap + convergence + kill switch |
 | **pipe** | compose the above into an ordered pipeline; holds no loop/map/fold of its own |
 
-`enumerate`, `group`, and `reduce` are bounded; `iterate` is unbounded (until a condition). `pipe`
-composes them — loops inside a pipeline come from using `iterate` as a stage.
+`enumerate` and `group` produce an items.json that `foreach` (map) and `group` consume; `reduce`
+collapses; `iterate` loops. `pipe` composes them — loops inside a pipeline come from using `iterate`
+(or a `repeat`/`until`/`while` stage) as a step. **`compose`** authors a reusable workflow-file from
+these; **`run`** executes one (with `--dry-run`/`plan` to preview).
+
+The per-item **operation** is a prompt (the instructions); model and subagent are optional, and
+`foreach` can process items inline in the main thread (`--execution main-thread`) instead of fanning
+out to subagents.
 
 ## The workflow layer
 

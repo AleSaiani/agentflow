@@ -48,4 +48,4 @@ stop_on_failure: true               # if any stage fails, the audit aborts
   component metadata in a field.
 
 - This recipe does NOT modify any files. Outputs land under `.audit/<run-id>/`
-  (the pipe run's directory) and the per-file review state under `.enumerate/<run-id>-s1-enumerate/`.
+  (the pipe run's directory) and the per-file review state under `.foreach/<run-id>-s1-foreach/`.

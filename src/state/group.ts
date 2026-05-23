@@ -63,7 +63,7 @@ function resolveInput(inputSource: StateDict): StateDict[] {
     return data;
   }
   if (src === "run") {
-    const fromCmd = inputSource["cmd"] ?? "enumerate";
+    const fromCmd = inputSource["cmd"] ?? "foreach";
     const other = loadState(statePath(fromCmd, inputSource["run_id"]));
     const items: StateDict[] = [];
     for (const it of Object.values(other["items"] ?? {}) as StateDict[]) {

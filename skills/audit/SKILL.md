@@ -11,13 +11,13 @@ description: |
   DO NOT use this skill autonomously when:
   - the user names a small specific set of files — read them inline;
   - the request is exploratory ("what does this folder do?") rather than audit-oriented;
-  - the user wants a security audit specifically — that calls for the `audit` kind on /enumerate, possibly via a separate `/security-audit-deep` recipe (not built yet).
+  - the user wants a security audit specifically — that calls for the `audit` kind on /foreach, possibly via a separate `/security-audit-deep` recipe (not built yet).
 
   Explicit user invocation (`/flow:audit ...`) bypasses these checks.
 
-  Pipeline (6 stages with declarative wiring): bash discover (with per-file content_hash) → /enumerate code-review with cache → bash build group-input → /group path-prefix → bash build digest-inputs → /reduce digest. No primitive logic added — the recipe is a thin shell over /pipe with wiring templates ({{stages.X.run_id}}, {{stages.X.result_pointer}}) so child run-ids are NOT hardcoded.
+  Pipeline (6 stages with declarative wiring): bash discover (with per-file content_hash) → /foreach code-review with cache → bash build group-input → /group path-prefix → bash build digest-inputs → /reduce digest. No primitive logic added — the recipe is a thin shell over /pipe with wiring templates ({{stages.X.run_id}}, {{stages.X.result_pointer}}) so child run-ids are NOT hardcoded.
 
-  Incremental re-runs are cheap: per-file content_hash + `/enumerate --cache` means unchanged files skip the agent dispatch. The run-id itself includes a manifest hash, so changing any source file forces a fresh run while leaving the cache intact for files that didn't change.
+  Incremental re-runs are cheap: per-file content_hash + `/foreach --cache` means unchanged files skip the agent dispatch. The run-id itself includes a manifest hash, so changing any source file forces a fresh run while leaving the cache intact for files that didn't change.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|sonnet|opus] [--review-concurrency N] [--group-depth N] [--digest-model opus|sonnet|haiku] [--run-id NAME]
 ---
@@ -54,7 +54,7 @@ The 6-stage structure is shipped as a **declarative workflow-file** at
 `${CLAUDE_PLUGIN_ROOT}/workflows/flow:audit.json` (this is the canonical, reusable
 artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the bundled
 `discover.mjs`, which reads the target/glob from the environment and emits a
-/enumerate-compatible items array with a per-file `content_hash` (for the review `--cache`).
+/foreach-compatible items array with a per-file `content_hash` (for the review `--cache`).
 
 Export these before init (resolve `${CLAUDE_PLUGIN_ROOT}` to its real path here):
 
@@ -72,7 +72,7 @@ To tune the review/digest models or group depth, copy the workflow file into you
 
 No stages.json to build. The workflow-file already wires the 6 stages with declarative
 templates (`{{stages.<name>.run_id}}`, `{{stages.<name>.result_pointer}}`, `{{run.dir}}`),
-resolved by /pipe at tick time. The stages are: `discover` (bash) → `review` (/enumerate,
+resolved by /pipe at tick time. The stages are: `discover` (bash) → `review` (/foreach,
 `--kind code-review --cache`) → `build-group-input` (json) → `partition` (/group path-prefix)
 → `build-digest-inputs` (json) → `digest` (/reduce, markdown).
 
@@ -96,16 +96,16 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" drive <run-id>
 ```
 
 Output is JSON:
-- `{"action": "needs_agent", "cmd": "enumerate", "suggested_child_run_id": "...", "init_args": [...]}` — you must init the child + run the dispatch loop + advance, then call `drive` again.
+- `{"action": "needs_agent", "cmd": "foreach", "suggested_child_run_id": "...", "init_args": [...]}` — you must init the child + run the dispatch loop + advance, then call `drive` again.
 - `{"action": "done", "result_pointer": "..."}` — pipeline complete, surface the digest.
 - `{"action": "failed", ...}` — surface the error.
 
-### When `needs_agent` for `/enumerate review`:
+### When `needs_agent` for `/foreach review`:
 
-1. Run the child init: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/enumerate.js" init <suggested_child_run_id> <init_args...> --force`
-2. Record in pipe: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" start-primitive-child <run-id> --child-cmd enumerate --child-run-id <suggested>`
-3. Follow `/enumerate` SKILL.md Step 4 dispatch loop: status → claim → split into chunks → fan-out parallel Agents in ONE message → complete-batch each result file.
-4. After every Agent return, record token usage: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/enumerate.js" budget-add <enum-run-id> --tokens <total_tokens> --model <review_model>` so the budget aggregates correctly.
+1. Run the child init: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" init <suggested_child_run_id> <init_args...> --force`
+2. Record in pipe: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" start-primitive-child <run-id> --child-cmd foreach --child-run-id <suggested>`
+3. Follow `/foreach` SKILL.md Step 4 dispatch loop: status → claim → split into chunks → fan-out parallel Agents in ONE message → complete-batch each result file.
+4. After every Agent return, record token usage: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" budget-add <enum-run-id> --tokens <total_tokens> --model <review_model>` so the budget aggregates correctly.
 5. When `complete-batch` reports `run_status: done`, call `drive` again — it advances past the review stage, auto-runs the bash bridges + group, and stops at `digest`.
 
 ### When `needs_agent` for `/reduce digest`:
@@ -121,13 +121,13 @@ When `drive` returns `done`:
 - `Read` the first 30 lines of `result_pointer` (the digest markdown) and surface inline.
 - Run `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" budget <run-id>` and surface the total cost.
 - Run `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" tree <run-id>` for the full child tree breakdown.
-- Suggest follow-ups (e.g. "to refine the auth component, run `/enumerate --kind audit --model opus --items <groups.json filtered>`").
+- Suggest follow-ups (e.g. "to refine the auth component, run `/foreach --kind audit --model opus --items <groups.json filtered>`").
 
 ## Important rules
 
 - **Idempotence**: re-running with the same `--run-id` (or the same `--target` if run-id is auto-derived) resumes. With the manifest hash in run-id derivation: a file content change → new run-id → fresh run. Pure resume of a half-completed run uses the SAME run-id.
-- **No file modification**: this recipe is read-only on the target. Outputs land under `.audit/<run-id>/`, `.pipe/<run-id>/`, `.enumerate/<run-id>-s1-enumerate/`, `.group/<run-id>-s3-partition/`, `.reduce/<run-id>-s5-digest/`.
-- **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.cache/enumerate-code-review/`.
+- **No file modification**: this recipe is read-only on the target. Outputs land under `.audit/<run-id>/`, `.pipe/<run-id>/`, `.foreach/<run-id>-s1-foreach/`, `.group/<run-id>-s3-partition/`, `.reduce/<run-id>-s5-digest/`.
+- **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.cache/foreach-code-review/`.
 - **Validate then drive**: trust the dry-run validation `/pipe init` performs. Catches recipe typos before any agent dispatch.
 
 ## Quick example
@@ -138,7 +138,7 @@ When `drive` returns `done`:
 
 Expected on the bundled fake-repo (8 files, 4 components, 6 with intentional bugs):
 - stage discover finds 8 .cs files (each with sha256 content_hash)
-- stage review dispatches /enumerate (sonnet, conc=4, --cache) → 6 bug reports + 2 clean
+- stage review dispatches /foreach (sonnet, conc=4, --cache) → 6 bug reports + 2 clean
 - stage build-group-input materializes the run reference
 - stage partition runs /group path-prefix depth=1 → 4 groups (auth, billing, api, data)
 - stage build-digest-inputs materializes the reduce inputs

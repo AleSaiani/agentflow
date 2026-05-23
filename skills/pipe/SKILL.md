@@ -1,7 +1,7 @@
 ---
 name: pipe
 description: |
-  Run an ordered pipeline of stages, each one either a bash command or an invocation of another primitive (/enumerate, /group, /reduce, /iterate). The composer of the toolkit — /pipe holds no loop, map, or fold semantics; those are provided by the primitives it composes.
+  Run an ordered pipeline of stages, each one either a bash command or an invocation of another primitive (/foreach, /group, /reduce, /iterate). The composer of the toolkit — /pipe holds no loop, map, or fold semantics; those are provided by the primitives it composes.
 
   USE this skill autonomously when:
   - the user describes a multi-step workflow with at least 2 distinct steps (e.g. "fetch issues, then triage them, then summarize", "review files, then group findings, then report");
@@ -10,12 +10,12 @@ description: |
 
   DO NOT use this skill autonomously when:
   - it is a single step — invoke the primitive directly;
-  - the steps are independent and would naturally run in parallel — that's `/enumerate` over a list of stage specs, not `/pipe`;
+  - the steps are independent and would naturally run in parallel — that's `/foreach` over a list of stage specs, not `/pipe`;
   - the user is exploring a one-off question — discuss the design first, then build the recipe if it stabilizes.
 
   Explicit user invocation (`/pipe ...`) bypasses these checks.
 
-  V1 stage types: `bash` (synchronous, captures stdout to a file) and `primitive` (one of enumerate/group/reduce/iterate; the pipe awaits its completion via cross-turn auto-continue). The `tick` command is a state machine: it tells the orchestrator the next action (run a bash command, spawn a child primitive, advance after a child finishes, or report final status).
+  V1 stage types: `bash` (synchronous, captures stdout to a file) and `primitive` (one of foreach/group/reduce/iterate; the pipe awaits its completion via cross-turn auto-continue). The `tick` command is a state machine: it tells the orchestrator the next action (run a bash command, spawn a child primitive, advance after a child finishes, or report final status).
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --file <spec.md> | --stages <path-to-stages.json> [--run-id NAME] [--context-policy summary|none|last-only|full] [--no-stop-on-failure]
 ---
@@ -78,7 +78,7 @@ Stage names MUST be unique; that's the lookup key for `{{stages.<name>...}}`.
   "type": "primitive",
   "name": "triage",
   "spec": {
-    "cmd": "enumerate",
+    "cmd": "foreach",
     "init_args": [
       "--items", ".pipe/<run-id>/items.json",
       "--task-prompt", "...",
@@ -109,7 +109,7 @@ stop-on-failure: true
 [
   {"type": "bash", "name": "fetch", "spec": {"command": "..."}},
   {"type": "primitive", "name": "classify", "spec": {"cmd": "group", "init_args": [...]}},
-  {"type": "primitive", "name": "review", "spec": {"cmd": "enumerate", "init_args": [...]}},
+  {"type": "primitive", "name": "review", "spec": {"cmd": "foreach", "init_args": [...]}},
   {"type": "primitive", "name": "digest", "spec": {"cmd": "reduce", "init_args": [...]}}
 ]
 ```
@@ -191,7 +191,7 @@ The output includes `cmd`, `suggested_child_run_id`, and `init_args`. Steps:
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" start-primitive-child <run-id> \
      --child-cmd <cmd> --child-run-id <suggested_child_run_id>
    ```
-3. **Exit the turn** — the Stop hook will resume the child primitive on subsequent turns. The child has its own SKILL.md flow (e.g. /enumerate dispatch loop). When the child is done, the hook resumes /pipe.
+3. **Exit the turn** — the Stop hook will resume the child primitive on subsequent turns. The child has its own SKILL.md flow (e.g. /foreach dispatch loop). When the child is done, the hook resumes /pipe.
 
 DO NOT also run the child's dispatch loop yourself here. Let the child's own SKILL.md handle it via cross-turn auto-continue.
 
@@ -222,7 +222,7 @@ The Stop hook detects `/pipe` runs with `auto_continue=true` and residual work. 
 
 - **/pipe never mutates child state**. It only reads child state (via `is_done`) to decide when to advance. Children manage their own state per the single-writer rule.
 - **Use the suggested_child_run_id** unless you have a reason to override. The default scheme (`<pipe-run-id>-s<N>-<cmd>`) makes provenance obvious.
-- **Pre-existing items file (`/group → /enumerate`)**: when a primitive stage's input is the output file of a prior stage, pass it via the appropriate flag of the child primitive — e.g. `/enumerate` init expects `--items <path>`. The orchestrator constructs `init_args` accordingly when building the stages.json.
+- **Pre-existing items file (`/group → /foreach`)**: when a primitive stage's input is the output file of a prior stage, pass it via the appropriate flag of the child primitive — e.g. `/foreach` init expects `--items <path>`. The orchestrator constructs `init_args` accordingly when building the stages.json.
 - **Idempotence**: re-running `/pipe` with the same run-id without `--force` resumes from where it left off.
 
 ## Quick example: audit pipeline
@@ -233,7 +233,7 @@ stages.json:
   {
     "type": "primitive", "name": "triage",
     "spec": {
-      "cmd": "enumerate",
+      "cmd": "foreach",
       "init_args": [
         "--items", ".pipe/audit-001/files.json",
         "--task-prompt", "Quick severity triage. Output: {has_issues, severity_hint}",
@@ -255,7 +255,7 @@ stages.json:
   {
     "type": "primitive", "name": "deep-review",
     "spec": {
-      "cmd": "enumerate",
+      "cmd": "foreach",
       "init_args": [
         "--items", ".pipe/audit-001/groups-as-items.json",
         "--task-prompt", "Deep code-review of every file in this group, cross-referenced.",

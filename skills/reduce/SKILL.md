@@ -4,14 +4,14 @@ description: |
   Collapse N results into 1 digest (markdown or JSON) via a single agent.
 
   USE this skill autonomously when:
-  - a finished /enumerate run exists and the user asks for a summary, rollup, top-N, hotspot list, or grouped report;
+  - a finished /foreach run exists and the user asks for a summary, rollup, top-N, hotspot list, or grouped report;
   - inputs are MANY (typically >= 5 result objects) so a structured digest beats inline summarization;
   - the user wants a persisted artifact (a file at `.reduce/<run-id>/digest.<md|json>`) rather than a chat reply.
 
   DO NOT use this skill autonomously when:
   - inputs are few (< 5) — summarize inline in chat;
   - the user is asking a one-off question about results, not requesting a structured digest;
-  - there is no persisted source: /reduce needs a /enumerate run, a result file, or inline data, NOT a free-form question.
+  - there is no persisted source: /reduce needs a /foreach run, a result file, or inline data, NOT a free-form question.
 
   Explicit user invocation (`/reduce ...`) bypasses these rules.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
@@ -47,7 +47,7 @@ run-id: audit-digest
 model: opus
 format: markdown
 inputs:
-  - run: enum-abc123          # pull results from this /enumerate run
+  - run: enum-abc123          # pull results from this /foreach run
   - run: enum-def456
   - file: ./extra-data.json   # raw JSON file
   - inline: {"note": "..."}   # inline data

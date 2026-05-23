@@ -1,6 +1,6 @@
-# Task kinds — preflight enrichment for /enumerate
+# Task kinds — preflight enrichment for /foreach
 
-Table of "task kinds" with prompt template + suggested model. The `/enumerate` orchestrator (Step 1.5):
+Table of "task kinds" with prompt template + suggested model. The `/foreach` orchestrator (Step 1.5):
 
 1. Classifies the user task-prompt into one of the kinds below.
 2. If classification is **certain**: enriches the task-prompt with the kind template, suggests the model, proceeds.

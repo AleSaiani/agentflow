@@ -114,6 +114,22 @@ test("pipe: the shipped audit workflow-file validates and inits (dogfood)", () =
   );
 });
 
+test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const repo = resolve(".");
+  run(env, ["init", "p-plan", "--workflow", join(repo, "examples", "workflows", "demo.json")]);
+  const plan = run(env, ["plan", "p-plan"]);
+  assert.equal(plan.dry_run, true);
+  assert.equal(plan.stages, 3);
+  assert.equal(plan.plan[0].type, "bash");
+  assert.equal(plan.plan[2].cmd, "group");
+  // dry-run must not advance or execute anything
+  const status = run(env, ["status", "p-plan"]);
+  assert.equal(status.stage_index, 0);
+  assert.deepEqual(status.stages.map((s: any) => s.status), ["pending", "pending", "pending"]);
+});
+
 test("pipe: the README no-LLM demo workflow drives to done (groups src/lib)", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const gdir = mkdtempSync(join(tmpdir(), "pipe-grp-"));

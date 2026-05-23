@@ -73,6 +73,8 @@ function cmdInit(args: string[]): void {
     options: {
       stage: { type: "string" },
       stop: { type: "string" },
+      times: { type: "string" },
+      "check-first": { type: "boolean", default: false },
       "max-iterations": { type: "string", default: "10" },
       "convergence-check": { type: "boolean" },
       "no-convergence-check": { type: "boolean" },
@@ -87,30 +89,40 @@ function cmdInit(args: string[]): void {
   });
   const runId = positionals[0];
   if (!runId) die("error: init requires a run_id");
-  if (!values["stage"] || !values["stop"]) die("error: init requires --stage and --stop");
+  if (!values["stage"]) die("error: init requires --stage");
 
+  const times = values["times"] !== undefined ? parseInt(values["times"] as string, 10) : null;
   const stage = JSON.parse(values["stage"] as string);
-  const stop = JSON.parse(values["stop"] as string);
+  // `stop` is optional with --times: a fixed-count repeat uses a never-satisfied predicate so
+  // the loop terminates only at max_iterations (= times).
+  let stop: StateDict;
+  if (values["stop"]) stop = JSON.parse(values["stop"] as string);
+  else if (times !== null) stop = { type: "bash", command: "false", mode: "until" };
+  else die("error: init requires --stop (or --times for a fixed-count repeat)");
+
   if (stage.type !== "bash") die("error: v1 only supports stage type 'bash'");
   if (!("command" in stage)) die("error: stage must include 'command'");
   if (stop.type !== "bash") die("error: v1 only supports stop type 'bash'");
   if (!("command" in stop)) die("error: stop must include 'command'");
-  if (!["until", "while"].includes(stop.mode)) die("error: stop.mode must be 'until' or 'while'");
+  if (!["until", "while"].includes(stop["mode"])) die("error: stop.mode must be 'until' or 'while'");
 
-  const maxIterations = parseInt(values["max-iterations"] as string, 10);
+  const maxIterations = times !== null ? times : parseInt(values["max-iterations"] as string, 10);
+  const checkFirst = Boolean(values["check-first"]);
   if (values["validate-only"]) {
-    print({ valid: true, max_iterations: maxIterations });
+    print({ valid: true, max_iterations: maxIterations, check_first: checkFirst });
     return;
   }
 
   const autoContinue = values["no-auto-continue"] ? false : true;
-  const convergenceCheck = values["no-convergence-check"] ? false : true;
+  // Fixed-count repeats default convergence off (run exactly N times, don't stop early).
+  const convergenceCheck = values["no-convergence-check"] ? false : times === null;
   const state = makeBaseState(
     CMD,
     runId,
     {
       max_iterations: maxIterations,
       convergence_check: convergenceCheck,
+      check_first: checkFirst,
       model: values["model"],
       auto_continue: autoContinue,
       max_auto_continues: parseInt(values["max-auto-continues"] as string, 10),
@@ -170,6 +182,28 @@ function cmdRunIteration(args: string[]): void {
     ITER_PREV_OUTPUT_PATH: prevOut,
   };
   const cwd = findWorkspaceRoot();
+
+  // while-do ordering: when check_first, evaluate the predicate BEFORE running the stage; a
+  // satisfied predicate terminates the loop without executing the body this iteration.
+  if (state["config"]["check_first"]) {
+    let pre: ShellResult;
+    try {
+      pre = runBash(state["stop"]["command"], cwd, env);
+    } catch (e) {
+      markFailed(state, `predicate spawn error (check-first) at iter ${iterIndex}: ${String(e)}`);
+      save(runId, state);
+      print({ action: "stop", reason: "predicate_spawn_error", iter: iterIndex });
+      return;
+    }
+    const stopNow = state["stop"]["mode"] === "until" ? pre.status === 0 : pre.status !== 0;
+    if (stopNow) {
+      state["stop_reason"] = "predicate_satisfied";
+      markDone(state, state["result_pointer"] ?? null);
+      save(runId, state);
+      print({ action: "stop", reason: "predicate_satisfied", iter: iterIndex, checked: "before" });
+      return;
+    }
+  }
 
   const started = now();
   let proc: ShellResult;
@@ -234,23 +268,27 @@ function cmdRunIteration(args: string[]): void {
     }
   }
 
-  let predProc: ShellResult;
-  try {
-    predProc = runBash(state["stop"]["command"], cwd, env);
-  } catch (e) {
-    iterRecord["error"] = `predicate spawn error: ${String(e)}`;
-    state["iterations"].push(iterRecord);
-    state["iteration_count"] += 1;
-    markFailed(state, `predicate spawn error at iter ${iterIndex}: ${String(e)}`);
-    save(runId, state);
-    print({ action: "stop", reason: "predicate_spawn_error", iter: iterIndex });
-    return;
+  // check-last (do-until / do-while, default): evaluate the predicate AFTER the stage. In
+  // check-first mode the predicate already ran before the stage, so it is skipped here.
+  let shouldStop = false;
+  if (!state["config"]["check_first"]) {
+    let predProc: ShellResult;
+    try {
+      predProc = runBash(state["stop"]["command"], cwd, env);
+    } catch (e) {
+      iterRecord["error"] = `predicate spawn error: ${String(e)}`;
+      state["iterations"].push(iterRecord);
+      state["iteration_count"] += 1;
+      markFailed(state, `predicate spawn error at iter ${iterIndex}: ${String(e)}`);
+      save(runId, state);
+      print({ action: "stop", reason: "predicate_spawn_error", iter: iterIndex });
+      return;
+    }
+    iterRecord["predicate_exit"] = predProc.status;
+    // `until`: exit 0 = satisfied = stop. `while`: exit 0 = still true = continue.
+    shouldStop = state["stop"]["mode"] === "until" ? predProc.status === 0 : predProc.status !== 0;
+    iterRecord["predicate_value"] = shouldStop;
   }
-
-  iterRecord["predicate_exit"] = predProc.status;
-  // `until`: exit 0 = satisfied = stop. `while`: exit 0 = still true = continue.
-  const shouldStop = state["stop"]["mode"] === "until" ? predProc.status === 0 : predProc.status !== 0;
-  iterRecord["predicate_value"] = shouldStop;
   state["iterations"].push(iterRecord);
   state["iteration_count"] += 1;
   state["result_pointer"] = outPath;

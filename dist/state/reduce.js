@@ -155,7 +155,7 @@ function cmdMaterialize(args) {
     for (const inp of state["inputs"]) {
         const src = inp["source"];
         if (src === "run") {
-            const otherCmd = inp["cmd"] ?? "enumerate";
+            const otherCmd = inp["cmd"] ?? "foreach";
             const otherRun = inp["run_id"];
             const otherState = loadState(statePath(otherCmd, otherRun));
             const entry = { source: "run", cmd: otherCmd, run_id: otherRun, items: [] };

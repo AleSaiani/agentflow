@@ -52,12 +52,13 @@ import { runBash } from "../shell.js";
 
 // Side-effect imports: register child primitives so getPrimitive() works in tick/advance.
 import "./enumerate.js";
+import "./foreach.js";
 import "./group.js";
 import "./iterate.js";
 import "./reduce.js";
 
 const CMD = "pipe";
-const SUPPORTED_CHILD_CMDS = ["enumerate", "group", "iterate", "reduce"];
+const SUPPORTED_CHILD_CMDS = ["enumerate", "foreach", "group", "iterate", "reduce"];
 const PREVIEW_CHARS = 500;
 const STATUS_SKIPPED = "skipped";
 
@@ -721,6 +722,30 @@ function cmdDrive(args: string[]): void {
   print({ action: "max_steps_reached", steps_taken: stepsTaken, actions_taken: actionsTaken, hint: "increase --max-steps or inspect the run" });
 }
 
+/** Dry-run: show the resolved execution plan without running or dispatching anything. */
+function cmdPlan(args: string[]): void {
+  const runId = requireRunId(args, "plan");
+  const state = load(runId);
+  const plan = (state["stages"] as StateDict[]).map((s) => {
+    const entry: StateDict = { index: s["index"], name: s["name"], type: s["type"], status: s["status"] };
+    if (s["when"]) entry["when"] = (s["when"] as StateDict)["command"]; // evaluated at runtime
+    const outPath = s["spec"]["output_path"] || stageDefaultOutput(runId, s["index"]);
+    if (s["type"] === "bash") {
+      entry["command"] = resolveTemplate(s["spec"]["command"], state);
+      entry["output_path"] = resolveTemplate(outPath, state);
+    } else if (s["type"] === "json") {
+      entry["value"] = resolveValueTemplates(s["spec"]["value"], state);
+      entry["output_path"] = resolveTemplate(outPath, state);
+    } else {
+      entry["cmd"] = s["spec"]["cmd"];
+      entry["init_args"] = resolveInList(s["spec"]["init_args"] ?? [], state);
+    }
+    return entry;
+  });
+  // Unresolved forward references (later stages' result_pointers) remain as literal {{...}}.
+  print({ run_id: runId, dry_run: true, stages: plan.length, plan });
+}
+
 function cmdStatus(args: string[]): void {
   const runId = requireRunId(args, "status");
   const state = load(runId);
@@ -832,6 +857,8 @@ function main(argv: string[]): void {
       return cmdTick(rest);
     case "drive":
       return cmdDrive(rest);
+    case "plan":
+      return cmdPlan(rest);
     case "complete-bash-stage":
       return cmdCompleteBashStage(rest);
     case "complete-json-stage":

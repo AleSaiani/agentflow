@@ -92,6 +92,57 @@ test("iterate: max-iterations hard cap", () => {
   assert.equal(run(ITERATE, env, ["status", "i2"]).status, "done");
 });
 
+test("repeat (--times): runs exactly N times then stops at max_iterations", () => {
+  const dir = mkdtempSync(join(tmpdir(), "iter-"));
+  const env = { ITERATE_STATE_DIR: dir };
+  // no --stop → never-satisfied predicate; terminates only at --times
+  run(ITERATE, env, ["init", "rep", "--stage", JSON.stringify({ type: "bash", command: "echo run $ITER_INDEX" }), "--times", "3"]);
+  let last: any;
+  let runs = 0;
+  for (let i = 0; i < 6; i++) {
+    last = run(ITERATE, env, ["run-iteration", "rep"]);
+    if (last.action === "stop") break;
+    runs++;
+  }
+  assert.equal(last.reason, "max_iterations");
+  assert.equal(runs, 3); // exactly 3 continues before the cap
+  assert.equal(run(ITERATE, env, ["status", "rep"]).iteration_count, 3);
+});
+
+test("while (--check-first): false guard up front runs the body zero times", () => {
+  const dir = mkdtempSync(join(tmpdir(), "iter-"));
+  const env = { ITERATE_STATE_DIR: dir };
+  run(ITERATE, env, [
+    "init", "wh",
+    "--stage", JSON.stringify({ type: "bash", command: "echo SHOULD_NOT_RUN" }),
+    "--stop", JSON.stringify({ type: "bash", command: "false", mode: "while" }), // false → stop immediately
+    "--check-first",
+  ]);
+  const r = run(ITERATE, env, ["run-iteration", "wh"]);
+  assert.equal(r.action, "stop");
+  assert.equal(r.reason, "predicate_satisfied");
+  assert.equal(r.checked, "before");
+  const status = run(ITERATE, env, ["status", "wh"]);
+  assert.equal(status.iteration_count, 0); // body never ran
+  assert.equal(status.status, "done");
+});
+
+test("while (--check-first): guard checked before each run", () => {
+  const dir = mkdtempSync(join(tmpdir(), "iter-"));
+  const env = { ITERATE_STATE_DIR: dir };
+  run(ITERATE, env, [
+    "init", "wh2",
+    "--stage", JSON.stringify({ type: "bash", command: "echo body $ITER_INDEX" }),
+    "--stop", JSON.stringify({ type: "bash", command: '[ "$ITER_INDEX" -lt 2 ]', mode: "while" }),
+    "--check-first",
+  ]);
+  for (let i = 0; i < 6; i++) {
+    if (run(ITERATE, env, ["run-iteration", "wh2"]).action === "stop") break;
+  }
+  // index 0,1 pass the guard and run; at index 2 the guard fails before running → 2 bodies
+  assert.equal(run(ITERATE, env, ["status", "wh2"]).iteration_count, 2);
+});
+
 test("reduce: materialize resolves inline + file inputs, then complete", () => {
   const dir = mkdtempSync(join(tmpdir(), "red-"));
   const env = { REDUCE_STATE_DIR: dir };

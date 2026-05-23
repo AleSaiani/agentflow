@@ -69,7 +69,7 @@ Any markdown checklist is a valid item source. Inline `{...}` annotations become
 ```
 
 ```shell
-/flow:enumerate --checkbox TODO.md
+/flow:foreach --checkbox TODO.md
 ```
 
 Each unchecked line becomes an item processed in parallel; `[x]` lines start done. The authoritative
@@ -81,7 +81,7 @@ view).
 ```shell
 node dist/inspect.js runs --json                 # every run across all primitives
 node dist/inspect.js budget <run-id>             # cost, aggregated across child runs
-node dist/state/enumerate.js reset <run-id> --in-progress-to-pending   # unstick a run
+node dist/state/foreach.js reset <run-id> --in-progress-to-pending   # unstick a run
 ```
 
 Next: read **[concepts.md](concepts.md)** for the mental model behind all of this.

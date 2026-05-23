@@ -20,7 +20,7 @@
       "type": "primitive",
       "name": "review",
       "spec": {
-        "cmd": "enumerate",
+        "cmd": "foreach",
         "init_args": [
           "--items", "{{stages.discover.result_pointer}}",
           "--task-prompt", "Code review of the file at `data.path`. Per-file rules and the output schema are applied via --kind code-review.",
@@ -38,7 +38,7 @@
       "type": "json",
       "name": "build-group-input",
       "spec": {
-        "value": { "source": "run", "cmd": "enumerate", "run_id": "{{stages.review.run_id}}" },
+        "value": { "source": "run", "cmd": "foreach", "run_id": "{{stages.review.run_id}}" },
         "output_path": "{{run.dir}}/group-input.json"
       }
     },
@@ -60,7 +60,7 @@
       "name": "build-digest-inputs",
       "spec": {
         "value": [
-          { "source": "run", "cmd": "enumerate", "run_id": "{{stages.review.run_id}}" },
+          { "source": "run", "cmd": "foreach", "run_id": "{{stages.review.run_id}}" },
           { "source": "file", "path": "{{stages.partition.result_pointer}}" }
         ],
         "output_path": "{{run.dir}}/digest-inputs.json"

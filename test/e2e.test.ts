@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-const ENUM = resolve("dist/state/enumerate.js");
+const ENUM = resolve("dist/state/foreach.js");
 const ITERATE = resolve("dist/state/iterate.js");
 const PIPE = resolve("dist/state/pipe.js");
 const HOOK = resolve("dist/hook/continue.js");
@@ -24,7 +24,7 @@ const HOOK = resolve("dist/hook/continue.js");
 function baseEnv(): Record<string, string> {
   const b = mkdtempSync(join(tmpdir(), "e2e-"));
   return {
-    ENUMERATE_STATE_DIR: join(b, "enumerate"),
+    FOREACH_STATE_DIR: join(b, "foreach"),
     GROUP_STATE_DIR: join(b, "group"),
     ITERATE_STATE_DIR: join(b, "iterate"),
     PIPE_STATE_DIR: join(b, "pipe"),
@@ -45,9 +45,9 @@ function fireHook(env: Record<string, string>): { decision: string; reason: stri
   return out ? JSON.parse(out) : null;
 }
 
-test("E2E: Stop hook drives an /enumerate run to completion across simulated turns", () => {
+test("E2E: Stop hook drives an /flow:foreach run to completion across simulated turns", () => {
   const env = baseEnv();
-  const items = join(env["ENUMERATE_STATE_DIR"]!, "..", "items.json");
+  const items = join(env["FOREACH_STATE_DIR"]!, "..", "items.json");
   writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }, { id: "c" }]), "utf8");
   run(ENUM, env, ["init", "r", "--items", items]);
 
@@ -56,7 +56,7 @@ test("E2E: Stop hook drives an /enumerate run to completion across simulated tur
     const decision = fireHook(env);
     if (decision === null) break; // hook silent → run complete
     assert.equal(decision.decision, "block");
-    assert.match(decision.reason, /enumerate run 'r'/);
+    assert.match(decision.reason, /flow:foreach run 'r'/);
     // Simulate one turn of model work: claim + complete exactly one item.
     const claimed = lastJson(run(ENUM, env, ["claim", "r", "--count", "1"]));
     if (claimed.length) run(ENUM, env, ["complete", "r", claimed[0].id]);
@@ -119,7 +119,7 @@ test("E2E: Stop hook + pipe drive complete a deterministic pipeline across turns
 
 test("E2E: a completed run never re-blocks (hook is silent at terminal state)", () => {
   const env = baseEnv();
-  const items = join(env["ENUMERATE_STATE_DIR"]!, "..", "items.json");
+  const items = join(env["FOREACH_STATE_DIR"]!, "..", "items.json");
   writeFileSync(items, JSON.stringify([{ id: "only" }]), "utf8");
   run(ENUM, env, ["init", "r", "--items", items]);
   const claimed = lastJson(run(ENUM, env, ["claim", "r", "--count", "1"]));

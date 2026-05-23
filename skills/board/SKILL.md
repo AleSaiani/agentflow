@@ -30,10 +30,10 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" board [--json] [--no-failed]
 
 - **Counts**: `N active, M done, K failed`
 - **Cumulative cost**: total tokens + USD recorded across all runs
-- **ACTIVE section**: every non-terminal run with its primitive-specific progress (e.g. `enumerate: 12/30`, `pipe: 2/4 stages`, `iterate: 3/10 iters`), plus the parent run if it is a /pipe child
+- **ACTIVE section**: every non-terminal run with its primitive-specific progress (e.g. `foreach: 12/30`, `pipe: 2/4 stages`, `iterate: 3/10 iters`), plus the parent run if it is a /pipe child
 - **BLOCKERS section**: runs that need manual attention — items stuck `in_progress` from a dead session, `auto_continues` cap exhausted, etc.
 - **FAILED section** (top 5; suppress with `--no-failed`): runs that ended in `failed` status, with error preview
-- **Suggested next actions**: concrete commands the user can run — `pipe drive`, `inspect tree`, `state/enumerate.js reset`, etc.
+- **Suggested next actions**: concrete commands the user can run — `pipe drive`, `inspect tree`, `state/foreach.js reset`, etc.
 
 ## Typical usage
 

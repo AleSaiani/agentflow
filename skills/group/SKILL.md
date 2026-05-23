@@ -1,7 +1,7 @@
 ---
 name: group
 description: |
-  Partition N items into K groups by key. Output is items.json-compatible — feed it directly to /enumerate to process per-group.
+  Partition N items into K groups by key. Output is items.json-compatible — feed it directly to /foreach to process per-group.
 
   USE this skill autonomously when:
   - the user wants to partition a set of items by a key (path, domain, label, severity, component, ...);
@@ -9,7 +9,7 @@ description: |
   - input is large enough (typically >= 10 items) that grouping reduces noise.
 
   DO NOT use this skill autonomously when:
-  - input is small (< 10 items) — process inline or pass to /enumerate directly;
+  - input is small (< 10 items) — process inline or pass to /foreach directly;
   - the user wants a single aggregate (use /reduce instead — collapse N to 1);
   - grouping is not actually a step toward downstream work (no point partitioning if you do not process per group).
 
@@ -35,9 +35,9 @@ argument-hint: --file <spec.md> | --from-run <run-id> --method <path-prefix|rege
 You are the **orchestrator** of a `/group` run. Job:
 1. resolve the input items (from another run, a file, or inline),
 2. apply the chosen grouping method (deterministic in pure Python, or LLM-classify via one Agent),
-3. produce `groups.json` — an items.json-compatible array of group items, ready for downstream `/enumerate`.
+3. produce `groups.json` — an items.json-compatible array of group items, ready for downstream `/foreach`.
 
-**Composition pattern**: the output of `/group` IS a valid input for `/enumerate`. Pipe them: `/group → /enumerate --from-file <groups.json>`. Each "item" enumerate sees is a whole group, with `data: {group_id, items, size}`.
+**Composition pattern**: the output of `/group` IS a valid input for `/foreach`. Pipe them: `/group → /foreach --from-file <groups.json>`. Each "item" foreach sees is a whole group, with `data: {group_id, items, size}`.
 
 ## Input forms
 
@@ -53,7 +53,7 @@ method: llm-classify
 model: sonnet
 input:
   source: run
-  cmd: enumerate
+  cmd: foreach
   run_id: enum-abc123
 method_config:
   prompt-style: short
@@ -90,7 +90,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/group/defaults.md` (YAML frontmatter). Use de
 ## Step 2 — Threshold guardrail (autonomous invocation only)
 
 After the input source is resolved (you can peek at items count cheaply by reading the source), compute `items_total`. If `items_total < min_items` from defaults (default 10) AND this is an autonomous invocation, STOP and use `AskUserQuestion`:
-> "Only <N> items to group. /group adds an extra step (and possibly an agent dispatch for llm-classify). For this size you can probably feed items directly to /enumerate without partitioning. Proceed with /group anyway?"
+> "Only <N> items to group. /group adds an extra step (and possibly an agent dispatch for llm-classify). For this size you can probably feed items directly to /foreach without partitioning. Proceed with /group anyway?"
 > Options: **skip** (cancel /group, the caller can use the items directly) | **proceed** (continue with /group)
 
 If the user typed `/group` explicitly → skip the guardrail.
@@ -99,7 +99,7 @@ If the user typed `/group` explicitly → skip the guardrail.
 
 Write the input source descriptor to `.group/<run-id>/input-source.json`:
 ```json
-{"source": "run",  "cmd": "enumerate", "run_id": "enum-abc123"}
+{"source": "run",  "cmd": "foreach", "run_id": "enum-abc123"}
 {"source": "file", "path": "<path-to-json-array>"}
 {"source": "inline", "data": [ {...}, {...} ]}
 ```
@@ -173,7 +173,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" status <run-id>
 
 Print: `run-id`, `method`, `items_total`, `groups_count`, `output_pointer`, plus a one-line summary of group sizes (e.g. "auth: 12, billing: 8, api: 5, unclassified: 2").
 
-Suggest the next step explicitly: "Output `.group/<run-id>/groups.json` is items.json-compatible. Run `/enumerate --list-file .group/<run-id>/groups.json --task '...'` to process per group, or `/reduce` it for a partition-aware digest."
+Suggest the next step explicitly: "Output `.group/<run-id>/groups.json` is items.json-compatible. Run `/foreach --list-file .group/<run-id>/groups.json --task '...'` to process per group, or `/reduce` it for a partition-aware digest."
 
 ## Cross-turn auto-continue
 
@@ -193,7 +193,7 @@ A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.group/`.
 Group .cs files by directory and validate each group:
 ```
 /group --from-run enum-cs-files --method path-prefix --method-config '{"depth": 2}' --run-id cs-by-dir
-/enumerate --list-file .group/cs-by-dir/groups.json \
+/foreach --list-file .group/cs-by-dir/groups.json \
            --task "review every file in this group as a coherent unit; cross-reference for cross-file bugs"
 ```
 

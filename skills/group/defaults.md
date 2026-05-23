@@ -21,8 +21,8 @@ path_prefix_depth: 2        # for method=path-prefix: number of leading path seg
 # Notes
 
 - /group is the **partition** primitive. Output is items.json-compatible: each "item"
-  in the output is a group, ready to be consumed by /enumerate as `--from-file`.
-  This is the canonical `/group → /enumerate (per group)` composition.
+  in the output is a group, ready to be consumed by /foreach as `--from-file`.
+  This is the canonical `/group → /foreach (per group)` composition.
 
 - **Deterministic methods** (path-prefix, regex, jsonpath) complete in one shot, no
   LLM dispatch. Pure Python in the state helper. Cheap and reproducible.

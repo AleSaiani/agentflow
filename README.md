@@ -41,32 +41,35 @@ $ node dist/inspect.js show demo --cmd group   # the partition child
 # → groups: lib (1 item), src (2 items)
 ```
 
-That's the engine. Swap the deterministic stages for `/flow:enumerate` (per-file LLM review) and
+That's the engine. Swap the deterministic stages for `/flow:foreach` (per-file LLM review) and
 `/flow:reduce` (digest) and you have the `audit` recipe — same machinery, agents only where needed.
 
 ## Highlights
 
-- **Iteration as primitives** — `for each` / `reduce` / `group by` / `while`, each a persisted run.
+- **A programmatic vocabulary** — `enumerate` (unfold 1→N), `foreach` (map N→N), `reduce` (fold N→1),
+  `group` (partition), `repeat` / `until` / `while` (loop) — each a persisted, resumable run.
 - **Durable across turns** — a Stop hook auto-resumes in-flight runs; state survives compaction
   because it lives in `state.json`, not the conversation.
-- **Composable** — `/flow:pipe` chains stages (bash, json, or a primitive), with declarative wiring
-  templates and per-stage **conditional guards** (`when`).
-- **Declarative workflows** — author a reusable pipeline as a JSON file; it compiles into the pipe.
+- **Composable** — `/flow:pipe` chains stages with declarative wiring and per-stage **conditional
+  guards** (`when`); `/flow:compose` authors reusable workflow-files, `/flow:run` executes them.
 - **Human-readable sources** — drive a run from a markdown checklist (`- [ ] task {model:opus}`).
+- **Operation = a prompt** — the per-item op is instructions; model and subagent are optional, and
+  work can run inline in the main thread instead of fanning out.
 - **Zero runtime dependencies** — Node builtins only; ships compiled, runs anywhere Node ≥ 22 runs.
 
 ## Primitives
 
 | Command | Like | What it does |
 |---|---|---|
-| `/flow:enumerate` | `for each` / `map` | One task across many items, parallel chunks across N subagents; per-item overrides + content-hash cache |
-| `/flow:reduce` | `reduce` / fold | Collapse N inputs into 1 digest (markdown or JSON) |
-| `/flow:group` | `group by` | Partition N items into K groups — deterministic (path-prefix / regex / jsonpath) or LLM-classify |
-| `/flow:iterate` | `while` / `do…while` | Repeat a stage until a predicate holds; hard cap, convergence detection, kill switch |
-| `/flow:pipe` | pipeline | Compose stages; declarative wiring + conditional `when` guards |
-| `/flow:inspect` | — | Read-only: list runs, show a run, draw a pipe child tree, aggregate budget, timeline |
-| `/flow:board` | — | Session-start dashboard: active runs, blockers, cost, suggested next actions |
-| `/flow:audit` | recipe | discover → per-file review → partition → executive digest, as a declarative workflow-file |
+| `/flow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec (outline → chapters); produces an items.json |
+| `/flow:foreach` | `map` (N→N) | Apply one operation to each item — inline or parallel subagents; per-item overrides + content-hash cache |
+| `/flow:reduce` | `fold` (N→1) | Collapse N inputs into 1 digest (markdown or JSON) |
+| `/flow:group` | `group by` | Partition N items into K groups — path-prefix / regex / jsonpath, or LLM-classify |
+| `/flow:repeat` · `until` · `while` | `for` · `do…until` · `while…do` | Loop a stage a fixed count, until a predicate, or while one holds (one engine) |
+| `/flow:pipe` | pipeline | Compose stages; declarative wiring + `when` guards; `plan` for a dry-run |
+| `/flow:run` · `compose` | — | Run a workflow-file end to end (`--dry-run` to preview) · author one from the primitives |
+| `/flow:inspect` · `board` | — | Read-only: inspect a run / session-start dashboard |
+| `/flow:audit` | recipe | discover → review → partition → executive digest, as a declarative workflow-file |
 
 ## The workflow layer
 
@@ -98,14 +101,22 @@ claude --plugin-dir .
 ## Cookbook
 
 ```text
-# Review every C# file under a folder, then produce an executive digest:
+# Review every C# file under a folder, then produce an executive digest (a shipped recipe):
 /flow:audit --target src --file-glob "**/*.cs"
 
 # Process a markdown checklist in parallel (each line becomes an item):
-/flow:enumerate --checkbox TODO.md
+/flow:foreach --checkbox TODO.md
 
-# Loop until the build passes (semantic termination, not a fixed count):
-/flow:iterate   # stage: "npm run build", stop: "until exit 0"
+# Generate a list, then act on it (unfold → map):
+/flow:enumerate --prompt "Break this outline into chapters"   # → items.json
+/flow:foreach --items <items.json> --prompt "Draft each chapter"
+
+# Loop until the build passes (do…until); or while a queue stays non-empty (while…do):
+/flow:until    # stage "npm run build", stop "exit 0"
+
+# Author a reusable workflow, then run it:
+/flow:compose "discover files → review each → digest"
+/flow:run workflows/<name>.json    # add --dry-run to preview the plan first
 
 # See what's in flight after reopening the workspace:
 /flow:board

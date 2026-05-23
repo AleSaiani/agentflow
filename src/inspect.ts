@@ -17,6 +17,7 @@ import { PRIMITIVES, type StateDict, die, getPrimitive, loadState, print, stateD
 
 // Ensure every primitive self-registers.
 import "./state/enumerate.js";
+import "./state/foreach.js";
 import "./state/group.js";
 import "./state/iterate.js";
 import "./state/reduce.js";
@@ -118,7 +119,7 @@ function cmdShow(args: string[]): void {
     followups_pending: (state["followups"] ?? []).length,
     config_keys: Object.keys(state["config"] ?? {}).sort(),
   };
-  if (cmd === "enumerate") {
+  if (cmd === "foreach") {
     const items = Object.values(state["items"] ?? {}) as StateDict[];
     const counts: Record<string, number> = { pending: 0, in_progress: 0, done: 0, failed: 0 };
     for (const it of items) counts[it["status"] ?? "pending"] = (counts[it["status"] ?? "pending"] ?? 0) + 1;
@@ -135,6 +136,8 @@ function cmdShow(args: string[]): void {
     summary["items_total"] = state["items_total"] ?? 0;
     summary["groups_count"] = state["groups_count"] ?? 0;
     summary["method"] = state["config"]?.method;
+  } else if (cmd === "enumerate") {
+    summary["items_generated"] = state["items_generated"] ?? 0;
   }
   process.stdout.write(JSON.stringify(summary, null, values["pretty"] ? 2 : undefined) + "\n");
 }
@@ -256,7 +259,7 @@ function cmdBoard(args: string[]): void {
         auto_continues: s["auto_continues"] ?? 0, max_auto_continues: s["config"]?.max_auto_continues ?? 0,
         usd, tokens, parent_run_id: s["parent_run_id"] ?? null, error: s["error"] ?? null,
       };
-      if (cmd === "enumerate") {
+      if (cmd === "foreach") {
         const items = Object.values(s["items"] ?? {}) as StateDict[];
         const counts: Record<string, number> = { pending: 0, in_progress: 0, done: 0, failed: 0 };
         for (const it of items) counts[it["status"] ?? "pending"] = (counts[it["status"] ?? "pending"] ?? 0) + 1;
@@ -320,10 +323,10 @@ function cmdBoard(args: string[]): void {
     lines.push(`  - \`${nodeCmd("state/pipe.js")} drive ${top["run_id"]}\` — auto-advance the pipe until an Agent dispatch is needed`);
     lines.push(`  - \`${nodeCmd("inspect.js")} tree ${top["run_id"]}\` — see the full child tree`);
   }
-  const enumActive = active.filter((e) => e["cmd"] === "enumerate");
+  const enumActive = active.filter((e) => e["cmd"] === "foreach");
   if (enumActive.length && !pipeRuns.length) {
     const top = enumActive[0] as StateDict;
-    lines.push(`  - Send any message and the Stop hook will resume /enumerate '${top["run_id"]}' automatically`);
+    lines.push(`  - Send any message and the Stop hook will resume /flow:foreach '${top["run_id"]}' automatically`);
   }
   for (const e of stuck.slice(0, 2)) {
     if (String(e["reason"]).includes("stuck in_progress")) lines.push(`  - \`${nodeCmd(`state/${e["cmd"]}.js`)} reset ${e["run_id"]} --in-progress-to-pending\``);

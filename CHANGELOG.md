@@ -14,9 +14,17 @@ First public beta. Brand: **Flow** (`/flow:*`), distributed as `flow@flow-cc`.
   Apache-2.0 license, plugin manifest, and self-hosted marketplace catalog.
 - Core (`src/common.ts`): typed base state, atomic I/O, workspace-root resolution,
   primitive registry, budget tracking, content-hash cache, knowledge journals.
-- Five primitives: `enumerate` (per-item overrides + checkbox source + cache),
-  `group` (deterministic + llm-classify), `reduce`, `iterate` (predicate stop +
-  convergence + kill switch), `pipe` (composer with declarative wiring templates).
+- A programmatic primitive vocabulary (unfold / map / fold / partition / loop):
+  - `enumerate` — **unfold** (1→N): generate an items list from a spec.
+  - `foreach` — **map** (N→N): apply an operation per item; the op is a `--prompt`, with
+    `--model`/`--subagent-type` optional and `--execution main-thread|subagent`; per-item overrides,
+    checkbox source, content-hash cache.
+  - `reduce` — **fold** (N→1) · `group` — partition (deterministic + llm-classify).
+  - `iterate` engine surfaced as three loop skills: `repeat` (fixed count, `--times`),
+    `until` (do…until), `while` (while…do, `--check-first`); hard cap + convergence + kill switch.
+  - `pipe` — composer with declarative wiring templates and a `plan` dry-run.
+- `run` (execute a workflow-file end to end, `--dry-run`) and `compose` (author a workflow-file
+  from the primitives).
 - Workflow layer: `Source`/`View` seam (inline | file | run | checkbox), per-stage
   `when` guard (conditional steps), and a declarative JSON workflow-file that compiles
   into `pipe.stages[]` (`pipe init --workflow`). Graph `next` edge carried in schema.
