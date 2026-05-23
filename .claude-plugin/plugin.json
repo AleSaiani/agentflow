@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "enumerate-skill",
+  "displayName": "Enumerate",
+  "version": "0.1.0",
+  "description": "Deterministic, composable iteration inside a single Claude Code session: enumerate, group, reduce, iterate, and pipe operations across a sequence.",
+  "author": {
+    "name": "Alessandro Saiani",
+    "email": "11213486+AleSaiani@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/AleSaiani/enumerate-skill",
+  "repository": "https://github.com/AleSaiani/enumerate-skill",
+  "license": "Apache-2.0",
+  "keywords": [
+    "iteration",
+    "enumerate",
+    "group",
+    "reduce",
+    "iterate",
+    "pipe",
+    "workflow"
+  ]
+}
