@@ -114,6 +114,19 @@ test("pipe: the shipped audit workflow-file validates and inits (dogfood)", () =
   );
 });
 
+test("pipe: the README no-LLM demo workflow drives to done (groups src/lib)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const gdir = mkdtempSync(join(tmpdir(), "pipe-grp-"));
+  const env = { PIPE_STATE_DIR: dir, GROUP_STATE_DIR: gdir };
+  const repo = resolve(".");
+  const init = run(env, ["init", "demo", "--workflow", join(repo, "examples", "workflows", "demo.json")]);
+  assert.equal(init.stages, 3);
+  const driven = run(env, ["drive", "demo", "--max-steps", "50"]);
+  assert.equal(driven.action, "done"); // fully deterministic → no agent needed
+  const groups = JSON.parse(readFileSync(join(gdir, "demo-s2-group", "groups.json"), "utf8"));
+  assert.deepEqual(groups.map((g: any) => `${g.id}:${g.data.size}`).sort(), ["lib:1", "src:2"]);
+});
+
 test("pipe: init rejects a primitive stage with a bad flag (preflight validation)", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };

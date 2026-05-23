@@ -1,6 +1,6 @@
 {
   "name": "flow-cc",
-  "version": "0.1.0",
+  "version": "1.0.0-beta.1",
   "description": "Deterministic, composable iteration inside a single Claude Code session, shipped as a plugin.",
   "license": "Apache-2.0",
   "type": "module",

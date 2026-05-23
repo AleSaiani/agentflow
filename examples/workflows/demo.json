@@ -1,0 +1,34 @@
+{
+  "name": "demo",
+  "description": "A fully deterministic, no-LLM pipeline you can run in 10 seconds to see the engine work: emit a list of items → build a group descriptor → partition by path prefix. `pipe drive` runs all three stages to `done` with zero agent dispatches.",
+  "stages": [
+    {
+      "type": "bash",
+      "name": "discover",
+      "spec": {
+        "command": "printf '[{\"id\":\"src/a.ts\"},{\"id\":\"src/b.ts\"},{\"id\":\"lib/c.ts\"}]' > \"$PIPE_OUTPUT_PATH\"",
+        "output_path": "{{run.dir}}/items.json"
+      }
+    },
+    {
+      "type": "json",
+      "name": "build-input",
+      "spec": {
+        "value": { "source": "file", "path": "{{stages.discover.result_pointer}}" },
+        "output_path": "{{run.dir}}/group-input.json"
+      }
+    },
+    {
+      "type": "primitive",
+      "name": "partition",
+      "spec": {
+        "cmd": "group",
+        "init_args": [
+          "--method", "path-prefix",
+          "--method-config", "{\"depth\": 1}",
+          "--input-source", "{{stages.build-input.result_pointer}}"
+        ]
+      }
+    }
+  ]
+}

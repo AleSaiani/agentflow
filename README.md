@@ -1,117 +1,149 @@
-# flow
+<div align="center">
 
-**Deterministic, composable iteration — and declarative workflows — inside a single Claude Code session.**
+# Flow
 
-`flow` gives an LLM the control-flow primitives you'd reach for in code — `for each`,
-`reduce`, `group by`, `while`, and pipeline composition — as durable, resumable operations that
-survive across turns and context compaction. The state lives on disk; a Stop hook carries loops
-across turns; and a declarative workflow-file lets you wire the primitives into reusable pipelines.
+**Deterministic, composable iteration & workflows for Claude Code — durable across turns.**
+
+[![version](https://img.shields.io/badge/version-1.0.0--beta.1-blue)](CHANGELOG.md)
+[![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
+[![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](https://nodejs.org)
+
+`flow-cc` · a Claude Code plugin · invoke as `/flow:enumerate` · `/flow:pipe` · `/flow:audit`
+
+</div>
+
+---
+
+**Flow** gives an LLM the control-flow you'd reach for in code — `for each`, `reduce`, `group by`,
+`while`, and pipelines — as **durable, resumable operations**. State lives on disk, a Stop hook
+carries loops across turns and context compaction, and a declarative workflow-file wires the
+primitives into reusable pipelines.
 
 Think of it as a **structured, durable "Ralph loop"**: not a blind while-loop over a task list, but
-a deterministic engine where the *worker* is an LLM and the *control flow* is code.
+an engine where the *worker* is an LLM and the *control flow* is deterministic code. The rule that
+keeps "deterministic" honest: **the LLM produces structured data; branching is always evaluated by
+code — never on free text.**
 
-## The determinism boundary
+## See it work — no LLM, ~10 seconds
 
-The core principle: **the LLM produces structured data; branching is always evaluated by code.**
-A fuzzy judgment ("did the review find a security issue?") becomes a step whose structured output
-feeds a deterministic predicate. The engine never branches on free text — that's what keeps
-"deterministic" honest.
+A fully deterministic pipeline (emit items → build a descriptor → partition by path). `drive`
+auto-runs every stage to completion with **zero agent dispatches**:
+
+```console
+$ node dist/state/pipe.js init demo --workflow examples/workflows/demo.json
+{"run_id":"demo","stages":3,...}
+
+$ node dist/state/pipe.js drive demo
+{"action":"done","steps_taken":5,...}
+
+$ node dist/inspect.js show demo --cmd group   # the partition child
+# → groups: lib (1 item), src (2 items)
+```
+
+That's the engine. Swap the deterministic stages for `/flow:enumerate` (per-file LLM review) and
+`/flow:reduce` (digest) and you have the `audit` recipe — same machinery, agents only where needed.
+
+## Highlights
+
+- **Iteration as primitives** — `for each` / `reduce` / `group by` / `while`, each a persisted run.
+- **Durable across turns** — a Stop hook auto-resumes in-flight runs; state survives compaction
+  because it lives in `state.json`, not the conversation.
+- **Composable** — `/flow:pipe` chains stages (bash, json, or a primitive), with declarative wiring
+  templates and per-stage **conditional guards** (`when`).
+- **Declarative workflows** — author a reusable pipeline as a JSON file; it compiles into the pipe.
+- **Human-readable sources** — drive a run from a markdown checklist (`- [ ] task {model:opus}`).
+- **Zero runtime dependencies** — Node builtins only; ships compiled, runs anywhere Node ≥ 22 runs.
 
 ## Primitives
 
-| Skill | Programming analog | What it does |
+| Command | Like | What it does |
 |---|---|---|
-| `/flow:enumerate` | `for each` / `map` | Apply one task to many items in parallel chunks across N subagents, with per-item overrides and a content-hash cache |
-| `/flow:reduce` | `reduce` / fold | Collapse N inputs into 1 digest (markdown or JSON) via a single agent |
-| `/flow:group` | `group by` | Partition N items into K groups by key — deterministic (path-prefix / regex / jsonpath) or LLM-classify. Output feeds `/enumerate` |
-| `/flow:iterate` | `while` / `do…while` | Repeat a stage until a predicate is satisfied (or `while` it holds), with hard cap, convergence detection, and a clean kill switch |
-| `/flow:pipe` | pipeline / DAG | Compose an ordered pipeline of stages (bash, json, or a primitive invocation), with declarative wiring templates and per-stage conditional guards |
-| `/flow:inspect` | — | Read-only: list runs, show a run, draw a `/pipe` child tree, aggregate budget, print a timeline |
-| `/flow:board` | — | Session-start dashboard: active runs, blockers, cumulative cost, suggested next actions |
-| `/flow:audit` | recipe | A layer-3 recipe: discover → per-file review → partition → executive digest, shipped as a declarative workflow-file |
+| `/flow:enumerate` | `for each` / `map` | One task across many items, parallel chunks across N subagents; per-item overrides + content-hash cache |
+| `/flow:reduce` | `reduce` / fold | Collapse N inputs into 1 digest (markdown or JSON) |
+| `/flow:group` | `group by` | Partition N items into K groups — deterministic (path-prefix / regex / jsonpath) or LLM-classify |
+| `/flow:iterate` | `while` / `do…while` | Repeat a stage until a predicate holds; hard cap, convergence detection, kill switch |
+| `/flow:pipe` | pipeline | Compose stages; declarative wiring + conditional `when` guards |
+| `/flow:inspect` | — | Read-only: list runs, show a run, draw a pipe child tree, aggregate budget, timeline |
+| `/flow:board` | — | Session-start dashboard: active runs, blockers, cost, suggested next actions |
+| `/flow:audit` | recipe | discover → per-file review → partition → executive digest, as a declarative workflow-file |
 
 ## The workflow layer
 
-- **Source / View** — items come from a pluggable source: an inline list, a JSON file, another
-  run's output, or a **markdown checklist** (`- [ ] task {model:opus, subagent:code-reviewer}`).
-  A View can reflect authoritative state back onto the checklist (`[ ]` ↔ `[x]`).
-- **Conditional steps** — a `/pipe` stage may carry a `when` guard (a bash predicate); exit 0 runs
-  the stage, non-zero skips it. This is the "do only if" step.
-- **Workflow-files** — a declarative JSON `WorkflowSpec` compiles 1:1 into `pipe.stages[]`, so you
-  can version and reuse pipelines (see [`workflows/flow:audit.json`](workflows/flow:audit.json)).
-- **Graph seam** — each stage carries a `next` edge. v1 traversal is linear; conditional branches
-  and back-edges are schema-ready for v1.1.
-
-## How it works
-
-- **Single-writer state.** Each run is a `state.json` under `.<cmd>/<run-id>/` at the workspace
-  root. The orchestrator (Claude) is the only writer; subagents write result files it commits.
-- **Cross-turn continuity.** A `Stop` hook scans every run; if one has `auto_continue` and residual
-  work (and is under its `max_auto_continues` cap), it blocks the turn and tells Claude how to
-  resume. Resumption depends solely on disk state, so runs survive context compaction.
-- **Composition.** `/pipe` reads its children's state to decide when to advance; it never mutates
-  them. `pipe drive` auto-runs every bash, json, and deterministic stage, stopping only when an
-  agent dispatch is genuinely needed.
+- **Source / View** — items come from an inline list, a JSON file, another run's output, or a
+  **markdown checklist**; a View can reflect state back onto the checklist (`[ ]` ↔ `[x]`).
+- **Conditional steps** — a pipe stage's `when` guard (a bash predicate) decides run-vs-skip.
+- **Workflow-files** — a declarative JSON `WorkflowSpec` compiles 1:1 into the pipe's stages, so you
+  version and reuse pipelines (see [`workflows/audit.json`](workflows/audit.json)).
 
 ## Install
 
-This repository is both the plugin and its own marketplace.
-
 ```shell
-# from inside Claude Code
+# inside Claude Code
 /plugin marketplace add AleSaiani/flow-cc
 /plugin install flow@flow-cc
 ```
 
-For local development, point Claude Code at the directory directly:
+Local development (point Claude Code at a clone):
 
 ```shell
-claude --plugin-dir /path/to/flow-cc
+git clone https://github.com/AleSaiani/flow-cc && cd flow-cc
+npm install && npm run build
+claude --plugin-dir .
 ```
 
-## Quickstart
+> Requires Node ≥ 22 and `git bash` on `PATH` (pipe/iterate run shell stages under bash for POSIX
+> semantics on every OS).
 
-```
-# Apply a review to every C# file under a folder, then digest the findings:
-/flow:audit --target examples/fake-repo
+## Cookbook
 
-# Or compose your own pipeline from a workflow-file:
-node "$CLAUDE_PLUGIN_ROOT/dist/state/pipe.js" init my-run --workflow workflows/flow:audit.json
-node "$CLAUDE_PLUGIN_ROOT/dist/state/pipe.js" drive my-run
+```text
+# Review every C# file under a folder, then produce an executive digest:
+/flow:audit --target src --file-glob "**/*.cs"
 
-# Inspect what's in flight:
+# Process a markdown checklist in parallel (each line becomes an item):
+/flow:enumerate --checkbox TODO.md
+
+# Loop until the build passes (semantic termination, not a fixed count):
+/flow:iterate   # stage: "npm run build", stop: "until exit 0"
+
+# See what's in flight after reopening the workspace:
 /flow:board
 ```
 
+See **[docs/getting-started.md](docs/getting-started.md)** for a guided first run and
+**[docs/concepts.md](docs/concepts.md)** for the mental model.
+
+## How it works
+
+Each run is a `state.json` under `.<cmd>/<run-id>/` at the workspace root; the orchestrator (Claude)
+is the only writer. A `Stop` hook scans every run and, if one has `auto_continue` and residual work
+(under its cap), blocks the turn and tells Claude how to resume — purely from disk, so runs survive
+compaction. `/flow:pipe` reads its children's state to decide when to advance and never mutates them;
+`pipe drive` auto-runs every bash, json, and deterministic stage, stopping only when an agent
+dispatch is genuinely needed.
+
 ## Architecture
 
-- **TypeScript → committed `dist/`**, run with `node`. **Zero runtime dependencies** (Node builtins
-  only: `fs`, `path`, `crypto`, `child_process`, `util.parseArgs`). Node ≥ 22.
-- Source in `src/` (strict, ESM/NodeNext); the registry in `src/common.ts` is the composition
-  contract every primitive registers into. Add a primitive → the Stop hook and `/pipe` pick it up
-  with no changes.
-- `git bash` must be on `PATH` (the `/iterate` stage/predicate and `/pipe` bash stages run under bash
-  for POSIX semantics on every OS).
-
-Build and test:
+TypeScript (strict, ESM/NodeNext) compiled to a committed `dist/`, run with `node`. **Zero runtime
+dependencies** — Node builtins only (`fs`, `path`, `crypto`, `child_process`, `util.parseArgs`). The
+registry in `src/common.ts` is the composition contract every primitive registers into: add one and
+the Stop hook and `/flow:pipe` pick it up automatically.
 
 ```shell
 npm install      # dev deps only (typescript, @types/node)
 npm run build    # tsc → dist/
-npm test         # node:test, builds first
+npm test         # node:test (builds first)
 ```
 
 ## Status
 
-v0.1.0. Primitives, the workflow layer, inspect/board, and the Stop hook are implemented and
-covered by an automated test suite, including a simulated cross-turn resumption loop (each turn a
-fresh process reading only disk state). **A live multi-turn Claude Code session smoke test is the
-recommended final check** before relying on it in production — the Stop hook output contract is
-verified against the current docs, but real-session resumption + compaction has not been exercised
-interactively here.
-
-Deferred to v1.1: YAML workflow front-end, folder-kanban source, conditional branch/back-edge
-runtime, nested enumeration fan-out, lock-based sharding, and a Codex adapter.
+`1.0.0-beta.1`. Primitives, the workflow layer, inspect/board, and the Stop hook are implemented and
+covered by an automated suite, including a simulated cross-turn resumption loop (each turn a fresh
+process reading only disk state). The Stop hook output contract is verified against current docs; a
+**live multi-turn Claude Code session smoke test** is the recommended final check before relying on
+it in production. Roadmap and deferred items (YAML front-end, folder-kanban source, branch/back-edge
+runtime, Codex adapter) live in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
