@@ -30,6 +30,7 @@ function cmdInit(args) {
         strict: true,
         options: {
             inputs: { type: "string" },
+            prompt: { type: "string" },
             "task-prompt": { type: "string", default: "" },
             model: { type: "string", default: "sonnet" },
             "output-format": { type: "string", default: "markdown" },
@@ -70,7 +71,7 @@ function cmdInit(args) {
         auto_continue: autoContinue,
         max_auto_continues: parseInt(values["max-auto-continues"], 10),
         subagent_type: values["subagent-type"],
-    }, { task_prompt: values["task-prompt"], inputs });
+    }, { task_prompt: (values["prompt"] ?? values["task-prompt"]), inputs });
     const p = pathFor(runId);
     if (existsSync(p) && !values["force"])
         die(`error: state already exists at ${p}; use --force to overwrite`);

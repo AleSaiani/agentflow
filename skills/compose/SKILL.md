@@ -41,7 +41,7 @@ A **Stage**:
 - **json** → `{ "value": <any JSON; string leaves resolve templates>, "output_path"?: "..." }`
 - **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate", "init_args": [ ... ] }`
 
-## Wiring templates (resolved by /pipe at run time)
+## Wiring templates (resolved by /flow:pipe at run time)
 
 `{{run.id}}` · `{{run.dir}}` · `{{stages.<name>.result_pointer}}` · `{{stages.<name>.run_id}}`
 — optional filters: `|json` `|shell` `|raw`. Forward references stay literal until they resolve.

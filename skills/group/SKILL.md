@@ -15,7 +15,7 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --method path-prefix|regex|jsonpath|llm-classify --input-source <descriptor> [--method-config '{…}'] [--model haiku|sonnet|opus]
 ---
 
-# /group
+# /flow:group
 
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/group/` (this folder: SKILL.md + defaults.md)
@@ -23,18 +23,18 @@ argument-hint: --method path-prefix|regex|jsonpath|llm-classify --input-source <
 > - `${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js` — generalized Stop hook
 > - the Stop hook is wired automatically by the plugin (hooks/hooks.json)
 
-You are the **orchestrator** of a `/group` run. Job:
+You are the **orchestrator** of a `/flow:group` run. Job:
 1. resolve the input items (from another run, a file, or inline),
 2. apply the chosen grouping method (deterministic in pure Python, or LLM-classify via one Agent),
-3. produce `groups.json` — an items.json-compatible array of group items, ready for downstream `/foreach`.
+3. produce `groups.json` — an items.json-compatible array of group items, ready for downstream `/flow:foreach`.
 
-**Composition pattern**: the output of `/group` IS a valid input for `/foreach`. Pipe them: `/group → /foreach --from-file <groups.json>`. Each "item" foreach sees is a whole group, with `data: {group_id, items, size}`.
+**Composition pattern**: the output of `/flow:group` IS a valid input for `/flow:foreach`. Pipe them: `/flow:group → /flow:foreach --from-file <groups.json>`. Each "item" foreach sees is a whole group, with `data: {group_id, items, size}`.
 
 ## Input forms
 
 ### Form A — structured markdown file
 ```
-/group --file path/to/spec.md
+/flow:group --file path/to/spec.md
 ```
 With YAML frontmatter (config + input source + method config) and an optional `## Classify` section (only for method=llm-classify):
 ```markdown
@@ -56,10 +56,10 @@ method_config:
 
 ### Form B — inline flags
 ```
-/group --from-run <enum-run-id> --method path-prefix --depth 2 [--run-id NAME]
-/group --from-file <items.json> --method regex --pattern "^src/([^/]+)/" --field id
-/group --from-file <items.json> --method jsonpath --path data.component
-/group --from-run <enum-run-id> --method llm-classify --classify-prompt "Group by intent: auth, billing, api, infra, other" --model sonnet
+/flow:group --from-run <enum-run-id> --method path-prefix --depth 2 [--run-id NAME]
+/flow:group --from-file <items.json> --method regex --pattern "^src/([^/]+)/" --field id
+/flow:group --from-file <items.json> --method jsonpath --path data.component
+/flow:group --from-run <enum-run-id> --method llm-classify --classify-prompt "Group by intent: auth, billing, api, infra, other" --model sonnet
 ```
 
 If neither input source nor method are provided → stop with a clear message.
@@ -81,10 +81,10 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/group/defaults.md` (YAML frontmatter). Use de
 ## Step 2 — Threshold guardrail (autonomous invocation only)
 
 After the input source is resolved (you can peek at items count cheaply by reading the source), compute `items_total`. If `items_total < min_items` from defaults (default 10) AND this is an autonomous invocation, STOP and use `AskUserQuestion`:
-> "Only <N> items to group. /group adds an extra step (and possibly an agent dispatch for llm-classify). For this size you can probably feed items directly to /foreach without partitioning. Proceed with /group anyway?"
-> Options: **skip** (cancel /group, the caller can use the items directly) | **proceed** (continue with /group)
+> "Only <N> items to group. /flow:group adds an extra step (and possibly an agent dispatch for llm-classify). For this size you can probably feed items directly to /flow:foreach without partitioning. Proceed with /flow:group anyway?"
+> Options: **skip** (cancel /flow:group, the caller can use the items directly) | **proceed** (continue with /flow:group)
 
-If the user typed `/group` explicitly → skip the guardrail.
+If the user typed `/flow:group` explicitly → skip the guardrail.
 
 ## Step 3 — Build the input source descriptor and init state
 
@@ -164,11 +164,11 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" status <run-id>
 
 Print: `run-id`, `method`, `items_total`, `groups_count`, `output_pointer`, plus a one-line summary of group sizes (e.g. "auth: 12, billing: 8, api: 5, unclassified: 2").
 
-Suggest the next step explicitly: "Output `.group/<run-id>/groups.json` is items.json-compatible. Run `/foreach --list-file .group/<run-id>/groups.json --task '...'` to process per group, or `/reduce` it for a partition-aware digest."
+Suggest the next step explicitly: "Output `.group/<run-id>/groups.json` is items.json-compatible. Run `/flow:foreach --list-file .group/<run-id>/groups.json --task '...'` to process per group, or `/flow:reduce` it for a partition-aware digest."
 
 ## Cross-turn auto-continue
 
-A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.group/`. For /group, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /group run-id:
+A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.group/`. For /flow:group, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /flow:group run-id:
 - DO NOT re-init.
 - Read state. If method is deterministic → re-run `run-deterministic`. If method is `llm-classify` → check whether `classification.json` exists; if yes, run `apply-classification`; if no, re-dispatch the classify agent (Step 4b.2).
 
@@ -177,20 +177,20 @@ A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.group/`.
 - **Single-writer**: only you (orchestrator) call `init`/`run-deterministic`/`prepare-classify`/`apply-classification`/`fail`. The classify agent only writes the classification file.
 - **Output is canonical and stable**: `groups.json` shape is always `[{"id": <group_id>, "data": {"group_id", "items", "size"}}, ...]`. Downstream consumers can rely on this.
 - **Deterministic when possible**: prefer `path-prefix`/`regex`/`jsonpath` over `llm-classify` — cheaper, faster, reproducible across runs.
-- **Idempotence**: re-running `/group` with the same run-id without `--force` resumes.
+- **Idempotence**: re-running `/flow:group` with the same run-id without `--force` resumes.
 
 ## Quick example
 
 Group .cs files by directory and validate each group:
 ```
-/group --from-run enum-cs-files --method path-prefix --method-config '{"depth": 2}' --run-id cs-by-dir
-/foreach --list-file .group/cs-by-dir/groups.json \
+/flow:group --from-run enum-cs-files --method path-prefix --method-config '{"depth": 2}' --run-id cs-by-dir
+/flow:foreach --list-file .group/cs-by-dir/groups.json \
            --task "review every file in this group as a coherent unit; cross-reference for cross-file bugs"
 ```
 
 LLM-classify Jira issues by intent:
 ```
-/group --from-file .pipe/<run>/issues.json --method llm-classify \
+/flow:group --from-file .pipe/<run>/issues.json --method llm-classify \
        --classify-prompt "Read each issue. Assign to one of: regression, feature-request, ux, performance, infra. Use 'other' if unclear." \
        --model sonnet
 ```

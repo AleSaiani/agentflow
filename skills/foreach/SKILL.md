@@ -20,7 +20,7 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: (--items <json> | --checkbox <md> | --source <spec>) --prompt "<operation>" [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--concurrency N] [--cache] [--no-auto-continue]
 ---
 
-# /foreach
+# /flow:foreach
 
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/foreach/` (this folder: SKILL.md + defaults.md + task-kinds.md)
@@ -30,7 +30,7 @@ argument-hint: (--items <json> | --checkbox <md> | --source <spec>) --prompt "<o
 >
 > All paths in this file are **relative to the workspace root** (the dir where Claude Code runs). No absolute references.
 
-You are the **orchestrator** of a `/foreach` run. Your only job:
+You are the **orchestrator** of a `/flow:foreach` run. Your only job:
 1. resolve a (deterministic) list of items from a source,
 2. dispatch items to subagents in parallel chunks,
 3. persist state at every step.
@@ -43,7 +43,7 @@ Two input forms, never mixed:
 
 ### Form A — structured markdown file
 ```
-/foreach --file path/to/spec.md
+/flow:foreach --file path/to/spec.md
 ```
 The file has YAML frontmatter (config overrides) plus `## List` and `## Task` sections:
 ```markdown
@@ -64,7 +64,7 @@ auto-continue: true
 
 ### Form B — inline flags
 ```
-/foreach --list "<list-prompt>" --task "<task-prompt>" \
+/flow:foreach --list "<list-prompt>" --task "<task-prompt>" \
            [--run-id NAME] [--concurrency N] [--chunk-size N|auto] \
            [--model haiku|sonnet|opus] [--max-retries N] \
            [--no-auto-continue]
@@ -106,7 +106,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/foreach/task-kinds.md`. Classify the user's t
 
 **Effective model**: the kind template suggests a model (haiku/sonnet/opus). If the user did NOT force `--model`, use the suggested one. If they did force, honor the user's choice but log "kind=X would suggest Y, forced to Z".
 
-**Enriched task-prompt**: do NOT pre-enrich manually in this step. Instead, pass `--kind <name>` to `state/foreach.js init` (Step 2). The state helper loads the matching template from `task-kinds.md`, prepends it to the user task-prompt, and stores the enriched prompt in state.task_prompt + the chosen kind in state.config.kind. This way the enrichment happens once, in one place, and any downstream resume (including /pipe-spawned children whose dispatch loop bypasses this SKILL flow) uses the already-enriched prompt without re-doing the work.
+**Enriched task-prompt**: do NOT pre-enrich manually in this step. Instead, pass `--kind <name>` to `state/foreach.js init` (Step 2). The state helper loads the matching template from `task-kinds.md`, prepends it to the user task-prompt, and stores the enriched prompt in state.task_prompt + the chosen kind in state.config.kind. This way the enrichment happens once, in one place, and any downstream resume (including /flow:pipe-spawned children whose dispatch loop bypasses this SKILL flow) uses the already-enriched prompt without re-doing the work.
 
 Confirm to the user in a single line: `run-id`, `kind`, `effective model`, `concurrency`, `chunk-size`, `auto-continue`, first 150 chars of list-prompt and user task-prompt.
 
@@ -126,13 +126,13 @@ If the list-prompt does not already specify the format, **add it yourself** befo
 
 If the prompt is of the form "find files matching X" and you can do it deterministically with `Glob`/`Grep`, do that directly — preferable to generating the list from memory.
 
-**Pre-existing items file (`/group` composition)**: if the user already has a JSON array of `{id, data}` (e.g. the `groups.json` produced by `/group`), skip list resolution entirely. Copy or read the file and write it as `.foreach/<run-id>/items.json`, then call `init`. This is the canonical `/group → /foreach` composition: each "item" foreach processes is a whole group with `data: {group_id, items, size}`.
+**Pre-existing items file (`/flow:group` composition)**: if the user already has a JSON array of `{id, data}` (e.g. the `groups.json` produced by `/flow:group`), skip list resolution entirely. Copy or read the file and write it as `.foreach/<run-id>/items.json`, then call `init`. This is the canonical `/flow:group → /flow:foreach` composition: each "item" foreach processes is a whole group with `data: {group_id, items, size}`.
 
-**Threshold guardrail** (after the list is resolved, BEFORE init): if `len(items) < min_items` from defaults (default 15) AND this is an autonomous invocation (not the user typing `/foreach` explicitly), STOP and use `AskUserQuestion`:
-> "Only <N> items found. /foreach adds orchestration overhead (state file, chunk dispatch, Stop hook). For this size it's usually faster to read them inline in this agent. Proceed with /foreach anyway?"
-> Options: **inline** (cancel /foreach, the main agent processes them directly) | **proceed** (continue with /foreach as planned)
+**Threshold guardrail** (after the list is resolved, BEFORE init): if `len(items) < min_items` from defaults (default 15) AND this is an autonomous invocation (not the user typing `/flow:foreach` explicitly), STOP and use `AskUserQuestion`:
+> "Only <N> items found. /flow:foreach adds orchestration overhead (state file, chunk dispatch, Stop hook). For this size it's usually faster to read them inline in this agent. Proceed with /flow:foreach anyway?"
+> Options: **inline** (cancel /flow:foreach, the main agent processes them directly) | **proceed** (continue with /flow:foreach as planned)
 
-If the user typed `/foreach` explicitly → skip the guardrail (consider it consent).
+If the user typed `/flow:foreach` explicitly → skip the guardrail (consider it consent).
 
 Save the JSON to `.foreach/<run-id>/items.json` with `Write`. Then:
 
@@ -231,7 +231,7 @@ For each iteration (safety cap: max 100):
      --event-type agent_dispatch \
      --meta '{"chunk": <N>, "wave": <W>}'
    ```
-   Do this once per Agent return (one `budget-add` per chunk). Cost tracking aggregates across all chunks; `/inspect budget <run-id>` will show the cumulative figures.
+   Do this once per Agent return (one `budget-add` per chunk). Cost tracking aggregates across all chunks; `/flow:inspect budget <run-id>` will show the cumulative figures.
 
    **6b. State commit**:
    ```bash
@@ -260,7 +260,7 @@ Print: totals per status, and — if any `failed` — a compact list with error 
 A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) exists that:
 - at the end of each turn, scans `.foreach/`,
 - if it finds a run with `auto_continue=true` and residual work,
-- forces Claude to continue in the next turn with the instruction "resume /foreach <run-id>".
+- forces Claude to continue in the next turn with the instruction "resume /flow:foreach <run-id>".
 
 Cap: `max_auto_continues` per run (default 20). Beyond that, the hook stops.
 
@@ -278,16 +278,16 @@ Cap: `max_auto_continues` per run (default 20). Beyond that, the hook stops.
 - **No silent skip**: every item ends `done` or `failed`. Never left `in_progress`.
 - **Safety cap**: max 100 iterations of the loop. If reached, stop.
 - **Context economy**: store only the structured result (the final JSON) in state, not the subagent's full text output.
-- **Idempotence**: `/foreach` with the same run-id without `--force` must be able to resume.
+- **Idempotence**: `/flow:foreach` with the same run-id without `--force` must be able to resume.
 
 ## Quick example
 
 ```
-/foreach --file examples/spec-example.md
+/flow:foreach --file examples/spec-example.md
 ```
 
 ```
-/foreach --list "find every .md under examples/ — output JSON array of {id: path, data: {path}}" \
+/flow:foreach --list "find every .md under examples/ — output JSON array of {id: path, data: {path}}" \
            --task "read the file and report {wc, has_frontmatter, sections}" \
            --concurrency 3 --chunk-size auto --model sonnet
 ```

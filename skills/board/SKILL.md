@@ -15,7 +15,7 @@ argument-hint: [--json] [--no-failed]
 disable-model-invocation: false
 ---
 
-# /board
+# /flow:board
 
 Surface the workspace's current state in one screen. Read-only, no mutation.
 
@@ -27,7 +27,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" board [--json] [--no-failed]
 
 - **Counts**: `N active, M done, K failed`
 - **Cumulative cost**: total tokens + USD recorded across all runs
-- **ACTIVE section**: every non-terminal run with its primitive-specific progress (e.g. `foreach: 12/30`, `pipe: 2/4 stages`, `iterate: 3/10 iters`), plus the parent run if it is a /pipe child
+- **ACTIVE section**: every non-terminal run with its primitive-specific progress (e.g. `foreach: 12/30`, `pipe: 2/4 stages`, `iterate: 3/10 iters`), plus the parent run if it is a /flow:pipe child
 - **BLOCKERS section**: runs that need manual attention — items stuck `in_progress` from a dead session, `auto_continues` cap exhausted, etc.
 - **FAILED section** (top 5; suppress with `--no-failed`): runs that ended in `failed` status, with error preview
 - **Suggested next actions**: concrete commands the user can run — `pipe drive`, `inspect tree`, `state/foreach.js reset`, etc.
@@ -37,14 +37,14 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" board [--json] [--no-failed]
 After (re)opening Claude Code in this workspace:
 
 ```
-user: /board
+user: /flow:board
 assistant: (calls the CLI, surfaces the output)
 ```
 
-If something is active, sending any next message will trigger the Stop hook at end-of-turn and auto-resume the work. `/board` does not resume anything itself — it only reports.
+If something is active, sending any next message will trigger the Stop hook at end-of-turn and auto-resume the work. `/flow:board` does not resume anything itself — it only reports.
 
 ## Important rules
 
 - **Read-only**: never mutates state.
-- **Different from `/inspect runs`**: `/board` is for the "session start" overview with suggestions; `/inspect runs` is the bare tabular listing. `/board` is opinionated, `/inspect` is plumbing.
+- **Different from `/flow:inspect runs`**: `/flow:board` is for the "session start" overview with suggestions; `/flow:inspect runs` is the bare tabular listing. `/flow:board` is opinionated, `/flow:inspect` is plumbing.
 - **Always safe to run**: no flags, no risk. Use it freely.

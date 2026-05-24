@@ -13,7 +13,7 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --inputs <descriptors.json> --prompt "<synthesis>" [--output-format markdown|json] [--model haiku|sonnet|opus]
 ---
 
-# /reduce
+# /flow:reduce
 
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/reduce/` (this folder: SKILL.md + defaults.md)
@@ -21,19 +21,19 @@ argument-hint: --inputs <descriptors.json> --prompt "<synthesis>" [--output-form
 > - `${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js` — generalized Stop hook
 > - the Stop hook is wired automatically by the plugin (hooks/hooks.json)
 
-You are the **orchestrator** of a `/reduce` run. Job:
+You are the **orchestrator** of a `/flow:reduce` run. Job:
 1. resolve N inputs (from another run, a file, or inline),
 2. materialize them into a single JSON file the digest agent can read,
 3. dispatch ONE agent that produces 1 digest output,
 4. persist the output pointer in state.
 
-**Single-step primitive**: no fan-out, no per-item parallelism. /reduce is the "fold" of the toolkit — N in, 1 out.
+**Single-step primitive**: no fan-out, no per-item parallelism. /flow:reduce is the "fold" of the toolkit — N in, 1 out.
 
 ## Input forms
 
 ### Form A — structured markdown file
 ```
-/reduce --file path/to/spec.md
+/flow:reduce --file path/to/spec.md
 ```
 With YAML frontmatter (config + inputs) and a `## Task` section:
 ```markdown
@@ -42,7 +42,7 @@ run-id: audit-digest
 model: opus
 format: markdown
 inputs:
-  - run: enum-abc123          # pull results from this /foreach run
+  - run: enum-abc123          # pull results from this /flow:foreach run
   - run: enum-def456
   - file: ./extra-data.json   # raw JSON file
   - inline: {"note": "..."}   # inline data
@@ -54,7 +54,7 @@ inputs:
 
 ### Form B — inline flags
 ```
-/reduce --from-run <enum-run-id> --task "<digest-prompt>" \
+/flow:reduce --from-run <enum-run-id> --task "<digest-prompt>" \
         [--from-file <path>]... [--from-run <id>]... \
         [--run-id NAME] [--model haiku|sonnet|opus] \
         [--format markdown|json] [--no-auto-continue]
@@ -84,10 +84,10 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/reduce/defaults.md` (YAML frontmatter). Use d
 - For `run` inputs: verify the referenced state exists (run `node "${CLAUDE_PLUGIN_ROOT}/dist/state/<cmd>.js" status <run-id>`). Warn if the upstream run has `failed` items but proceed (the digest agent will see them as `result: null`).
 
 **Threshold guardrail** (autonomous invocation only): after resolving inputs, count the total result objects (sum of `done` items across run inputs + length of file inputs + length of inline inputs). If total < `min_inputs` (default 5) AND this is an autonomous invocation, STOP and use `AskUserQuestion`:
-> "Only <N> total inputs to reduce. For this size, summarizing inline in chat is usually faster than running /reduce (which dispatches an agent and writes a file). Proceed with /reduce?"
-> Options: **inline** (cancel /reduce, summarize directly in chat) | **proceed** (continue with /reduce)
+> "Only <N> total inputs to reduce. For this size, summarizing inline in chat is usually faster than running /flow:reduce (which dispatches an agent and writes a file). Proceed with /flow:reduce?"
+> Options: **inline** (cancel /flow:reduce, summarize directly in chat) | **proceed** (continue with /flow:reduce)
 
-If the user typed `/reduce` explicitly → skip the guardrail.
+If the user typed `/flow:reduce` explicitly → skip the guardrail.
 
 ## Step 2 — Init state
 
@@ -167,7 +167,7 @@ Print a one-liner: `run-id`, `status`, `output_pointer`, byte size of the digest
 
 ## Cross-turn auto-continue
 
-A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.reduce/` (alongside other primitives). For /reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /reduce run-id:
+A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.reduce/` (alongside other primitives). For /flow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /flow:reduce run-id:
 - DO NOT re-init.
 - Read the state. If `status == in_progress` and the output file is absent → re-dispatch (Step 5).
 - If the output file IS present → call `complete` (Step 6).
@@ -177,16 +177,16 @@ A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.reduce/`
 - **Single-writer**: only you (orchestrator) call `start`/`complete`/`fail`. The agent only writes the output file.
 - **Materialize once per run**: `inputs.json` is built at init; if upstream runs change, the user must call `--force` to rebuild.
 - **No partial digests**: either the file is fully written and `complete` is called, or it stays `failed`. Half-written outputs are discarded by `complete` (it requires the file to exist).
-- **Idempotence**: re-running `/reduce` with the same run-id without `--force` resumes (re-dispatches if needed).
+- **Idempotence**: re-running `/flow:reduce` with the same run-id without `--force` resumes (re-dispatches if needed).
 
 ## Quick example
 
 ```
-/reduce --from-run enum-a0b460e3 \
+/flow:reduce --from-run enum-a0b460e3 \
         --task "Group findings by severity. Top-5 hotspot files. Recurring patterns." \
         --model opus --format markdown
 ```
 
 ```
-/reduce --file examples/audit-digest-spec.md
+/flow:reduce --file examples/audit-digest-spec.md
 ```
