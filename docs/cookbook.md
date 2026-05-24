@@ -305,6 +305,56 @@ session: `… foreach reset <run-id> --in-progress-to-pending`, then send any me
 
 ---
 
+## Level 5 — composing operators
+
+The RxJS-style operators are **compositions** of the primitives, not separate commands:
+
+### 16. `tap` — a side-effect that doesn't change the data
+
+A `bash` stage whose output you simply don't wire downstream: log, write a file, or ping. Downstream
+stages keep referencing the *previous* stage, so the tap is pure side-effect.
+
+```markdown
+## notify-progress · bash
+```sh
+node "${CLAUDE_PLUGIN_ROOT}/dist/notify.js" --message "review stage done"
+```
+```
+
+### 17. `gate` — run/abort on a condition (deterministic or LLM-judged)
+
+A per-stage `when:` guard skips one stage; a `bash` stage that exits non-zero (with `stop_on_failure`)
+aborts the flow. For an **LLM-judged** gate, make it a `step` that emits structured JSON, validate it
+with `output-schema`, then branch with a `when:` bash predicate over that JSON — never on free text.
+
+```markdown
+## judge · step
+- runtime: claude-cli
+- prompt: Output JSON {"blocking": <bool>} — is the diff at {{stages.diff.result_pointer}} unsafe to ship?
+- output-schema: { type: object, required: [blocking] }
+
+## deploy · bash
+- when: [ "$(jq -r .blocking {{stages.judge.result_pointer}})" = false ]
+```sh
+./deploy.sh
+```
+```
+
+### 18. `filter` — keep matching items
+
+Use `group` to partition then feed one group to `foreach`, or a `bash` stage that selects (e.g. with
+`node`/`jq`) and emits a smaller `items.json` the next stage consumes.
+
+### 19. Cross-model conversation (adversarial / cooperative)
+
+Two `step` stages with **different `--model`/`--runtime`** (e.g. `claude-cli` opus proposes,
+`codex-cli` critiques), looped with `/agentflow:until` whose predicate is a deterministic convergence
+check over their structured outputs. The exchange passes through each step's `output_pointer`; the loop
+predicate (code) decides when they've converged. Determinism boundary holds — the models produce data,
+the branch is code.
+
+---
+
 ## Where to go next
 
 - [reference.md](reference.md) — every skill, flag, and subcommand.
