@@ -19,7 +19,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, cacheKey, cacheLookup, cacheStore, die, loadState, loadTaskKindTemplate, makeBaseState, markDone, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
+import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, cacheKey, cacheLookup, cacheStore, die, isPaused, loadState, loadTaskKindTemplate, makeBaseState, parseBudgetCaps, markDone, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
 import { loadSource, moveKanbanItem, writeChecklistView, writeFolderView } from "../source.js";
 const CMD = "foreach";
 // Valid kinds for --kind. Mirrors `skills/foreach/task-kinds.md`. "unknown" has no
@@ -140,6 +140,9 @@ function cmdInit(args) {
             carry: { type: "boolean", default: false },
             shard: { type: "string" },
             "stop-file": { type: "string" },
+            "max-usd": { type: "string" },
+            "max-tokens": { type: "string" },
+            "max-agents": { type: "string" },
             execution: { type: "string", default: "subagent" },
             concurrency: { type: "string", default: "4" },
             "chunk-size": { type: "string", default: "auto" },
@@ -239,6 +242,7 @@ function cmdInit(args) {
         // does not auto-resume. Remove it (and send a message) to continue. Resolved to absolute
         // so the check is cwd-independent.
         stop_file: values["stop-file"] ? resolve(values["stop-file"]) : null,
+        budget_caps: parseBudgetCaps(values),
         kind,
         cache: Boolean(values["cache"]),
         folder: folderBaseFromValues(values),
@@ -428,12 +432,12 @@ function cmdStatus(args) {
         counts[item["status"]] = (counts[item["status"]] ?? 0) + 1;
     }
     const b = state["budget"] ?? {};
-    const stopFile = state["config"]?.["stop_file"];
-    const paused = Boolean(stopFile && existsSync(String(stopFile)));
+    const [paused, pausedReason] = isPaused(state);
     print({
         run_id: runId,
         run_status: state["status"],
         paused,
+        paused_reason: pausedReason,
         total: Object.keys(state["items"]).length,
         ...counts,
         budget: {

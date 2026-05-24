@@ -14,7 +14,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PRIMITIVES, saveAtomic, stateDir } from "../common.js";
+import { PRIMITIVES, isPaused, saveAtomic, stateDir } from "../common.js";
 // Import every state module so they self-register into PRIMITIVES.
 // Order matters: /pipe yields to its primitive children, so children must come FIRST
 // (children's residual work is detected before /pipe's "advance" residual).
@@ -45,6 +45,9 @@ function findActiveRun() {
                 continue;
             const cap = config["max_auto_continues"] ?? 20;
             if ((state["auto_continues"] ?? 0) >= cap)
+                continue;
+            // Paused (stop-file present or budget cap exceeded) → do not auto-resume.
+            if (isPaused(state)[0])
                 continue;
             const residual = spec.hasResidualWork(state);
             if (residual === null)

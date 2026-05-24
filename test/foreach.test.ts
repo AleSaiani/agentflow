@@ -190,6 +190,21 @@ test("foreach CLI: --stop-file pauses (status.paused) while the file exists", ()
   assert.equal(run(dir, ["status", "sf"]).paused, true);
 });
 
+test("foreach CLI: --max-usd cost cap pauses the run when exceeded", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }]), "utf8");
+  run(dir, ["init", "cap", "--items", items, "--prompt", "x", "--max-usd", "0.10"]);
+  assert.equal(run(dir, ["status", "cap"]).paused, false);
+
+  const ev = run(dir, ["budget-add", "cap", "--usd", "0.25", "--event-type", "agent_dispatch"]);
+  assert.equal(ev.over_cap, true);
+
+  const status = run(dir, ["status", "cap"]);
+  assert.equal(status.paused, true); // over the usd cap → paused (Stop hook won't auto-resume)
+  assert.match(status.paused_reason, /usd_estimate .* > cap 0\.1/);
+});
+
 test("foreach CLI: validate-only does not read items or write state", () => {
   const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
   const v = run(dir, ["init", "rX", "--items", join(dir, "nope.json"), "--validate-only"]);

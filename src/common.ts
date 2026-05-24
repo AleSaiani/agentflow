@@ -491,6 +491,29 @@ export function checkBudgetCaps(state: StateDict): [boolean, string | null] {
   return [false, null];
 }
 
+/**
+ * A run is *paused* (not failed, not done) when its `config.stop_file` exists on disk, or a budget
+ * cap is exceeded. The Stop hook skips paused runs (no auto-resume); `status` surfaces it. Remove the
+ * stop-file / raise the cap to resume. Centralizes the pause contract across every primitive.
+ */
+export function isPaused(state: StateDict): [boolean, string | null] {
+  const stopFile = (state["config"] as StateDict | undefined)?.["stop_file"];
+  if (stopFile && existsSync(String(stopFile))) return [true, `stop-file present: ${stopFile}`];
+  return checkBudgetCaps(state);
+}
+
+/** Parse `--max-usd` / `--max-tokens` / `--max-agents` CLI flags into a `budget_caps` object (or null). */
+export function parseBudgetCaps(values: Record<string, unknown>): Record<string, number> | null {
+  const caps: Record<string, number> = {};
+  const usd = values["max-usd"];
+  const tokens = values["max-tokens"];
+  const agents = values["max-agents"];
+  if (usd !== undefined) caps["max_usd"] = parseFloat(String(usd));
+  if (tokens !== undefined) caps["max_tokens"] = parseInt(String(tokens), 10);
+  if (agents !== undefined) caps["max_agents"] = parseInt(String(agents), 10);
+  return Object.keys(caps).length ? caps : null;
+}
+
 // ---------- cache: skip-if-unchanged for per-item primitives ----------
 //
 // Storage: `.cache/<namespace>/<sha256>.json` at workspace root. Override with $CACHE_DIR.

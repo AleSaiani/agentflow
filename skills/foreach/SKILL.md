@@ -70,6 +70,9 @@ runs each item; per-item override via `{subagent:…}` in a checklist), `--execu
 - `--stop-file <path>` — a **pause gate**: while this file exists, the dispatch loop stops claiming
   new items and the Stop hook does **not** auto-resume the run. Delete the file (and send a message)
   to continue. Lets you halt/resume external workers by touching a file.
+- `--max-usd N` (also `--max-tokens N`, `--max-agents N`) — a **cost cap**: once the run's recorded
+  budget exceeds it, the run pauses exactly like `--stop-file` (`status` shows `paused`, the Stop hook
+  won't resume). Record spend with `budget-add` so the cap is real; raise the cap to continue.
 
 **Invoked with natural language?** (e.g. `/agentflow:foreach review every .cs file in src/ for bugs`) —
 translate the user's words into a source + `--prompt`, don't ask them for flags. If they name files you

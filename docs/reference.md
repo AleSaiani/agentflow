@@ -61,10 +61,11 @@ The operation is, primarily, a **`--prompt`** (the instructions applied per item
 `--execution main-thread` are optional knobs. **`--serial`** processes one item at a time in list
 order (no fan-out); **`--carry`** implies serial and threads each item the previous item's output.
 **`--shard k/N`** keeps only items at `index % N == k` (run N terminals with distinct run-ids to split
-a list, no locks); **`--stop-file <path>`** pauses the run (and the Stop hook) while that file exists.
+a list, no locks); **`--stop-file <path>`** pauses the run (and the Stop hook) while that file exists;
+**`--max-usd N`** (`--max-tokens`, `--max-agents`) pauses the run once the recorded budget exceeds the cap.
 
 **CLI** (`dist/state/foreach.js`):
-- `init <id> (--items <path> | --checkbox <path> | --folder <dir> | --source <json>) (--prompt "…" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--serial] [--carry] [--shard k/N] [--stop-file <path>] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
+- `init <id> (--items <path> | --checkbox <path> | --folder <dir> | --source <json>) (--prompt "…" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--serial] [--carry] [--shard k/N] [--stop-file <path>] [--max-usd N] [--max-tokens N] [--max-agents N] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
 - `claim <id> --count N` · `claim-serial <id>` (next item in order + `prev_result` for `--carry`) · `complete <id> <item-id> [--result <json>]` · `fail <id> <item-id> [--error "…"] [--retry]`
 - `complete-batch <id> --results <file>` (array of `{id, ok, result, error}`)
 - `status <id>` · `list <id> [--status …] [--limit N]` · `reset <id> [--failed-to-pending] [--in-progress-to-pending]`
@@ -131,7 +132,7 @@ Run an ordered pipeline of stages (bash / json / a primitive). Holds no loop/map
 loops come from an `iterate` stage. Reads children's state to advance; never mutates them.
 
 **CLI** (`dist/state/pipe.js`):
-- `init <id> (--stages <json> | --workflow <json>) [--param name=value …] [--context-policy …] [--max-stages N] [--no-stop-on-failure] [--skip-validate-stages] [--force]`
+- `init <id> (--stages <json> | --workflow <md|json>) [--param name=value …] [--max-usd N] [--max-tokens N] [--max-agents N] [--context-policy …] [--max-stages N] [--no-stop-on-failure] [--skip-validate-stages] [--force]`
 - `tick <id>` → next action · `drive <id> [--max-steps N]` → auto-run until an agent is needed · `plan <id>` → **dry-run** the resolved stage plan
 - `complete-bash-stage <id> --exit-code N --output-path <f> [--error "…"]` · `complete-json-stage <id> --output-path <f>`
 - `start-primitive-child <id> --child-cmd <cmd> --child-run-id <id>` · `advance <id>` · `fail <id>` · `status <id>` · `runs` · `budget-add`

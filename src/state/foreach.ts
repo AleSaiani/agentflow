@@ -34,9 +34,11 @@ import {
   cacheLookup,
   cacheStore,
   die,
+  isPaused,
   loadState,
   loadTaskKindTemplate,
   makeBaseState,
+  parseBudgetCaps,
   markDone,
   markInProgress,
   now,
@@ -161,6 +163,9 @@ function cmdInit(args: string[]): void {
       carry: { type: "boolean", default: false },
       shard: { type: "string" },
       "stop-file": { type: "string" },
+      "max-usd": { type: "string" },
+      "max-tokens": { type: "string" },
+      "max-agents": { type: "string" },
       execution: { type: "string", default: "subagent" },
       concurrency: { type: "string", default: "4" },
       "chunk-size": { type: "string", default: "auto" },
@@ -262,6 +267,7 @@ function cmdInit(args: string[]): void {
       // does not auto-resume. Remove it (and send a message) to continue. Resolved to absolute
       // so the check is cwd-independent.
       stop_file: values["stop-file"] ? resolve(values["stop-file"] as string) : null,
+      budget_caps: parseBudgetCaps(values),
       kind,
       cache: Boolean(values["cache"]),
       folder: folderBaseFromValues(values),
@@ -440,12 +446,12 @@ function cmdStatus(args: string[]): void {
     counts[item["status"]] = (counts[item["status"]] ?? 0) + 1;
   }
   const b = state["budget"] ?? {};
-  const stopFile = (state["config"] as StateDict)?.["stop_file"];
-  const paused = Boolean(stopFile && existsSync(String(stopFile)));
+  const [paused, pausedReason] = isPaused(state);
   print({
     run_id: runId,
     run_status: state["status"],
     paused,
+    paused_reason: pausedReason,
     total: Object.keys(state["items"]).length,
     ...counts,
     budget: {

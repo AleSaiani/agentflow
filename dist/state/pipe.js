@@ -23,7 +23,7 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { Primitive, STATUS_ABORTED, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, findWorkspaceRoot, getPrimitive, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, stateDir, statePath, } from "../common.js";
+import { Primitive, STATUS_ABORTED, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, findWorkspaceRoot, getPrimitive, loadState, makeBaseState, markDone, markFailed, markInProgress, now, parseBudgetCaps, print, saveAtomic, stateDir, statePath, } from "../common.js";
 import { runBash } from "../shell.js";
 import { parseWorkflowMd } from "../workflow_md.js";
 // Side-effect imports: register child primitives so getPrimitive() works in tick/advance.
@@ -232,6 +232,9 @@ function cmdInit(args) {
             "stop-on-failure": { type: "boolean" },
             "no-stop-on-failure": { type: "boolean" },
             param: { type: "string", multiple: true },
+            "max-usd": { type: "string" },
+            "max-tokens": { type: "string" },
+            "max-agents": { type: "string" },
             force: { type: "boolean", default: false },
             "skip-validate-stages": { type: "boolean", default: false },
         },
@@ -313,6 +316,7 @@ function cmdInit(args) {
         max_auto_continues: pick("max_auto_continues", parseInt(values["max-auto-continues"], 10)),
         max_stages: maxStages,
         stop_on_failure: pick("stop_on_failure", stopOnFailure),
+        budget_caps: parseBudgetCaps(values),
     }, { stages, stage_index: 0, stop_reason: null, workflow_dir: workflowDir, params });
     const p = pathFor(runId);
     if (existsSync(p) && !values["force"])
