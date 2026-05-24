@@ -9,11 +9,11 @@
  * Subcommands: runs | show <id> | tree <id> | budget <id> | timeline <id> | board.
  */
 
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { parseArgs } from "node:util";
 
-import { PRIMITIVES, type StateDict, die, getPrimitive, loadState, print, stateDir, statePath } from "./common.js";
+import { PRIMITIVES, type StateDict, die, findWorkspaceRoot, getPrimitive, loadState, print, stateDir, statePath } from "./common.js";
 
 // Ensure every primitive self-registers.
 import "./state/enumerate.js";
@@ -389,11 +389,71 @@ function cmdBoard(args: string[]): void {
   process.stdout.write(lines.join("\n") + "\n");
 }
 
+/** List authored workflows under <workspace>/workflows/ (format-agnostic: WORKFLOW.md or workflow.json). */
+function cmdWorkflows(args: string[]): void {
+  const { values } = parseArgs({ args, allowPositionals: false, strict: true, options: { json: { type: "boolean", default: false } } });
+  const root = findWorkspaceRoot();
+  const wfRoot = join(root, "workflows");
+  const found: StateDict[] = [];
+  if (existsSync(wfRoot)) {
+    for (const name of readdirSync(wfRoot).sort()) {
+      const full = join(wfRoot, name);
+      const isDir = statSync(full).isDirectory();
+      // A workflow is a folder holding WORKFLOW.md (preferred, human-authored) or workflow.json
+      // (compiled spec), or a bare workflows/<name>.json.
+      let mdPath: string | null = null;
+      let jsonPath: string | null = null;
+      if (isDir) {
+        if (existsSync(join(full, "WORKFLOW.md"))) mdPath = join(full, "WORKFLOW.md");
+        if (existsSync(join(full, "workflow.json"))) jsonPath = join(full, "workflow.json");
+      } else if (name.endsWith(".json")) {
+        jsonPath = full;
+      }
+      if (!mdPath && !jsonPath) continue;
+      const entry: StateDict = {
+        name: name.replace(/\.json$/, ""),
+        format: mdPath && jsonPath ? "md+json" : mdPath ? "md" : "json",
+        path: relative(root, (mdPath ?? jsonPath) as string).split(sep).join("/"),
+      };
+      if (jsonPath) {
+        try {
+          const wf = JSON.parse(readFileSync(jsonPath, "utf8"));
+          if (wf.name) entry["name"] = wf.name;
+          entry["description"] = wf.description ?? "";
+          entry["stages"] = Array.isArray(wf.stages) ? wf.stages.length : 0;
+          entry["params"] = wf.params && typeof wf.params === "object" ? Object.keys(wf.params) : [];
+        } catch {
+          entry["error"] = "malformed workflow.json";
+        }
+      }
+      found.push(entry);
+    }
+  }
+  if (values["json"]) return print(found);
+  if (found.length === 0) {
+    process.stdout.write(`No workflows found under ${wfRoot}/. Author one with /agentflow:create-workflow.\n`);
+    return;
+  }
+  const lines = [`=== Workflows (${found.length}) ===`];
+  for (const w of found) {
+    const params = (w["params"] as string[] | undefined) ?? [];
+    const meta = [w["format"], w["stages"] !== undefined ? `${w["stages"]} stages` : null, params.length ? `params: ${params.join(",")}` : null]
+      .filter(Boolean)
+      .join(", ");
+    lines.push(`  ${w["name"]}  (${meta})`);
+    lines.push(`    ${w["path"]}`);
+    if (w["description"]) lines.push(`    ${String(w["description"]).slice(0, 100)}`);
+  }
+  process.stdout.write(lines.join("\n") + "\n");
+}
+
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
   switch (sub) {
     case "runs":
       return cmdRuns(rest);
+    case "workflows":
+      return cmdWorkflows(rest);
     case "history":
       return cmdHistory(rest);
     case "show":
@@ -407,7 +467,7 @@ function main(argv: string[]): void {
     case "board":
       return cmdBoard(rest);
     default:
-      die(`error: unknown subcommand '${sub ?? ""}' (runs|history|show|tree|budget|timeline|board)`);
+      die(`error: unknown subcommand '${sub ?? ""}' (runs|workflows|history|show|tree|budget|timeline|board)`);
   }
 }
 

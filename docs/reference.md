@@ -24,7 +24,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `pipe` | compose | run an ordered pipeline of stages |
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
-| `inspect` / `board` / `history` | observe | read-only status, trees, budget, dashboard, and a time-ordered run log |
+| `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |
 | `audit` | recipe | discover → review → partition → digest |
 
 The engine CLIs are `node "${CLAUDE_PLUGIN_ROOT}/dist/state/<cmd>.js" <subcommand> <run-id> [flags]`
