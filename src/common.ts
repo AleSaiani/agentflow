@@ -171,6 +171,7 @@ const OVERRIDE_ENV: Record<string, string> = {
   queue: "QUEUE_STATE_DIR",
   reduce: "REDUCE_STATE_DIR",
   step: "STEP_STATE_DIR",
+  mailbox: "MAILBOX_STATE_DIR",
 };
 
 function isDir(p: string): boolean {

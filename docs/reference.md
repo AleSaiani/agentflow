@@ -24,6 +24,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `pipe` | compose | run an ordered pipeline of stages |
 | `queue` | shared queue | many workers drain one queue safely (atomic-rename claim, no locks) |
 | `step` | one unit | run ONE prompt once (inline / subagent / `claude -p` / `codex exec`); capture output |
+| `mailbox` | outbox/inbox | directed messages between instances (atomic FIFO recv, no locks) |
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |
