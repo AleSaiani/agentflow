@@ -20,5 +20,5 @@ test("validateSchema: type, required, properties, items, enum, integer", () => {
   assert.equal(validateSchema([{ id: "a" }, { id: "b" }], { type: "array", items: { required: ["id"] } }), null);
   assert.match(validateSchema([{ id: "a" }, {}], { type: "array", items: { required: ["id"] } }) ?? "", /\$\[1\]\.id: required/);
   // unknown keywords ignored; top-level type mismatch
-  assert.match(validateSchema("hi", { type: "object" }) ?? "", /expected object/);
+  assert.match(validateSchema("hi", { type: "object" }) ?? "", /expected type object/);
 });
