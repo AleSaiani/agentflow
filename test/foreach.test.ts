@@ -97,3 +97,13 @@ test("foreach CLI: validate-only does not read items or write state", () => {
   assert.equal(v.valid, true);
   assert.equal(v.kind, null);
 });
+
+test("foreach CLI: --kind resolves task-kinds.md WITHOUT CLAUDE_PLUGIN_ROOT (root from module path)", () => {
+  // Regression: the spawned CLI must find the bundled skills/foreach/task-kinds.md from its own
+  // location, not from $CLAUDE_PLUGIN_ROOT (which is not exported to the Bash tool). run() here does
+  // NOT set CLAUDE_PLUGIN_ROOT.
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const v = run(dir, ["init", "rk", "--items", join(dir, "nope.json"), "--kind", "code-review", "--validate-only"]);
+  assert.equal(v.valid, true);
+  assert.equal(v.kind, "code-review");
+});
