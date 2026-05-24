@@ -192,6 +192,12 @@ function validateStages(stagesRaw) {
             when_result: null,
             next: next ?? null,
             output_schema: raw["output_schema"] ?? null, // optional: validate the stage's JSON output
+            retries: Number.isFinite(raw["retries"]) ? Math.max(0, Math.trunc(raw["retries"])) : 0,
+            timeout_ms: Number.isFinite(raw["timeout"])
+                ? Math.max(0, Math.trunc(raw["timeout"] * 1000))
+                : Number.isFinite(raw["timeout_ms"])
+                    ? Math.max(0, Math.trunc(raw["timeout_ms"]))
+                    : 0,
             status: STATUS_PENDING,
             child_cmd: null,
             child_run_id: null,
@@ -447,6 +453,8 @@ function cmdTick(args) {
                 stage_index: cur["index"],
                 command: resolveTemplate(cur["spec"]["command"], state),
                 output_path: resolveTemplate(rawOut, state),
+                retries: cur["retries"] ?? 0,
+                timeout_ms: cur["timeout_ms"] ?? 0,
             });
             return;
         }
@@ -700,7 +708,7 @@ function cmdFail(args) {
 }
 // ---------- drive: auto-run as many stages as possible without agent dispatch ----------
 const DETERMINISTIC_GROUP_METHODS = ["path-prefix", "regex", "jsonpath"];
-function runBashSynchronously(command, outputPath, runId, stageIndex) {
+function runBashSynchronously(command, outputPath, runId, stageIndex, timeoutMs) {
     mkdirSync(dirname(outputPath), { recursive: true });
     const errP = outputPath + ".err";
     const env = {
@@ -710,7 +718,7 @@ function runBashSynchronously(command, outputPath, runId, stageIndex) {
         PIPE_OUTPUT_PATH: outputPath,
         PIPE_PREV_RESULT_POINTER: process.env["PIPE_PREV_RESULT_POINTER"] ?? "",
     };
-    const proc = runBash(command, findWorkspaceRoot(), env);
+    const proc = runBash(command, findWorkspaceRoot(), env, timeoutMs);
     writeFileSync(errP, proc.stderr, "utf8");
     // Fallback only: bash didn't redirect AND captured stdout is non-empty.
     if ((!existsSync(outputPath) || statSync(outputPath).size === 0) && proc.stdout) {
@@ -767,9 +775,20 @@ function cmdDrive(args) {
             return;
         }
         if (action === "run_bash") {
-            const [ec, err] = runBashSynchronously(t["command"], t["output_path"], runId, t["stage_index"]);
+            // Stage resilience: retry on failure up to `retries` times, each attempt bounded by `timeout_ms`.
+            const retries = t["retries"] ?? 0;
+            const timeoutMs = t["timeout_ms"] ?? 0;
+            let ec = -1;
+            let err = "";
+            let attempt = 0;
+            for (; attempt <= retries; attempt++) {
+                [ec, err] = runBashSynchronously(t["command"], t["output_path"], runId, t["stage_index"], timeoutMs);
+                if (ec === 0)
+                    break;
+            }
+            const attempts = Math.min(attempt + 1, retries + 1);
             nodeRun([THIS_FILE, "complete-bash-stage", runId, "--exit-code", String(ec), "--output-path", t["output_path"], "--error", ec !== 0 ? err : ""]);
-            actionsTaken.push({ step: stepsTaken, action: "run_bash", stage: t["stage_index"], exit_code: ec });
+            actionsTaken.push({ step: stepsTaken, action: "run_bash", stage: t["stage_index"], exit_code: ec, attempts });
             continue;
         }
         if (action === "write_json") {

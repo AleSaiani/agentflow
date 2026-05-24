@@ -226,6 +226,8 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
       "when": { "type": "bash", "command": "<predicate>" },  // optional guard: exit 0 runs, else skip
       "next": "<stage>" | <index> | [{ "when": "<bash>", "goto": "<stage>" }, …] | null, // fork/route
       "output_schema": { "type": "object", "required": [] }, // optional: validate the stage's JSON output
+      "retries": 0,                                          // bash: re-run on failure (extra attempts)
+      "timeout": 30,                                         // bash: per-attempt timeout in seconds (exit 124)
       "spec": { /* type-specific */ }
     }
   ]

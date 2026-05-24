@@ -217,6 +217,11 @@ function compileStage(s: RawStage): Record<string, unknown> {
   const next = bulletGet(bullets, "next");
   if (route !== undefined) stage["next"] = route;
   else if (next !== undefined) stage["next"] = next;
+  // Resilience (bash stages): retries + per-attempt timeout (seconds).
+  const retries = bulletGet(bullets, "retries");
+  if (retries !== undefined) stage["retries"] = retries;
+  const timeout = bulletGet(bullets, "timeout");
+  if (timeout !== undefined) stage["timeout"] = timeout;
 
   if (s.type === "bash") {
     stage["type"] = "bash";
@@ -239,7 +244,7 @@ function compileStage(s: RawStage): Record<string, unknown> {
     stage["type"] = "primitive";
     const initArgs: string[] = [];
     for (const [k, v] of bullets) {
-      if (k === "when" || k === "output-schema" || k === "output_schema" || k === "next" || k === "route") continue;
+      if (["when", "output-schema", "output_schema", "next", "route", "retries", "timeout"].includes(k)) continue;
       const flag = `--${k}`;
       if (v === true) {
         initArgs.push(flag);

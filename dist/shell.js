@@ -66,9 +66,19 @@ export function whichBash() {
     }
     return (cachedBash = "bash");
 }
-export function runBash(command, cwd, env) {
-    const proc = spawnSync(whichBash(), ["-c", command], { cwd, env, encoding: "utf8" });
-    if (proc.error)
+export function runBash(command, cwd, env, timeoutMs) {
+    const proc = spawnSync(whichBash(), ["-c", command], {
+        cwd,
+        env,
+        encoding: "utf8",
+        ...(timeoutMs && timeoutMs > 0 ? { timeout: timeoutMs } : {}),
+    });
+    // A timeout kills the process (signal set, status null, error.code ETIMEDOUT). Surface it as a
+    // conventional 124 exit rather than throwing — only a real spawn failure (e.g. bash not found) throws.
+    const code = proc.error?.code;
+    const timedOut = code === "ETIMEDOUT" || (proc.status === null && proc.signal !== null);
+    if (proc.error && !timedOut)
         throw proc.error;
-    return { status: proc.status ?? -1, stdout: proc.stdout ?? "", stderr: proc.stderr ?? "" };
+    const stderr = (proc.stderr ?? "") + (timedOut ? `\n[agentflow: timed out after ${timeoutMs}ms]` : "");
+    return { status: proc.status ?? (timedOut ? 124 : -1), stdout: proc.stdout ?? "", stderr };
 }

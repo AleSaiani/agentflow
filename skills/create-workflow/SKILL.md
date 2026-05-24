@@ -105,6 +105,10 @@ JSON-schema: `type`, `required`, `properties`, `items`, `enum`). The engine vali
 output before advancing; on mismatch the stage fails with a precise path (e.g. `$.severity: not in
 enum`). Use it on the step that produces the data a later guard branches on.
 
+**Resilience (bash stages).** A stage may declare `- retries: N` (re-run on non-zero exit, up to N
+extra attempts) and `- timeout: <seconds>` (each attempt is killed past the limit → fails with exit
+124). Use them on stages that call flaky networks/CLIs so a transient failure doesn't sink the run.
+
 **Branching (fork).** A stage's `- next:` routes the flow: a stage name jumps there; a `- route:` array
 of `{ when: <bash predicate>, goto: <stage> }` rules takes the first whose `when` exits 0 (a rule with
 no `when` is the default/else). Forward jumps skip the not-taken branch's stages. For loops/back-edges,

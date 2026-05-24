@@ -223,6 +223,13 @@ function compileStage(s) {
         stage["next"] = route;
     else if (next !== undefined)
         stage["next"] = next;
+    // Resilience (bash stages): retries + per-attempt timeout (seconds).
+    const retries = bulletGet(bullets, "retries");
+    if (retries !== undefined)
+        stage["retries"] = retries;
+    const timeout = bulletGet(bullets, "timeout");
+    if (timeout !== undefined)
+        stage["timeout"] = timeout;
     if (s.type === "bash") {
         stage["type"] = "bash";
         const cmd = fences["sh"] ?? fences["bash"] ?? fences["shell"] ?? fences[""];
@@ -251,7 +258,7 @@ function compileStage(s) {
         stage["type"] = "primitive";
         const initArgs = [];
         for (const [k, v] of bullets) {
-            if (k === "when" || k === "output-schema" || k === "output_schema" || k === "next" || k === "route")
+            if (["when", "output-schema", "output_schema", "next", "route", "retries", "timeout"].includes(k))
                 continue;
             const flag = `--${k}`;
             if (v === true) {

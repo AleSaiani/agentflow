@@ -225,6 +225,37 @@ test("pipe: a `step` child stage is a registered primitive (drive→needs_agent,
   assert.equal(adv.pipe_status, "done");
 });
 
+test("pipe: a bash stage retries on failure and a timeout bounds each attempt", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const counter = join(dir, "n").replace(/\\/g, "/");
+
+  // RETRY: fails while a counter < 3, succeeds on the 3rd attempt → needs retries:2.
+  writeFileSync(join(dir, "n"), "0", "utf8");
+  const rwf = join(dir, "retry.json");
+  writeFileSync(
+    rwf,
+    JSON.stringify({ stages: [{ name: "flaky", type: "bash", retries: 2, spec: { command: `n=$(cat ${counter}); n=$((n+1)); echo $n > ${counter}; test $n -ge 3` } }] }),
+    "utf8",
+  );
+  run(env, ["init", "rt", "--workflow", rwf]);
+  const driven = run(env, ["drive", "rt"]);
+  assert.equal(driven.action, "done");
+  assert.equal(driven.actions_taken[0].attempts, 3); // 1 + 2 retries
+
+  // TIMEOUT: sleep longer than the timeout → the stage fails (exit 124).
+  const twf = join(dir, "to.json");
+  writeFileSync(
+    twf,
+    JSON.stringify({ config: { stop_on_failure: true }, stages: [{ name: "slow", type: "bash", timeout: 1, spec: { command: 'sleep 3; echo done > "$PIPE_OUTPUT_PATH"' } }] }),
+    "utf8",
+  );
+  run(env, ["init", "to", "--workflow", twf]);
+  const t = run(env, ["drive", "to"]);
+  assert.equal(t.action, "failed");
+  assert.equal(t.actions_taken[0].exit_code, 124); // timeout → conventional 124
+});
+
 test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };
