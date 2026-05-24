@@ -94,4 +94,10 @@ test("inspect runs/board surface the active run", () => {
   assert.equal(show.cmd, "foreach");
   assert.equal(show.items.total, 2);
   assert.equal(show.items.pending, 2);
+
+  const history = JSON.parse(run(INSPECT, env, ["history", "--json"]));
+  assert.equal(history.length, 1);
+  assert.equal(history[0].cmd, "foreach");
+  assert.equal(history[0].run_id, "rb");
+  assert.ok(history[0].updated_at);
 });

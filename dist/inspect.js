@@ -96,6 +96,58 @@ function cmdRuns(args) {
     }
     process.stdout.write(lines.join("\n") + "\n");
 }
+/** Chronological history of runs across all primitives — most recent activity first. */
+function cmdHistory(args) {
+    const { values } = parseArgs({
+        args,
+        allowPositionals: true,
+        strict: true,
+        options: { limit: { type: "string", default: "20" }, cmd: { type: "string" }, json: { type: "boolean", default: false } },
+    });
+    const cmds = values["cmd"] ? [values["cmd"]] : [...PRIMITIVES.keys()];
+    const rows = [];
+    for (const cmd of cmds) {
+        for (const name of allRunDirs(cmd)) {
+            let s;
+            try {
+                s = loadState(join(stateDir(cmd), name, "state.json"));
+            }
+            catch {
+                continue;
+            }
+            const spec = getPrimitive(cmd);
+            const b = s["budget"] ?? {};
+            rows.push({
+                updated_at: s["updated_at"] ?? s["created_at"] ?? "",
+                cmd,
+                run_id: name,
+                status: s["status"],
+                is_done: spec ? spec.isDone(s) : s["status"] === "done",
+                agents: b["agents_dispatched"] ?? 0,
+                usd: round4(b["usd_estimate"] ?? 0),
+            });
+        }
+    }
+    rows.sort((a, b) => String(b["updated_at"]).localeCompare(String(a["updated_at"]))); // newest first
+    const limit = parseInt(values["limit"], 10);
+    const out = limit > 0 ? rows.slice(0, limit) : rows;
+    if (values["json"]) {
+        process.stdout.write(JSON.stringify(out, null, 2) + "\n");
+        return;
+    }
+    if (out.length === 0) {
+        process.stdout.write("(no runs yet)\n");
+        return;
+    }
+    const lines = [
+        `${"UPDATED_AT".padEnd(21)} ${"CMD".padEnd(10)} ${"RUN_ID".padEnd(34)} ${"STATUS".padEnd(12)} ${"AGENTS".padEnd(7)} USD$`,
+        "-".repeat(96),
+    ];
+    for (const e of out) {
+        lines.push(`${String(e["updated_at"]).padEnd(21)} ${String(e["cmd"]).padEnd(10)} ${String(e["run_id"]).padEnd(34)} ${String(e["status"]).padEnd(12)} ${String(e["agents"]).padEnd(7)} ${Number(e["usd"]).toFixed(4)}`);
+    }
+    process.stdout.write(lines.join("\n") + "\n");
+}
 function cmdShow(args) {
     const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { cmd: { type: "string" }, pretty: { type: "boolean", default: true } } });
     const runId = positionals[0];
@@ -358,6 +410,8 @@ function main(argv) {
     switch (sub) {
         case "runs":
             return cmdRuns(rest);
+        case "history":
+            return cmdHistory(rest);
         case "show":
             return cmdShow(rest);
         case "tree":
@@ -369,7 +423,7 @@ function main(argv) {
         case "board":
             return cmdBoard(rest);
         default:
-            die(`error: unknown subcommand '${sub ?? ""}' (runs|show|tree|budget|timeline|board)`);
+            die(`error: unknown subcommand '${sub ?? ""}' (runs|history|show|tree|budget|timeline|board)`);
     }
 }
 main(process.argv.slice(2));

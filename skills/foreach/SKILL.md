@@ -57,7 +57,11 @@ You are the **orchestrator** of a `/flow:foreach` run. Your only job:
   `--concurrency N`, `--chunk-size N|auto`, `--max-retries N`, `--cache`, `--run-id NAME`,
   `--no-auto-continue`, `--force`
 
-If no source or no `--prompt` is given → stop with a clear message.
+**Invoked with natural language?** (e.g. `/flow:foreach review every .cs file in src/ for bugs`) —
+translate the user's words into a source + `--prompt`, don't ask them for flags. If they name files you
+can list deterministically (a glob, a folder), build the items list yourself with `Glob`/`Grep` (or use
+`--folder`); only if the list must be *generated* from a higher-level spec do you need /flow:enumerate
+first. If no source and no operation can be inferred → ask one short clarifying question.
 
 ## Step 0 — Load defaults
 

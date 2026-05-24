@@ -24,7 +24,7 @@ the skill does. All state lives in `state.json` under `.<cmd>/<run-id>/` at the 
 | `pipe` | compose | run an ordered pipeline of stages |
 | `run` | execute | run a workflow-file end to end |
 | `compose` | author | build a reusable workflow-file |
-| `inspect` / `board` | observe | read-only status, trees, budget, dashboard |
+| `inspect` / `board` / `history` | observe | read-only status, trees, budget, dashboard, and a time-ordered run log |
 | `audit` | recipe | discover → review → partition → digest |
 
 The engine CLIs are `node "${CLAUDE_PLUGIN_ROOT}/dist/state/<cmd>.js" <subcommand> <run-id> [flags]`
@@ -154,8 +154,9 @@ with `/flow:run`. See [Workflow-file schema](#workflow-file-schema).
 
 ## Inspecting
 
-`/flow:inspect` (read-only) and `/flow:board` (dashboard). CLI: `dist/inspect.js`.
+`/flow:inspect` (read-only), `/flow:board` (dashboard), `/flow:history` (chronological log). CLI: `dist/inspect.js`.
 - `runs [--cmd <name>] [--json]` — list every run
+- `history [--limit N] [--cmd <name>] [--json]` — runs newest-first ("what ran, and when")
 - `show <id> [--cmd <name>] [--pretty]` — one run's status + primitive-specific extras
 - `tree <id> [--max-depth N]` — a pipe's child tree
 - `budget <id> [--json]` — cost aggregated across a run and its children

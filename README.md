@@ -21,9 +21,13 @@ the work. In a plain chat that work is fragile: you lose track halfway, there's 
 long session gets compacted and forgets where it was. Flow fixes that — **every run is a state file on
 disk**, a Stop hook **resumes it across turns**, and the pieces **compose into reusable workflows**.
 
-> **You don't type commands.** You describe the goal in plain language; Claude picks the right Flow
-> skill and runs it. The `/flow:…` lines in these docs show *what Claude runs*, for transparency — you
-> won't normally write the flags yourself.
+> **You don't type the flags — you describe the goal.** Two ways:
+> - let Claude pick the skill from your request (best-effort), or
+> - **for certainty, invoke the skill by name and describe the rest in plain words** —
+>   `/flow:foreach summarize every file in src/`. The `/flow:` prefix guarantees the skill runs; the
+>   skill translates your words into the exact command.
+>
+> The `/flow:…` lines in these docs show *what Claude runs*, for transparency.
 
 ## A first taste
 
@@ -124,7 +128,7 @@ engine underneath.)
 | `/flow:repeat` · `until` · `while` | `for` · `do…until` · `while…do` | Loop a stage a fixed count, until a predicate, or while one holds (one engine) |
 | `/flow:pipe` | pipeline | Compose stages; declarative wiring + `when` guards; `plan` for a dry-run |
 | `/flow:run` · `compose` | — | Run a workflow-file end to end (`--dry-run` to preview) · author one from the primitives |
-| `/flow:inspect` · `board` | — | Read-only: inspect a run / session-start dashboard |
+| `/flow:inspect` · `board` · `history` | — | Read-only: inspect a run · session dashboard · chronological run log |
 | `/flow:audit` | recipe | discover → review → partition → executive digest, as a declarative workflow-file |
 
 ## The workflow layer
