@@ -1,6 +1,11 @@
 {
   "name": "audit",
-  "description": "Deep code audit: discover files → per-file LLM review (cached) → partition by component → executive digest. The first declarative workflow-file; compiles 1:1 into pipe.stages[]. Self-contained: the discover stage runs ./discover.mjs via {{workflow.dir}}, so the whole workflows/audit/ folder is movable. Per-invocation inputs come from env: AUDIT_TARGET (required), AUDIT_GLOB, AUDIT_EXCLUDE. Tune review/digest models and group depth by editing this file or copying the folder into your project's workflows/.",
+  "description": "Deep code audit: discover files → per-file LLM review (cached) → partition by component → executive digest. The first declarative workflow-file; compiles 1:1 into pipe.stages[]. Self-contained: the discover stage runs ./discover.mjs via {{workflow.dir}}, so the whole workflows/audit/ folder is movable. Per-invocation inputs are declared params (target/glob/exclude), passed with --param. Tune review/digest models and group depth by editing this file or copying the folder into your project's workflows/.",
+  "params": {
+    "target": { "required": true, "description": "Directory to audit" },
+    "glob": { "default": "**/*", "description": "Comma-separated globs to include" },
+    "exclude": { "default": "", "description": "Comma-separated globs to exclude" }
+  },
   "config": {
     "context_policy": "summary",
     "max_auto_continues": 50,
@@ -12,7 +17,7 @@
       "type": "bash",
       "name": "discover",
       "spec": {
-        "command": "node \"{{workflow.dir}}/discover.mjs\" > \"$PIPE_OUTPUT_PATH\"",
+        "command": "AUDIT_TARGET={{params.target|shell}} AUDIT_GLOB={{params.glob|shell}} AUDIT_EXCLUDE={{params.exclude|shell}} node \"{{workflow.dir}}/discover.mjs\" > \"$PIPE_OUTPUT_PATH\"",
         "output_path": "{{run.dir}}/files.json"
       }
     },

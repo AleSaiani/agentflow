@@ -131,7 +131,7 @@ Run an ordered pipeline of stages (bash / json / a primitive). Holds no loop/map
 loops come from an `iterate` stage. Reads children's state to advance; never mutates them.
 
 **CLI** (`dist/state/pipe.js`):
-- `init <id> (--stages <json> | --workflow <json>) [--context-policy …] [--max-stages N] [--no-stop-on-failure] [--skip-validate-stages] [--force]`
+- `init <id> (--stages <json> | --workflow <json>) [--param name=value …] [--context-policy …] [--max-stages N] [--no-stop-on-failure] [--skip-validate-stages] [--force]`
 - `tick <id>` → next action · `drive <id> [--max-steps N]` → auto-run until an agent is needed · `plan <id>` → **dry-run** the resolved stage plan
 - `complete-bash-stage <id> --exit-code N --output-path <f> [--error "…"]` · `complete-json-stage <id> --output-path <f>`
 - `start-primitive-child <id> --child-cmd <cmd> --child-run-id <id>` · `advance <id>` · `fail <id>` · `status <id>` · `runs` · `budget-add`
@@ -151,7 +151,7 @@ with `/agentflow:run-workflow`. See [Workflow-file schema](#workflow-file-schema
 
 ### `run-workflow` — execute a workflow-file
 
-`/agentflow:run-workflow <workflow.json> [--run-id NAME] [--dry-run]` = `pipe init --workflow` + `pipe drive` (or
+`/agentflow:run-workflow <workflow.json> [--param name=value …] [--run-id NAME] [--dry-run]` = `pipe init --workflow` + `pipe drive` (or
 `pipe plan` for `--dry-run`). The one-command way to execute a saved pipeline.
 
 ---
@@ -177,6 +177,11 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
 {
   "name": "my-flow",
   "description": "...",
+  "params": {                                              // optional: per-invocation inputs
+    "target": { "required": true, "description": "..." },  // required → must pass --param target=...
+    "glob":   { "default": "**/*" },                       // default when --param omitted
+    "exclude": ""                                          // bare value = its default
+  },
   "config": { "context_policy": "summary", "max_auto_continues": 50, "stop_on_failure": true },
   "stages": [
     {
@@ -194,8 +199,13 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
 - **json** → `{ "value": <any JSON; string leaves resolve templates>, "output_path"?: "…" }`
 - **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate", "init_args": [ … ] }`
 
-**Wiring templates** (resolved at run time): `{{run.id}}`, `{{run.dir}}`,
-`{{stages.<name>.result_pointer}}`, `{{stages.<name>.run_id}}` — with filters `|json` `|shell` `|raw`.
+**Params** are supplied at run time with `--param name=value` (repeatable) and referenced anywhere as
+`{{params.<name>}}` (use `|shell` when injecting into a `bash` command). A `required` param with no
+value aborts `init`; declared defaults apply otherwise.
+
+**Wiring templates** (resolved at run time): `{{run.id}}`, `{{run.dir}}`, `{{workflow.dir}}`,
+`{{params.<name>}}`, `{{stages.<name>.result_pointer}}`, `{{stages.<name>.run_id}}` — with filters
+`|json` `|shell` `|raw`.
 
 ---
 

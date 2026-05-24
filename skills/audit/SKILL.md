@@ -45,40 +45,39 @@ Echo the resolved config + run-id in one line. If target has > 200 files, ask fo
 
 Create `.agentflow/audit/<run-id>/` (recipe scratch) and `.agentflow/pipe/<run-id>/` (pipeline state).
 
-## Step 2 — Export the discover env vars
+## Step 2 — Resolve the discover params
 
 The 6-stage structure is shipped as a **self-contained declarative workflow-file** at
 `${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json` (this is the canonical, reusable
 artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the sibling
 `discover.mjs` via `{{workflow.dir}}` (so the whole `workflows/audit/` folder is movable);
-the script reads the target/glob from the environment and emits a /agentflow:foreach-compatible
-items array with a per-file `content_hash` (for the review `--cache`).
+the script emits a /agentflow:foreach-compatible items array with a per-file `content_hash`
+(for the review `--cache`).
 
-Export these before init (resolve `${CLAUDE_PLUGIN_ROOT}` to its real path here):
+Per-invocation inputs are **declared params**, passed to `init` with `--param` (no env exports):
+- `target` (**required**) — the directory to audit
+- `glob` (default `**/*`) — comma-separated include globs, e.g. `**/*.cs`
+- `exclude` (default empty) — comma-separated exclude globs
 
-```bash
-export AUDIT_TARGET="<resolved-target-path>"
-export AUDIT_GLOB="<file_glob>"          # e.g. "**/*.cs"; default "**/*"
-export AUDIT_EXCLUDE="<file_exclude>"    # comma-separated globs; may be empty
-```
-
-(No `AUDIT_DISCOVER` needed — the workflow finds its own script via `{{workflow.dir}}`.) To tune
-the review/digest models or group depth, copy the whole `workflows/audit/` folder into your project's
-`workflows/` and edit the `--model` / `--method-config` values; pass that copy's `workflow.json` to `--workflow`.
+To tune the review/digest models or group depth, copy the whole `workflows/audit/` folder into your
+project's `workflows/` and edit the `--model` / `--method-config` values; pass that copy's
+`workflow.json` to `--workflow`.
 
 ## Step 3 — (the pipeline is the workflow-file)
 
 No stages.json to build. The workflow-file already wires the 6 stages with declarative
-templates (`{{stages.<name>.run_id}}`, `{{stages.<name>.result_pointer}}`, `{{run.dir}}`),
-resolved by /agentflow:pipe at tick time. The stages are: `discover` (bash) → `review` (/agentflow:foreach,
-`--kind code-review --cache`) → `build-group-input` (json) → `partition` (/agentflow:group path-prefix)
-→ `build-digest-inputs` (json) → `digest` (/agentflow:reduce, markdown).
+templates (`{{stages.<name>.run_id}}`, `{{stages.<name>.result_pointer}}`, `{{run.dir}}`,
+`{{params.*}}`), resolved by /agentflow:pipe at tick time. The stages are: `discover` (bash) →
+`review` (/agentflow:foreach, `--kind code-review --cache`) → `build-group-input` (json) →
+`partition` (/agentflow:group path-prefix) → `build-digest-inputs` (json) → `digest` (/agentflow:reduce, markdown).
 
 ## Step 4 — Validate and init the pipe
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> \
   --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json" \
+  --param target="<resolved-target-path>" \
+  [--param glob="**/*.cs"] [--param exclude="<globs>"] \
   [--no-stop-on-failure if user passed --keep-going] \
   [--force if --run-id was explicitly provided and overrides existing]
 ```

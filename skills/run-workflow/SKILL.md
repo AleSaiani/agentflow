@@ -5,7 +5,7 @@ description: |
 
   USE when the user points at a workflow JSON ("run this workflow", "run workflows/audit/workflow.json", "run my pipeline") or wants to run a saved `WorkflowSpec`. Workflows are normally self-contained folders (`workflows/<name>/workflow.json` + sibling scripts), but a bare `.json` path also works.
 allowed-tools: Bash, Read, Write, Agent
-argument-hint: <workflow.json> [--run-id NAME] [--dry-run]
+argument-hint: <workflow.json> [--param name=value ...] [--run-id NAME] [--dry-run]
 ---
 
 # /agentflow:run-workflow — execute a workflow-file
@@ -21,10 +21,14 @@ scripts via `{{workflow.dir}}`, so it runs unchanged wherever the folder is. Pic
 ## 1. Init the pipe from the workflow
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> --workflow <workflow.json> [--force]
+node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> --workflow <workflow.json> \
+  [--param name=value ...] [--force]
 ```
 
 `init` runs preflight validation on every primitive stage (catches bad flags before anything runs).
+If the workflow declares `params`, pass each with `--param name=value` (a **required** param with no
+value aborts init; declared defaults apply otherwise). Map the user's natural-language inputs to the
+right params — e.g. *"audit src for bugs"* → `--param target=src`.
 
 ## 2a. `--dry-run` — preview only
 

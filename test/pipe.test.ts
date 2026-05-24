@@ -105,7 +105,7 @@ test("pipe: the shipped audit workflow-file validates and inits (dogfood)", () =
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const repo = resolve(".");
   const env = { PIPE_STATE_DIR: dir, CLAUDE_PLUGIN_ROOT: repo };
-  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit", "workflow.json")]);
+  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit", "workflow.json"), "--param", "target=examples/fake-repo"]);
   assert.equal(init.stages, 6);
   const status = run(env, ["status", "audit-x"]);
   assert.deepEqual(
@@ -119,12 +119,36 @@ test("pipe: {{workflow.dir}} resolves to the workflow file's folder (self-contai
   const repo = resolve(".");
   const env = { PIPE_STATE_DIR: dir };
   const wf = join(repo, "workflows", "audit", "workflow.json");
-  run(env, ["init", "wfdir", "--workflow", wf]);
+  run(env, ["init", "wfdir", "--workflow", wf, "--param", "target=examples/fake-repo"]);
   const plan = run(env, ["plan", "wfdir"]);
   const discover = plan.plan.find((s: any) => s.name === "discover");
   // {{workflow.dir}} must be resolved to the audit folder's discover.mjs, not left literal
   assert.ok(!discover.command.includes("{{workflow.dir}}"), "workflow.dir should be resolved");
   assert.match(discover.command.replace(/\\/g, "/"), /workflows\/audit\/discover\.mjs/);
+});
+
+test("pipe: workflow params — defaults, --param override, required-missing errors", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const wfDir = mkdtempSync(join(tmpdir(), "wf-"));
+  const wf = join(wfDir, "workflow.json");
+  writeFileSync(
+    wf,
+    JSON.stringify({
+      name: "p",
+      params: { target: { default: "src" }, glob: "**/*", must: { required: true } },
+      stages: [{ type: "bash", name: "s", spec: { command: "echo {{params.target}} {{params.glob}} {{params.must}} > $PIPE_OUTPUT_PATH" } }],
+    }),
+    "utf8",
+  );
+  const env = { PIPE_STATE_DIR: dir };
+
+  // required 'must' missing → non-zero exit
+  assert.throws(() => run(env, ["init", "p1", "--workflow", wf]));
+
+  // defaults + override resolve in the plan
+  run(env, ["init", "p2", "--workflow", wf, "--param", "must=hello", "--param", "glob=*.cs"]);
+  const cmd = run(env, ["plan", "p2"]).plan[0].command;
+  assert.match(cmd, /echo src \*\.cs hello/); // target default, glob overridden, must provided
 });
 
 test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {

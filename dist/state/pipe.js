@@ -72,6 +72,13 @@ function resolveTemplate(value, state) {
                 return applyFilter(join(stateDir(CMD), state["run_id"] ?? ""), filterName);
             return whole;
         }
+        if (parts[0] === "params" && parts.length === 2) {
+            // {{params.<name>}} → the resolved parameter value (workflow default or --param override).
+            const p = state["params"]?.[parts[1]];
+            if (p === undefined)
+                return whole;
+            return applyFilter(String(p), filterName);
+        }
         if (parts[0] === "workflow" && parts.length === 2 && parts[1] === "dir") {
             // The directory the workflow-file lives in — lets a workflow reference its own scripts
             // relatively (`{{workflow.dir}}/discover.mjs`), so the folder is self-contained and movable.
@@ -223,6 +230,7 @@ function cmdInit(args) {
             "max-stages": { type: "string", default: "20" },
             "stop-on-failure": { type: "boolean" },
             "no-stop-on-failure": { type: "boolean" },
+            param: { type: "string", multiple: true },
             force: { type: "boolean", default: false },
             "skip-validate-stages": { type: "boolean", default: false },
         },
@@ -239,17 +247,44 @@ function cmdInit(args) {
     let stagesRaw;
     let workflowConfig = {};
     let workflowDir = null;
+    let paramSpec = {};
     if (workflowPath) {
         const wf = JSON.parse(readFileSync(workflowPath, "utf8"));
         if (typeof wf !== "object" || wf === null || !Array.isArray(wf.stages))
             die("error: workflow file must be an object with a 'stages' array");
         stagesRaw = wf.stages;
         workflowConfig = wf.config ?? {};
+        paramSpec = wf.params ?? {};
         workflowDir = dirname(resolve(workflowPath)); // for {{workflow.dir}} — self-contained workflows
     }
     else {
         stagesRaw = JSON.parse(readFileSync(stagesPath, "utf8"));
     }
+    // Parameters: the workflow's `params` declares defaults (bare value, or {default, required,
+    // description}); `--param k=v` overrides. Resolved values are exposed as {{params.<name>}}.
+    const paramOverrides = {};
+    for (const kv of values["param"] ?? []) {
+        const eq = kv.indexOf("=");
+        if (eq < 0)
+            die(`error: --param must be name=value, got '${kv}'`);
+        paramOverrides[kv.slice(0, eq)] = kv.slice(eq + 1);
+    }
+    const params = {};
+    for (const [name, decl] of Object.entries(paramSpec)) {
+        const obj = decl && typeof decl === "object" && !Array.isArray(decl) ? decl : null;
+        const def = obj && "default" in obj ? obj["default"] : obj ? undefined : decl;
+        const val = name in paramOverrides ? paramOverrides[name] : def;
+        if (val === undefined) {
+            if (obj && obj["required"])
+                die(`error: required workflow param '${name}' was not provided (--param ${name}=...)`);
+            continue;
+        }
+        params[name] = val;
+    }
+    // Undeclared --param values still pass through (handy for --stages runs and ad-hoc params).
+    for (const [k, v] of Object.entries(paramOverrides))
+        if (!(k in params))
+            params[k] = v;
     const stages = validateStages(stagesRaw);
     const maxStages = parseInt(values["max-stages"], 10);
     if (stages.length > maxStages)
@@ -275,7 +310,7 @@ function cmdInit(args) {
         max_auto_continues: pick("max_auto_continues", parseInt(values["max-auto-continues"], 10)),
         max_stages: maxStages,
         stop_on_failure: pick("stop_on_failure", stopOnFailure),
-    }, { stages, stage_index: 0, stop_reason: null, workflow_dir: workflowDir });
+    }, { stages, stage_index: 0, stop_reason: null, workflow_dir: workflowDir, params });
     const p = pathFor(runId);
     if (existsSync(p) && !values["force"])
         die(`error: state already exists at ${p}; use --force to overwrite`);

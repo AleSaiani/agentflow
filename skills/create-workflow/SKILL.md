@@ -24,16 +24,30 @@ You design a `WorkflowSpec` JSON that wires the primitives, save it as a **self-
 `{{workflow.dir}}` template — never an absolute path or a shared `workflows/` script. Move the folder
 anywhere (another repo, another machine) and it still runs.
 
+**Input** — you can author from a plain description **or from a file**: if the user passes a path (e.g.
+`/agentflow:create-workflow ./my-flow.md`), read that file with `Read` and treat its contents as the
+description/spec. This is the "import" side of the round-trip below — re-deriving a workflow from an
+exported `.md` (the result may differ slightly from the original; that's expected).
+
 ## WorkflowSpec shape
 
 ```jsonc
 {
   "name": "my-flow",
   "description": "...",
+  "params": {                                             // optional: per-invocation inputs
+    "target":  { "required": true, "description": "..." },// required → must be passed with --param
+    "glob":    { "default": "**/*", "description": "..." },// default used when --param omitted
+    "exclude": ""                                          // bare value = its default
+  },
   "config": { "context_policy": "summary", "max_auto_continues": 50, "stop_on_failure": true },
   "stages": [ /* Stage[] */ ]
 }
 ```
+
+**Params** make a workflow reusable without editing it: declare them here, reference them as
+`{{params.<name>}}` in any stage (use `|shell` when injecting into a `bash` command), and the user
+supplies values at run time with `--param name=value`. Prefer params over hardcoded paths/globs.
 
 A **Stage**:
 
@@ -53,9 +67,9 @@ A **Stage**:
 ## Wiring templates (resolved by /agentflow:pipe at run time)
 
 `{{run.id}}` · `{{run.dir}}` · `{{workflow.dir}}` (the folder this workflow-file lives in — use it to
-call sibling scripts: `node "{{workflow.dir}}/discover.mjs"`) · `{{stages.<name>.result_pointer}}` ·
-`{{stages.<name>.run_id}}` — optional filters: `|json` `|shell` `|raw`. Forward references stay
-literal until they resolve.
+call sibling scripts: `node "{{workflow.dir}}/discover.mjs"`) · `{{params.<name>}}` (a declared
+parameter) · `{{stages.<name>.result_pointer}}` · `{{stages.<name>.run_id}}` — optional filters:
+`|json` `|shell` `|raw`. Forward references stay literal until they resolve.
 
 ## The primitives as stages
 
@@ -100,3 +114,15 @@ is fuzzy, make it a step whose **structured output** a later guard reads — nev
 
 See `workflows/audit/workflow.json` for a complete worked example (discover via `{{workflow.dir}}/discover.mjs`
 → foreach review → group → reduce digest).
+
+## Export to a human-readable `.md` (a view)
+
+When the user wants to read, review, or share a workflow, render its `workflow.json` as markdown:
+title + description, a **Params** list (name · default/required · description), and a numbered **Stages**
+list (each: name, type, and a one-line summary of `spec` — the command, the primitive `cmd` + key
+init_args, or the json value — plus any `when` guard and `{{…}}` wiring). Write it next to the spec as
+`workflows/<name>/workflow.md`. This is a lossy *view*, not a second source of truth.
+
+**Round-trip:** that `.md` can be fed straight back to `/agentflow:create-workflow ./workflows/<name>/workflow.md`
+to re-derive a workflow — handy for editing in prose. The rebuilt spec may differ slightly from the
+original (the `.md` is a human summary, not an exact serialization); that's expected.
