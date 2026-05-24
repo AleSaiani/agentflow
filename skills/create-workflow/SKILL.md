@@ -70,7 +70,9 @@ an arbitrary skill, an MCP-using agent, `claude -p`, or a different model as a s
 
 **Params** make a workflow reusable without editing it: declare them in frontmatter, reference them as
 `{{params.<name>}}` in any stage (use `|shell` when injecting into a `bash` command), and the user
-supplies values at run time with `--param name=value`. Prefer params over hardcoded paths/globs.
+supplies values at run time with `--param name=value`. Prefer params over hardcoded paths/globs. A
+param may declare a **`type`** (`string`/`number`/`integer`/`boolean`) and/or an **`enum`**
+(`{ enum: [prod, staging] }`) — validated + coerced at run start, so a bad input fails fast.
 
 ## Wiring templates (resolved by /agentflow:pipe at run time)
 

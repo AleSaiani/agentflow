@@ -312,10 +312,27 @@ function cmdInit(args: string[]): void {
   for (const [name, decl] of Object.entries(paramSpec)) {
     const obj = decl && typeof decl === "object" && !Array.isArray(decl) ? (decl as Record<string, unknown>) : null;
     const def = obj && "default" in obj ? obj["default"] : obj ? undefined : decl;
-    const val = name in paramOverrides ? paramOverrides[name] : def;
+    let val: unknown = name in paramOverrides ? paramOverrides[name] : def;
     if (val === undefined) {
       if (obj && obj["required"]) die(`error: required workflow param '${name}' was not provided (--param ${name}=...)`);
       continue;
+    }
+    // Optional type/enum validation + coercion (params arrive as strings from --param).
+    if (obj) {
+      const enumVals = (obj["enum"] ?? obj["values"]) as unknown[] | undefined;
+      if (Array.isArray(enumVals) && !enumVals.map(String).includes(String(val)))
+        die(`error: param '${name}'=${JSON.stringify(val)} not in enum [${enumVals.join(", ")}]`);
+      const type = obj["type"] as string | undefined;
+      if (type === "number" || type === "integer") {
+        const n = Number(val);
+        if (!Number.isFinite(n) || (type === "integer" && !Number.isInteger(n)))
+          die(`error: param '${name}'=${JSON.stringify(val)} is not a valid ${type}`);
+        val = n;
+      } else if (type === "boolean") {
+        const s = String(val).toLowerCase();
+        if (s !== "true" && s !== "false") die(`error: param '${name}'=${JSON.stringify(val)} must be true|false`);
+        val = s === "true";
+      }
     }
     params[name] = val;
   }

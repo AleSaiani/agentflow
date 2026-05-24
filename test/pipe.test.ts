@@ -225,6 +225,27 @@ test("pipe: a `step` child stage is a registered primitive (drive→needs_agent,
   assert.equal(adv.pipe_status, "done");
 });
 
+test("pipe: typed params validate + coerce (enum / integer / boolean)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const wf = join(dir, "typed.json");
+  writeFileSync(
+    wf,
+    JSON.stringify({
+      params: { env: { enum: ["prod", "staging"], required: true }, retries: { type: "integer", default: 3 }, verbose: { type: "boolean", default: false } },
+      stages: [{ name: "s", type: "bash", spec: { command: 'echo {{params.env}} {{params.retries}} {{params.verbose}} > "$PIPE_OUTPUT_PATH"' } }],
+    }),
+    "utf8",
+  );
+  // enum / integer / boolean violations all abort init
+  assert.throws(() => run(env, ["init", "e1", "--workflow", wf, "--param", "env=dev"]));
+  assert.throws(() => run(env, ["init", "e2", "--workflow", wf, "--param", "env=prod", "--param", "retries=abc"]));
+  assert.throws(() => run(env, ["init", "e3", "--workflow", wf, "--param", "env=prod", "--param", "verbose=yes"]));
+  // valid → coerced and resolved into the plan
+  run(env, ["init", "ok", "--workflow", wf, "--param", "env=staging", "--param", "verbose=true"]);
+  assert.match(run(env, ["plan", "ok"]).plan[0].command, /echo staging 3 true/);
+});
+
 test("pipe: a bash stage retries on failure and a timeout bounds each attempt", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };

@@ -240,7 +240,9 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
 
 **Params** are supplied at run time with `--param name=value` (repeatable) and referenced anywhere as
 `{{params.<name>}}` (use `|shell` when injecting into a `bash` command). A `required` param with no
-value aborts `init`; declared defaults apply otherwise.
+value aborts `init`; declared defaults apply otherwise. A param may declare a **`type`**
+(`string`/`number`/`integer`/`boolean`) and/or an **`enum`** (`{ "enum": ["prod","staging"] }`) — values
+are validated and coerced at `init`, and a bad value aborts with a clear error.
 
 **`output_schema`** (bash/json stages) validates the stage's JSON output against a restricted
 JSON-schema (`type`, `required`, `properties`, `items`, `enum`) before advancing; a mismatch fails the
