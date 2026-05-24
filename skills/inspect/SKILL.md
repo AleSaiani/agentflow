@@ -1,13 +1,16 @@
 ---
 name: inspect
 description: |
-  Read-only inspector over runs of any framework primitive (foreach / group / iterate / reduce / pipe). Lists runs, shows a single run's status with primitive-specific extras, draws the child tree of a /pipe run, aggregates budget across a run and its children, prints a timeline of events.
+  Read-only inspector over runs of any primitive (enumerate / foreach / group / reduce / iterate /
+  pipe). Lists runs, shows a run's status, draws a /flow:pipe child tree, aggregates budget across a
+  run and its children, prints a timeline. Never mutates state.
 
-  USE this skill whenever the user wants to debug, inspect, audit, or report on the state of any framework run — "show me", "what happened", "how much did X cost", "why did Y fail", "list active runs". `/inspect` never mutates state.
+  USE whenever the user wants to debug, inspect, or report on a run — "show me", "what happened", "how
+  much did X cost", "why did Y fail", "list active runs".
 
-  DO NOT use this for: actually doing work (the other primitives do that), or for inspecting non-framework state (it only knows about `.foreach/`, `.group/`, `.iterate/`, `.reduce/`, `.pipe/`).
-
-  Explicit user invocation: `/inspect runs` (list all), `/inspect show <run-id>`, `/inspect tree <pipe-run-id>`, `/inspect budget <run-id>`, `/inspect timeline <run-id>`.
+  DON'T use to do work (the other skills do that) or for non-Flow state (it only knows `.enumerate/`,
+  `.foreach/`, `.group/`, `.iterate/`, `.reduce/`, `.pipe/`).
+  Explicit: `/flow:inspect runs | show <id> | tree <id> | budget <id> | timeline <id>`.
 allowed-tools: Bash, Read
 argument-hint: runs | show <run-id> | tree <run-id> | budget <run-id> | timeline <run-id>
 disable-model-invocation: false

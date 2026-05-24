@@ -1,25 +1,19 @@
 ---
 name: audit
 description: |
-  Deep code audit recipe: find files in a target tree, review each one (LLM), partition by component, then produce an executive digest with hotspot list and recurring patterns. A layer-3 recipe — a thin shell over /pipe that wires the framework primitives.
+  Deep code-audit recipe: discover files in a target → review each (LLM, cached) → partition by
+  component → executive digest with hotspots and recurring patterns. A layer-3 recipe over /flow:pipe
+  (the 6-stage pipeline and caching are detailed in the body).
 
-  USE this skill autonomously when:
-  - the user asks for a "code review" / "audit" / "find bugs" / "review every file" against a folder, repo, or glob;
-  - the target is large enough that per-file parallelism + structured digest beats inline reading (>= ~10 files);
-  - the user wants a persisted, structured report (executive summary, hotspots), not a conversational answer.
+  USE when the user asks to "review / audit / find bugs across" a folder, repo, or glob and wants a
+  persisted, structured report — and the target is large enough (≥ ~10 files) that per-file parallelism
+  plus a digest beats reading inline.
 
-  DO NOT use this skill autonomously when:
-  - the user names a small specific set of files — read them inline;
-  - the request is exploratory ("what does this folder do?") rather than audit-oriented;
-  - the user wants a security audit specifically — that calls for the `audit` kind on /foreach, possibly via a separate `/security-audit-deep` recipe (not built yet).
-
-  Explicit user invocation (`/flow:audit ...`) bypasses these checks.
-
-  Pipeline (6 stages with declarative wiring): bash discover (with per-file content_hash) → /foreach code-review with cache → bash build group-input → /group path-prefix → bash build digest-inputs → /reduce digest. No primitive logic added — the recipe is a thin shell over /pipe with wiring templates ({{stages.X.run_id}}, {{stages.X.result_pointer}}) so child run-ids are NOT hardcoded.
-
-  Incremental re-runs are cheap: per-file content_hash + `/foreach --cache` means unchanged files skip the agent dispatch. The run-id itself includes a manifest hash, so changing any source file forces a fresh run while leaving the cache intact for files that didn't change.
+  DON'T use for a few named files (read them inline), exploratory questions ("what does this do?"), or
+  generic per-item work that isn't a code review (→ /flow:foreach).
+  Explicit invocation (`/flow:audit …`) skips these checks.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|sonnet|opus] [--review-concurrency N] [--group-depth N] [--digest-model opus|sonnet|haiku] [--run-id NAME]
+argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|sonnet|opus] [--group-depth N] [--digest-model opus|sonnet|haiku] [--run-id NAME]
 ---
 
 # /flow:audit

@@ -1,23 +1,19 @@
 ---
 name: pipe
 description: |
-  Run an ordered pipeline of stages, each one either a bash command or an invocation of another primitive (/foreach, /group, /reduce, /iterate). The composer of the toolkit — /pipe holds no loop, map, or fold semantics; those are provided by the primitives it composes.
+  Run an ordered pipeline of stages — each a bash command, a json write, or another primitive
+  (/flow:enumerate, /flow:foreach, /flow:group, /flow:reduce, or a loop). The composer: it holds no
+  map/fold/loop of its own; it sequences the primitives that do, with declarative wiring and per-stage
+  `when` guards.
 
-  USE this skill autonomously when:
-  - the user describes a multi-step workflow with at least 2 distinct steps (e.g. "fetch issues, then triage them, then summarize", "review files, then group findings, then report");
-  - the steps have a clear order and the output of one step feeds the next;
-  - at least one step needs the durability of a persisted run (long-running primitive, cross-turn work).
+  USE for a multi-step workflow with ≥ 2 ordered steps where one feeds the next — "fetch issues, triage
+  each, then summarize", "review files, group findings, then report". To run a SAVED workflow-file use
+  /flow:run; to AUTHOR one use /flow:compose.
 
-  DO NOT use this skill autonomously when:
-  - it is a single step — invoke the primitive directly;
-  - the steps are independent and would naturally run in parallel — that's `/foreach` over a list of stage specs, not `/pipe`;
-  - the user is exploring a one-off question — discuss the design first, then build the recipe if it stabilizes.
-
-  Explicit user invocation (`/pipe ...`) bypasses these checks.
-
-  V1 stage types: `bash` (synchronous, captures stdout to a file) and `primitive` (one of foreach/group/reduce/iterate; the pipe awaits its completion via cross-turn auto-continue). The `tick` command is a state machine: it tells the orchestrator the next action (run a bash command, spawn a child primitive, advance after a child finishes, or report final status).
+  DON'T use for a single step (call the primitive directly) or independent parallel work over a list
+  (that's /flow:foreach). Explicit invocation (`/flow:pipe …`) skips these checks.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: --file <spec.md> | --stages <path-to-stages.json> [--run-id NAME] [--context-policy summary|none|last-only|full] [--no-stop-on-failure]
+argument-hint: (--stages <json> | --workflow <json>) [--context-policy summary|none|last-only|full] [--no-stop-on-failure]
 ---
 
 # /pipe

@@ -1,27 +1,18 @@
 ---
 name: group
 description: |
-  Partition N items into K groups by key. Output is items.json-compatible — feed it directly to /foreach to process per-group.
+  Partition N items into K groups by key — the partition step. Output is items.json-compatible: feed
+  it straight to /flow:foreach to process per group. Methods: path-prefix / regex / jsonpath
+  (deterministic) or llm-classify (semantic, when no deterministic key works).
 
-  USE this skill autonomously when:
-  - the user wants to partition a set of items by a key (path, domain, label, severity, component, ...);
-  - the next natural step would be to process each partition (e.g. "group migrations by table, then validate each group");
-  - input is large enough (typically >= 10 items) that grouping reduces noise.
+  USE when the user wants to split a set by a key before acting on each part — "group these by
+  component/table/label/severity, then handle each group", "bucket the issues by …". Trigger on the
+  intent; for a small set, ask whether grouping is worth it or just process inline.
 
-  DO NOT use this skill autonomously when:
-  - input is small (< 10 items) — process inline or pass to /foreach directly;
-  - the user wants a single aggregate (use /reduce instead — collapse N to 1);
-  - grouping is not actually a step toward downstream work (no point partitioning if you do not process per group).
-
-  Methods:
-  - **path-prefix** (deterministic): group by leading path segments. Good for "by directory", "by module".
-  - **regex** (deterministic): group by capture group on a field (id or data path).
-  - **jsonpath** (deterministic): group by dotted JSON path into the item.
-  - **llm-classify** (LLM-driven): semantic grouping when no deterministic key works. Slower, costs an agent dispatch.
-
-  Explicit user invocation (`/group ...`) bypasses the threshold guardrail.
+  DON'T use to produce a single aggregate (→ /flow:reduce — collapse N to 1), or when you won't
+  actually process per group afterward. Explicit invocation (`/flow:group …`) skips the size check.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: --file <spec.md> | --from-run <run-id> --method <path-prefix|regex|jsonpath|llm-classify> [--method-config <json>] [--run-id NAME] [--model haiku|sonnet|opus]
+argument-hint: --method path-prefix|regex|jsonpath|llm-classify --input-source <descriptor> [--method-config '{…}'] [--model haiku|sonnet|opus]
 ---
 
 # /group

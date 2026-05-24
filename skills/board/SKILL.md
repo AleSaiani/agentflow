@@ -8,11 +8,8 @@ description: |
   - the user says "what's going on", "show me everything", "any active runs", "where are we", "any pipelines running";
   - the user wants a one-shot health check + suggested next action.
 
-  DO NOT use this for:
-  - inspecting a specific run in depth (use `/inspect show <id>` or `/inspect tree <id>`);
-  - modifying state (board is read-only, like all `/inspect` flavors).
-
-  Explicit user invocation: `/board` (no args) or `/board --json` for structured output.
+  DON'T use this to inspect a specific run in depth (use `/flow:inspect show <id>` or `tree <id>`), or
+  to modify state (board is read-only). Explicit: `/flow:board` or `/flow:board --json`.
 allowed-tools: Bash, Read
 argument-hint: [--json] [--no-failed]
 disable-model-invocation: false

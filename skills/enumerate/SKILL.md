@@ -3,16 +3,13 @@ name: enumerate
 description: |
   Generate a list of items from a higher-level spec — the **unfold** (1→N) primitive. Turn an outline into chapters, a feature into tasks, a goal into a checklist. Output is an items.json array that `/flow:foreach` (map) or `/flow:group` (partition) consume. The complement of `/flow:reduce` (N→1).
 
-  USE this skill when:
-  - the user wants to expand/break down a spec into a structured list to process next ("break this outline into chapters", "list the tasks for this feature", "turn this goal into a checklist");
-  - producing the list itself needs judgment (not a deterministic glob/file listing — that is a plain Source, not /enumerate);
-  - the natural next step is to process each generated item (`/flow:foreach`) or partition them (`/flow:group`).
+  USE when the user wants to break something down into a list to act on next — "break this outline into
+  chapters", "list the tasks for this feature", "what are the steps, then do each", "turn this into a
+  checklist". Producing the list itself takes judgment.
 
-  DO NOT use when:
-  - the list already exists (a file, a glob, a markdown checklist) — feed that Source directly to `/flow:foreach`;
-  - you only need a single synthesized output, not a list — use `/flow:reduce`.
-
-  Explicit user invocation: `/flow:enumerate --prompt "<generation instructions>" [--input <source material>]`.
+  DON'T use when the list already exists (a file, a glob, a markdown checklist) — point /flow:foreach at
+  it directly; or when you need a single synthesized output (→ /flow:reduce).
+  Explicit: `/flow:enumerate --prompt "<what to produce>" [--input <source>]`.
 allowed-tools: Bash, Read, Write, Agent
 argument-hint: --prompt "<instructions>" [--input <path>] [--model haiku|sonnet|opus] [--execution main-thread|subagent]
 ---

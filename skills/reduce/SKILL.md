@@ -1,21 +1,16 @@
 ---
 name: reduce
 description: |
-  Collapse N results into 1 digest (markdown or JSON) via a single agent.
+  Collapse N results into 1 digest (markdown or JSON) via a single agent — the **fold** (N→1).
 
-  USE this skill autonomously when:
-  - a finished /foreach run exists and the user asks for a summary, rollup, top-N, hotspot list, or grouped report;
-  - inputs are MANY (typically >= 5 result objects) so a structured digest beats inline summarization;
-  - the user wants a persisted artifact (a file at `.reduce/<run-id>/digest.<md|json>`) rather than a chat reply.
+  USE when finished work needs synthesizing into one artifact — a /flow:foreach run, several result
+  files, or inline data: "summarize all these", "roll this up", "give me one report / top-N / hotspot
+  list from these". Best with a persisted source and many inputs.
 
-  DO NOT use this skill autonomously when:
-  - inputs are few (< 5) — summarize inline in chat;
-  - the user is asking a one-off question about results, not requesting a structured digest;
-  - there is no persisted source: /reduce needs a /foreach run, a result file, or inline data, NOT a free-form question.
-
-  Explicit user invocation (`/reduce ...`) bypasses these rules.
+  DON'T use for a handful of results (summarize inline), a one-off question about results, or when
+  there's no persisted source to read. Explicit invocation (`/flow:reduce …`) skips these checks.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: --file <spec.md> | --from-run <enum-run-id> --task "<prompt>" [--model haiku|sonnet|opus] [--format markdown|json] [--run-id NAME]
+argument-hint: --inputs <descriptors.json> --prompt "<synthesis>" [--output-format markdown|json] [--model haiku|sonnet|opus]
 ---
 
 # /reduce

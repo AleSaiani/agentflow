@@ -1,24 +1,23 @@
 ---
 name: foreach
 description: |
-  Apply the SAME task to MANY items in parallel chunks across N subagents, with persistent state and cross-turn auto-continue.
+  Apply ONE operation to EVERY item of a list — the **map** (N→N). The operation is a prompt; items
+  come from a JSON list, a markdown checklist, or another run's output. Runs in parallel subagents or
+  inline in the main thread, with persistent state and cross-turn auto-continue.
 
-  USE this skill autonomously ONLY when ALL of the following hold:
-  - the user wants the same task applied across MANY items (typically >= 15);
-  - the user signals "scope-wide" intent: "every", "all", "entire codebase", glob patterns ("**/*.cs"), a folder, "each migration", "all PRs", etc.;
-  - per-item parallelism actually saves time (the task is non-trivial AND items are independent).
+  USE on any "do the same thing to each of these" intent — formal OR casual: "for each X…", "per ogni…",
+  "go through these one by one", "do every item in TODO.md", "review each of these files", "handle all
+  of them", a glob, a folder. Trigger on the INTENT, then judge by count (the count gate, Step 2.5):
+  - 1–2 items → just do it inline, no machinery;
+  - a borderline handful (~3–10) → ask whether to use the durable/parallel mechanism or handle inline;
+  - genuinely many, or heavy/independent items → use foreach.
 
-  DO NOT use this skill autonomously when:
-  - the user names a specific small set ("look at foo.py and bar.py");
-  - the count is small (< 15 items) — read them inline in a single agent instead;
-  - the task requires cross-item reasoning that cannot be split (use a single agent + /reduce after);
-  - the user is exploring/asking a question rather than running a batch operation.
+  DON'T use when the list must first be generated from a spec (→ /flow:enumerate, then foreach), or you
+  need one combined output (→ /flow:reduce). For the prebuilt "review every file → digest", use /flow:audit.
 
-  When in doubt, read items inline. The orchestration overhead of /foreach is wasteful for small batches and confusing for exploratory work.
-
-  Explicit user invocation (`/foreach ...`) bypasses these rules — the user knows what they want.
+  Explicit invocation (`/flow:foreach …`) skips the count check — the user already chose the mechanism.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: --file <spec.md> | --list "<prompt>" --task "<prompt>" [--run-id NAME] [--concurrency N] [--chunk-size N|auto] [--model haiku|sonnet|opus] [--no-auto-continue]
+argument-hint: (--items <json> | --checkbox <md> | --source <spec>) --prompt "<operation>" [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--concurrency N] [--cache] [--no-auto-continue]
 ---
 
 # /foreach
@@ -152,6 +151,23 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" init <run-id> \
 The state helper handles `--kind` by reading `${CLAUDE_PLUGIN_ROOT}/skills/foreach/task-kinds.md`, prepending the matching template to the user task-prompt, and storing the result in `state.task_prompt`. After init the prompt is already enriched; downstream dispatch uses it as-is.
 
 If the run-id exists **without `--force`**: ask the user to choose `resume` (skip init, process pending) or `reset` (start over). DO NOT overwrite without confirmation.
+
+## Step 2.5 — Count gate (inline vs ask vs run)
+
+Now that the list is resolved, decide whether `/flow:foreach` is worth its overhead — **unless the
+user invoked `/flow:foreach` explicitly** (then skip this gate and proceed). Judge by the item count
+`total`:
+
+- **`total` ≤ 2** → don't run the machinery. Just do the work inline in this turn and report. (No
+  state file, no subagents — it would only add latency.)
+- **`total` ~3–10** → borderline. Use **AskUserQuestion** to offer the choice, e.g. *"N items — run
+  the durable/parallel mechanism (resumable across turns, one subagent per chunk) or just handle them
+  inline now?"* Proceed per the answer; default to inline if they don't care.
+- **`total` > 10** (or fewer but heavy/long/independent items) → proceed with `/flow:foreach`: it's
+  where persistence + parallelism pay off.
+
+This gate is what lets the skill trigger on a casual "do X for each of these" without forcing the full
+mechanism onto a handful of items.
 
 ## Step 3 — Compute effective chunk_size
 

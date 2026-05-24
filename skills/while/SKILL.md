@@ -5,7 +5,7 @@ description: |
 
   USE when the guard must be checked first — "while there are pending PRs, process the next", "keep refining while the reviewer disagrees", "process the queue while it's non-empty". For running the body first and then checking (at least one run), use `/flow:until`. For a fixed count, use `/flow:repeat`.
 allowed-tools: Bash, Read, Agent
-argument-hint: --stage "<bash>" --while "<bash predicate>" [--max-iterations N]
+argument-hint: --stage "<bash>" --stop "<bash predicate>" --mode while [--max-iterations N]
 ---
 
 # /flow:while — while…do loop (check-first)
