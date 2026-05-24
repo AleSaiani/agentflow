@@ -8,9 +8,9 @@ node_modules/
 coverage/
 
 # Runtime state produced by the primitives when run inside a workspace.
-# Everything lives under a single .flow/ dir (.flow/<cmd>/<run-id>/, .flow/cache, .flow/knowledge).
+# Everything lives under a single .agentflow/ dir (.agentflow/<cmd>/<run-id>/, .agentflow/cache, .agentflow/knowledge).
 # Never commit run state — it is per-invocation, per-machine.
-.flow/
+.agentflow/
 
 # Claude Code local (machine-specific) settings. STATUS.md stays tracked.
 .claude/settings.local.json

@@ -76,7 +76,7 @@ If the user typed `/agentflow:group` explicitly → skip the guardrail.
 
 ## Step 3 — Build the input source descriptor and init state
 
-Write the input source descriptor to `.flow/group/<run-id>/input-source.json`:
+Write the input source descriptor to `.agentflow/group/<run-id>/input-source.json`:
 ```json
 {"source": "run",  "cmd": "foreach", "run_id": "enum-abc123"}
 {"source": "file", "path": "<path-to-json-array>"}
@@ -87,7 +87,7 @@ Then init the state:
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" init <run-id> \
   --method <path-prefix|regex|jsonpath|llm-classify> \
-  --input-source .flow/group/<run-id>/input-source.json \
+  --input-source .agentflow/group/<run-id>/input-source.json \
   --method-config '<json>' \
   --model <model> --min-items <N> \
   --max-auto-continues <N> \
@@ -118,7 +118,7 @@ Skip to Step 5.
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" prepare-classify <run-id>
    ```
-   This writes `.flow/group/<run-id>/items-to-classify.json` and marks state in_progress.
+   This writes `.agentflow/group/<run-id>/items-to-classify.json` and marks state in_progress.
 
 2. Dispatch ONE Agent. Self-contained prompt:
    - `subagent_type`: from config (default `general-purpose`)
@@ -126,11 +126,11 @@ Skip to Step 5.
    - `description`: `group:<run-id>:classify`
    - `prompt`:
      - the user's classify instructions
-     - input file: `.flow/group/<run-id>/items-to-classify.json` (JSON array of `{id, data, ...}`)
-     - output file: `.flow/group/<run-id>/classification.json` (JSON object `{"<item_id>": "<group_id>", ...}` covering EVERY item)
+     - input file: `.agentflow/group/<run-id>/items-to-classify.json` (JSON array of `{id, data, ...}`)
+     - output file: `.agentflow/group/<run-id>/classification.json` (JSON object `{"<item_id>": "<group_id>", ...}` covering EVERY item)
      - **strict I/O rules**:
        - "Read the input file. For EACH item, decide its group based on the classification rule. Do NOT comment while working."
-       - "Write the result to `.flow/group/<run-id>/classification.json` via the `Write` tool: a JSON object mapping every `id` from the input to a `group_id` string. Group IDs should be short, lowercase, hyphenated (e.g. `auth`, `billing`, `data-pipeline`)."
+       - "Write the result to `.agentflow/group/<run-id>/classification.json` via the `Write` tool: a JSON object mapping every `id` from the input to a `group_id` string. Group IDs should be short, lowercase, hyphenated (e.g. `auth`, `billing`, `data-pipeline`)."
        - "Cover EVERY input id. If unsure, use the group `unclassified`."
        - "The file MUST be ONLY the JSON object — no prose, no fence."
        - "Your final response to the orchestrator must be a single line: `OK <group_count>`. Nothing else."
@@ -138,7 +138,7 @@ Skip to Step 5.
 3. Apply the classification:
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" apply-classification <run-id> \
-     --mapping .flow/group/<run-id>/classification.json
+     --mapping .agentflow/group/<run-id>/classification.json
    ```
    This produces `groups.json` and marks done.
 
@@ -152,11 +152,11 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" status <run-id>
 
 Print: `run-id`, `method`, `items_total`, `groups_count`, `output_pointer`, plus a one-line summary of group sizes (e.g. "auth: 12, billing: 8, api: 5, unclassified: 2").
 
-Suggest the next step explicitly: "Output `.flow/group/<run-id>/groups.json` is items.json-compatible. Run `/agentflow:foreach --items .flow/group/<run-id>/groups.json --prompt '...'` to process per group, or `/agentflow:reduce` it for a partition-aware digest."
+Suggest the next step explicitly: "Output `.agentflow/group/<run-id>/groups.json` is items.json-compatible. Run `/agentflow:foreach --items .agentflow/group/<run-id>/groups.json --prompt '...'` to process per group, or `/agentflow:reduce` it for a partition-aware digest."
 
 ## Cross-turn auto-continue
 
-A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.flow/group/`. For /agentflow:group, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /agentflow:group run-id:
+A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.agentflow/group/`. For /agentflow:group, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /agentflow:group run-id:
 - DO NOT re-init.
 - Read state. If method is deterministic → re-run `run-deterministic`. If method is `llm-classify` → check whether `classification.json` exists; if yes, run `apply-classification`; if no, re-dispatch the classify agent (Step 4b.2).
 
@@ -173,12 +173,12 @@ Group .cs files by directory, then review each group together:
 ```bash
 # src.json: {"source":"run","cmd":"foreach","run_id":"review-cs"}
 /agentflow:group --method path-prefix --method-config '{"depth":2}' --input-source src.json --run-id cs-by-dir
-/agentflow:foreach --items .flow/group/cs-by-dir/groups.json \
+/agentflow:foreach --items .agentflow/group/cs-by-dir/groups.json \
            --prompt "Review every file in this group together; cross-reference for cross-file bugs"
 ```
 
 LLM-classify Jira issues by intent (the classify instructions go to the agent at dispatch, Step 4b):
 ```bash
-# issues.json: {"source":"file","path":".flow/pipe/triage/issues.json"}
+# issues.json: {"source":"file","path":".agentflow/pipe/triage/issues.json"}
 /agentflow:group --method llm-classify --input-source issues.json --model sonnet
 ```

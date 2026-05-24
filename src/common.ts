@@ -196,12 +196,12 @@ export function pluginRoot(): string {
   return dirname(dirname(fileURLToPath(import.meta.url)));
 }
 
-/** Runtime dir for a primitive: `<workspace>/.flow/<cmd>/`. Override via env (e.g. FOREACH_STATE_DIR). */
+/** Runtime dir for a primitive: `<workspace>/.agentflow/<cmd>/`. Override via env (e.g. FOREACH_STATE_DIR). */
 export function stateDir(cmd: string): string {
   const env = OVERRIDE_ENV[cmd];
   const override = env ? process.env[env] : undefined;
   if (override) return resolve(override);
-  return join(findWorkspaceRoot(), ".flow", cmd);
+  return join(findWorkspaceRoot(), ".agentflow", cmd);
 }
 
 export function statePath(cmd: string, runId: string): string {
@@ -266,7 +266,7 @@ function sanitizeEntity(entity: string): string {
 export function knowledgeDir(): string {
   const override = process.env["KNOWLEDGE_DIR"];
   if (override) return resolve(override);
-  return join(findWorkspaceRoot(), ".flow", "knowledge");
+  return join(findWorkspaceRoot(), ".agentflow", "knowledge");
 }
 
 export function journalPath(domain: string, entity: string): string {
@@ -499,7 +499,7 @@ export function checkBudgetCaps(state: StateDict): [boolean, string | null] {
 export function cacheRoot(): string {
   const override = process.env["CACHE_DIR"];
   if (override) return resolve(override);
-  return join(findWorkspaceRoot(), ".flow", "cache");
+  return join(findWorkspaceRoot(), ".agentflow", "cache");
 }
 
 /** SHA-256 of the joined parts. Stable across runs as long as inputs are stable. */

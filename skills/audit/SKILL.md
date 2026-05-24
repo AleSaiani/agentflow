@@ -43,7 +43,7 @@ Echo the resolved config + run-id in one line. If target has > 200 files, ask fo
 
 ## Step 1 — Working dirs
 
-Create `.flow/audit/<run-id>/` (recipe scratch) and `.flow/pipe/<run-id>/` (pipeline state).
+Create `.agentflow/audit/<run-id>/` (recipe scratch) and `.agentflow/pipe/<run-id>/` (pipeline state).
 
 ## Step 2 — Export the discover env vars
 
@@ -112,7 +112,7 @@ Output is JSON:
 2. Dispatch ONE digest agent (no fan-out for /agentflow:reduce).
 3. After Agent returns: `state/reduce.js budget-add` for the tokens, then `state/reduce.js complete
    <child-id> --output-path ./<run-id>-audit.md` — write the digest to a **visible file in the
-   workspace root** (e.g. `audit-3f2a-audit.md`), not buried under `.flow/`.
+   workspace root** (e.g. `audit-3f2a-audit.md`), not buried under `.agentflow/`.
 4. Call `drive` once more → returns `done`.
 
 ## Step 6 — Final report
@@ -127,10 +127,10 @@ When `drive` returns `done`:
 
 - **Idempotence**: re-running with the same `--run-id` (or the same `--target` if run-id is auto-derived) resumes. With the manifest hash in run-id derivation: a file content change → new run-id → fresh run. Pure resume of a half-completed run uses the SAME run-id.
 - **No file modification**: this recipe is read-only on the target. The **digest lands as a visible
-  `./<run-id>-audit.md`** in the workspace; internal state lives under `.flow/audit/<run-id>/`,
-  `.flow/pipe/<run-id>/`, `.flow/foreach/<run-id>-s1-foreach/`, `.flow/group/<run-id>-s3-partition/`,
-  `.flow/reduce/<run-id>-s5-digest/`.
-- **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.flow/cache/foreach-code-review/`.
+  `./<run-id>-audit.md`** in the workspace; internal state lives under `.agentflow/audit/<run-id>/`,
+  `.agentflow/pipe/<run-id>/`, `.agentflow/foreach/<run-id>-s1-foreach/`, `.agentflow/group/<run-id>-s3-partition/`,
+  `.agentflow/reduce/<run-id>-s5-digest/`.
+- **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.agentflow/cache/foreach-code-review/`.
 - **Validate then drive**: trust the dry-run validation `/agentflow:pipe init` performs. Catches recipe typos before any agent dispatch.
 
 ## Quick example

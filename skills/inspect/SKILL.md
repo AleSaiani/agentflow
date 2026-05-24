@@ -8,8 +8,8 @@ description: |
   USE whenever the user wants to debug, inspect, or report on a run — "show me", "what happened", "how
   much did X cost", "why did Y fail", "list active runs".
 
-  DON'T use to do work (the other skills do that) or for non-Agent Flow state (it only knows `.flow/enumerate/`,
-  `.flow/foreach/`, `.flow/group/`, `.flow/iterate/`, `.flow/reduce/`, `.flow/pipe/`).
+  DON'T use to do work (the other skills do that) or for non-Agent Flow state (it only knows `.agentflow/enumerate/`,
+  `.agentflow/foreach/`, `.agentflow/group/`, `.agentflow/iterate/`, `.agentflow/reduce/`, `.agentflow/pipe/`).
   Explicit: `/agentflow:inspect runs | show <id> | tree <id> | budget <id> | timeline <id>`.
 allowed-tools: Bash, Read
 argument-hint: runs | show <run-id> | tree <run-id> | budget <run-id> | timeline <run-id>

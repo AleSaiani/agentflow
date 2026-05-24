@@ -75,11 +75,11 @@ If the user typed `/agentflow:reduce` explicitly → skip the guardrail.
 
 ## Step 2 — Init state
 
-Write the inputs descriptor to `.flow/reduce/<run-id>/inputs-spec.json` (the parsed list). Then:
+Write the inputs descriptor to `.agentflow/reduce/<run-id>/inputs-spec.json` (the parsed list). Then:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" init <run-id> \
-  --inputs .flow/reduce/<run-id>/inputs-spec.json \
+  --inputs .agentflow/reduce/<run-id>/inputs-spec.json \
   --task-prompt "<task-prompt>" \
   --model <model> --output-format <markdown|json> \
   --max-auto-continues <N> \
@@ -93,7 +93,7 @@ If the run-id exists **without `--force`**: ask the user `resume` (re-dispatch t
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" materialize <run-id> \
-  --out .flow/reduce/<run-id>/inputs.json
+  --out .agentflow/reduce/<run-id>/inputs.json
 ```
 
 This walks every input descriptor and produces a single JSON the agent will read. Run-typed inputs only include items with `status == done` (others appear with `result: null`).
@@ -112,10 +112,10 @@ Launch ONE Agent (no fan-out). The prompt is **self-contained**:
 - `description`: `reduce:<run-id>`
 - `prompt`:
   - the user's task-prompt verbatim
-  - inputs file path: `.flow/reduce/<run-id>/inputs.json` (read this with the `Read` tool)
+  - inputs file path: `.agentflow/reduce/<run-id>/inputs.json` (read this with the `Read` tool)
   - output file path: `./<run-id>.<md|json>` — a **visible file in the workspace root** (extension
     matches `output_format`), so the digest is easy to find and commit instead of being buried under
-    `.flow/`. Only the *internal* materialized inputs live under `.flow/reduce/<run-id>/`. Pick a
+    `.agentflow/`. Only the *internal* materialized inputs live under `.agentflow/reduce/<run-id>/`. Pick a
     descriptive `--run-id` (Step 2) so the filename reads well — e.g. `audit-digest` → `audit-digest.md`.
   - **strict I/O rules**:
     - "Read the inputs file. Synthesize the requested digest. Do NOT comment while working."
@@ -154,7 +154,7 @@ Print a one-liner: `run-id`, `status`, `output_pointer` (the visible `./<run-id>
 
 ## Cross-turn auto-continue
 
-A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.flow/reduce/` (alongside other primitives). For /agentflow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /agentflow:reduce run-id:
+A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.agentflow/reduce/` (alongside other primitives). For /agentflow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /agentflow:reduce run-id:
 - DO NOT re-init.
 - Read the state. If `status == in_progress` and the output file is absent → re-dispatch (Step 5).
 - If the output file IS present → call `complete` (Step 6).

@@ -139,7 +139,7 @@ claude --plugin-dir .
 
 ## How it works (the short version)
 
-Every run is a `state.json` under `.flow/<cmd>/<run-id>/`; Claude is the only writer. A `Stop` hook
+Every run is a `state.json` under `.agentflow/<cmd>/<run-id>/`; Claude is the only writer. A `Stop` hook
 finds any in-flight run and resumes it across turns — purely from disk, so runs survive compaction.
 The control flow is deterministic; only the work *inside* each step is the LLM (**it produces
 structured data; branching is always code over that data, never a judgment on free text**). The

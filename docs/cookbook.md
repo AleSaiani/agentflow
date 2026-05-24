@@ -65,7 +65,7 @@ all-pending. Same engine as the checklist; just a different **Source**.
 
 One agent reads all inputs (files, inline data, or another run's output) and writes a single digest.
 The digest lands as a **visible file in your workspace** — `./<run-id>.md` (e.g. name the run
-`audit-digest` and you get `audit-digest.md`), not buried under `.flow/`.
+`audit-digest` and you get `audit-digest.md`), not buried under `.agentflow/`.
 
 ### 3. Turn an outline into a structured list
 
@@ -265,7 +265,7 @@ won't auto-resume; delete `PAUSE` and nudge each session to continue. `/agentflo
 ### 13. Cheap re-runs with caching
 
 Add `--cache` to `foreach` (the `audit` recipe does). Items carry a `data.content_hash`; on re-run,
-unchanged items hit the cache (`.flow/cache/`) and skip dispatch entirely. Change one file → only that item
+unchanged items hit the cache (`.agentflow/cache/`) and skip dispatch entirely. Change one file → only that item
 re-runs.
 
 ### 14. Watch cost and progress

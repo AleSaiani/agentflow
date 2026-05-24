@@ -38,7 +38,7 @@ You are the **orchestrator** of a `/agentflow:pipe` run. The pipe itself is a st
   "name": "fetch-issues",          // optional, human-readable label
   "spec": {
     "command": "gh issue list --json number,title,body --limit 500 > \"$PIPE_OUTPUT_PATH\"",
-    "output_path": ".flow/pipe/<run-id>/issues.json"     // optional; defaults to stage-N.out
+    "output_path": ".agentflow/pipe/<run-id>/issues.json"     // optional; defaults to stage-N.out
   }
 }
 ```
@@ -52,7 +52,7 @@ Bash stages run synchronously inside a turn. Env vars exposed:
   "name": "build-config",
   "spec": {
     "value": {"source": "run", "run_id": "{{stages.review.run_id}}", "path": "{{stages.partition.result_pointer}}"},
-    "output_path": ".flow/pipe/<run-id>/config.json"
+    "output_path": ".agentflow/pipe/<run-id>/config.json"
   }
 }
 ```
@@ -79,7 +79,7 @@ Stage names MUST be unique; that's the lookup key for `{{stages.<name>...}}`.
   "spec": {
     "cmd": "foreach",
     "init_args": [
-      "--items", ".flow/pipe/<run-id>/items.json",
+      "--items", ".agentflow/pipe/<run-id>/items.json",
       "--task-prompt", "...",
       "--model", "haiku",
       "--concurrency", "4"
@@ -108,7 +108,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/pipe/defaults.md`. Use defaults when CLI/spec
 ## Step 1 — Parse and validate (init turn only)
 
 - `--stages`: read/parse the JSON array. `--workflow`: pass the file straight to `init --workflow`
-  (it reads `stages` + optional `config`). Either way the canonical state lands under `.flow/pipe/<run-id>/`.
+  (it reads `stages` + optional `config`). Either way the canonical state lands under `.agentflow/pipe/<run-id>/`.
 - Resolve config by priority (CLI > workflow `config` > defaults).
 - If `run-id` is missing: generate `pipe-<8 char hash>` from the stages/workflow JSON.
 - `init` validates every primitive stage's flags; a clear early failure beats a mid-run one.
@@ -117,7 +117,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/pipe/defaults.md`. Use defaults when CLI/spec
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> \
-  --stages .flow/pipe/<run-id>/stages.json \
+  --stages .agentflow/pipe/<run-id>/stages.json \
   --context-policy <policy> --max-auto-continues <N> \
   [--no-stop-on-failure] [--auto-continue|--no-auto-continue] [--force]
 ```
@@ -213,7 +213,7 @@ stages.json:
     "spec": {
       "cmd": "foreach",
       "init_args": [
-        "--items", ".flow/pipe/audit-001/files.json",
+        "--items", ".agentflow/pipe/audit-001/files.json",
         "--task-prompt", "Quick severity triage. Output: {has_issues, severity_hint}",
         "--model", "haiku", "--concurrency", "8"
       ]
@@ -225,7 +225,7 @@ stages.json:
       "cmd": "group",
       "init_args": [
         "--method", "jsonpath",
-        "--input-source", ".flow/pipe/audit-001/group-input.json",
+        "--input-source", ".agentflow/pipe/audit-001/group-input.json",
         "--method-config", "{\"path\":\"data.domain\"}"
       ]
     }
@@ -235,7 +235,7 @@ stages.json:
     "spec": {
       "cmd": "foreach",
       "init_args": [
-        "--items", ".flow/pipe/audit-001/groups-as-items.json",
+        "--items", ".agentflow/pipe/audit-001/groups-as-items.json",
         "--task-prompt", "Deep code-review of every file in this group, cross-referenced.",
         "--model", "opus", "--concurrency", "3"
       ]
@@ -246,7 +246,7 @@ stages.json:
     "spec": {
       "cmd": "reduce",
       "init_args": [
-        "--inputs", ".flow/pipe/audit-001/digest-inputs.json",
+        "--inputs", ".agentflow/pipe/audit-001/digest-inputs.json",
         "--task-prompt", "Executive summary by severity, top hotspots, recurring patterns.",
         "--model", "opus", "--output-format", "markdown"
       ]
