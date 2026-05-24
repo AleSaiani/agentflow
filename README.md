@@ -4,7 +4,8 @@
 
 **Describe a workflow in plain language — Agent Flow builds it, runs it, and keeps it running across turns.**
 
-[![version](https://img.shields.io/badge/version-1.0.0--beta.1-blue)](CHANGELOG.md)
+[![CI](https://github.com/AleSaiani/agentflow/actions/workflows/ci.yml/badge.svg)](https://github.com/AleSaiani/agentflow/actions/workflows/ci.yml)
+[![version](https://img.shields.io/badge/version-1.0.0--beta.2-blue)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
 [![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](https://nodejs.org)
@@ -168,9 +169,10 @@ text**). The engine is TypeScript compiled to a committed `dist/`, **zero runtim
 
 ## Status
 
-`1.0.0-beta.1`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation),
-`queue`/`mailbox`/`step`, inspect/board, and the hooks (cross-turn resume + preserve-chat) are
-implemented and covered by an automated suite (77 tests, including a simulated cross-turn loop). The
+`1.0.0-beta.2`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation, stage
+retry/timeout, approval gate, on-failure), `queue`/`mailbox`/`step`, inspect/board, and the hooks
+(cross-turn resume + preserve-chat) are implemented and covered by an automated suite (82 tests, run in
+CI) including a simulated cross-turn loop. The
 recommended final check before production is a **live multi-turn Claude Code session smoke test**
 (install, real turns, a real `claude -p`/`codex` step). Roadmap and deferred items live in
 [CHANGELOG.md](CHANGELOG.md).

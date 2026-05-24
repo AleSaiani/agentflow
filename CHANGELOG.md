@@ -1,9 +1,41 @@
 # Changelog
 
-All notable changes to `flow` are documented here.
+All notable changes to **Agent Flow** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0-beta.2] - 2026-05-24
+
+Production-hardening + capability expansion over beta.1.
+
+### Added
+- **`step`** primitive — run ONE prompt once with `--runtime main|subagent|claude-cli|codex-cli`
+  (the sessionless CLIs are executed by the engine). The unit that lets a stage be an arbitrary
+  skill, an MCP-using agent, `claude -p`, or a different model (cross-model conversations).
+- **`queue`** — a lock-free shared work queue (atomic-rename claim, collision-free item names,
+  `reclaim`) that many workers drain safely; **`mailbox`** — directed outbox/inbox between instances.
+- **`WORKFLOW.md`** authoring format (frontmatter + `## n. name · type` stages; deterministic md→spec
+  parser) — now the way to author workflows; `create-workflow` writes it, `run-workflow`/`pipe` run it.
+- Workflow layer: **params** (`--param`, with `type`/`enum` validation), `{{workflow.dir}}`, **fork**
+  (conditional `next`/`route`), **`output_schema`** validation, stage **retry**/**timeout**,
+  **human-approval** gate (`approve`), and a workflow **`on_failure`** hook.
+- Control & ops: **cost caps** (`--max-usd`/`--max-tokens`/`--max-agents` → pause), `--stop-file`
+  pause, `foreach` **`--shard`/`--serial`/`--carry`/`--prompt-file`** + automatic folder-kanban,
+  **`notify`** (webhook/desktop), **`workflows`** catalog, and **preserve-chat**
+  (PreCompact/SessionEnd → `.agentflow/chat/`).
+- Shipped workflow library: `workflows/audit/` + `workflows/release-gate/` (a production template).
+- Continuous integration (GitHub Actions: build + tests + committed-`dist/` freshness check).
+
+### Changed
+- Rebranded to **Agent Flow** (`agentflow`, `/agentflow:*`, `.agentflow/`); `compose`→`create-workflow`,
+  `run`→`run-workflow`. Runtime state consolidated under a single `.agentflow/` dir. `reduce` writes a
+  **visible** `./<run-id>.<ext>` by default. README/docs reorganized for navigation.
+
+### Fixed
+- Windows bash resolution prefers **Git Bash** and skips the WSL/Store `bash.exe` (broke pipe/iterate).
+- `pipe` registers the `step` child primitive; `queue` filenames are collision-free; `iterate`
+  evaluates the until/while predicate before the convergence fallback. Line endings normalized to LF.
 
 ## [1.0.0-beta.1] - 2026-05-23
 
@@ -36,4 +68,5 @@ First public beta. Brand: **Agent Flow** (`/agentflow:*`), distributed as `agent
 - Documentation: branded README, `docs/getting-started.md`, `docs/concepts.md`, and a
   runnable no-LLM demo workflow (`examples/workflows/demo.json`).
 
+[1.0.0-beta.2]: https://github.com/AleSaiani/agentflow/releases/tag/v1.0.0-beta.2
 [1.0.0-beta.1]: https://github.com/AleSaiani/agentflow/releases/tag/v1.0.0-beta.1
