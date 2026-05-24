@@ -8,6 +8,7 @@ Start here.
 | **[Concepts](concepts.md)** | The mental model: runs as state on disk, the Stop hook, the determinism boundary, the workflow layer. |
 | **[Cookbook](cookbook.md)** | Real scenarios from one command to a full workflow — simple → complex. The fastest way to learn what's possible. |
 | **[Reference](reference.md)** | Every skill, flag, and CLI subcommand; the workflow-file schema; sources & views; conventions. |
+| **[Beta testing](beta-test.md)** | A graded protocol to verify the promises live — including how automatic cross-turn resume works and how to confirm it. |
 
 New here? Read **Getting started**, skim **Concepts**, then keep **Cookbook** open and copy from it.
 The headline idea: **`enumerate` makes a list → `foreach` works each item → `reduce` digests** — with

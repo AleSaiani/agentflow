@@ -180,7 +180,8 @@ claude --plugin-dir .
 
 **📚 Full docs in [`docs/`](docs/):** [Getting started](docs/getting-started.md) ·
 [Concepts](docs/concepts.md) · [Cookbook](docs/cookbook.md) (real scenarios, simple → complex) ·
-[Reference](docs/reference.md) (every skill, flag, and subcommand).
+[Reference](docs/reference.md) (every skill, flag, and subcommand) ·
+[Beta testing](docs/beta-test.md) (try it live).
 
 ## How it works
 
