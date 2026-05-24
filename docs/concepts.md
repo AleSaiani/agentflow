@@ -28,6 +28,11 @@ This is what carries a loop across turns — and across compaction — without a
 trigger. Add a new primitive that registers into the shared registry and the hook picks it up with no
 changes.
 
+A second pair of hooks **preserves the conversation itself**: on `PreCompact` (and `SessionEnd`),
+Agent Flow copies the session transcript to `.agentflow/chat/<session>.jsonl` and renders a readable
+`<session>.md` — so the full chat survives compaction on disk, independent of what's in context. It's
+automatic and best-effort (never blocks or fails the turn).
+
 ## The determinism boundary
 
 Agent Flow is deterministic where it matters and fuzzy only where it must be:
