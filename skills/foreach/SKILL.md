@@ -17,7 +17,7 @@ description: |
 
   Explicit invocation (`/flow:foreach …`) skips the count check — the user already chose the mechanism.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: (--items <json> | --checkbox <md> | --source <spec>) --prompt "<operation>" [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--concurrency N] [--cache] [--no-auto-continue]
+argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) --prompt "<operation>" [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--concurrency N] [--cache] [--no-auto-continue]
 ---
 
 # /flow:foreach

@@ -14,8 +14,9 @@
  * override (`model`, `subagent`/`subagent_type` → subagentType, `prompt`); unknown keys
  * land in `data`. Indentation depth is recorded in `data.level` (nested fan-out is v1.1).
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { STATUS_DONE, STATUS_PENDING, die, } from "./common.js";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, } from "./common.js";
 const CHECKBOX_RE = /^(\s*)[-*]\s+\[([ xX])\]\s+(.*)$/;
 const ANNOTATION_RE = /\{([^}]*)\}\s*$/;
 function slugify(text) {
@@ -106,14 +107,92 @@ export function loadSource(spec) {
                 die("error: items file must contain a JSON array");
             return raw;
         }
+        case "folder":
+            return loadFolder(spec.path);
         case "run":
             // A `run` source is resolved by the orchestrator (it reads a sibling run's state and
             // feeds its items/output here). Kept as an explicit branch for the seam; impl lives
-            // with the consuming primitive (e.g. /reduce --from-run).
+            // with the consuming primitive (e.g. /reduce from a run).
             die("error: 'run' source must be resolved by the orchestrator, not loadSource()");
             break;
     }
     return [];
+}
+// ---------- folder-kanban source/view: todo/ → in-progress/ → done/ ----------
+const KANBAN = [
+    ["todo", STATUS_PENDING],
+    ["in-progress", STATUS_IN_PROGRESS],
+    ["done", STATUS_DONE],
+];
+/** Map an item status to its kanban folder. */
+function kanbanFolder(status) {
+    if (status === STATUS_DONE || status === STATUS_FAILED)
+        return "done";
+    if (status === STATUS_IN_PROGRESS)
+        return "in-progress";
+    return "todo";
+}
+/**
+ * Folder-kanban Source: one file = one item. If `<base>/{todo,in-progress,done}/` exist, items
+ * take their status from the folder they sit in; otherwise every file under `<base>` is a pending
+ * todo. The file's contents are the task — the orchestrator reads `data.path` when processing.
+ */
+export function loadFolder(base) {
+    if (!existsSync(base))
+        die(`error: folder source not found at ${base}`);
+    const items = [];
+    let usedSubfolders = false;
+    for (const [name, status] of KANBAN) {
+        const dir = join(base, name);
+        if (!existsSync(dir) || !statSync(dir).isDirectory())
+            continue;
+        usedSubfolders = true;
+        for (const f of readdirSync(dir).sort()) {
+            const full = join(dir, f);
+            if (!statSync(full).isFile())
+                continue;
+            items.push({ id: f, data: { file: f, path: full, folder: name }, status });
+        }
+    }
+    if (!usedSubfolders) {
+        for (const f of readdirSync(base).sort()) {
+            const full = join(base, f);
+            if (!statSync(full).isFile())
+                continue;
+            items.push({ id: f, data: { file: f, path: full, folder: "todo" }, status: STATUS_PENDING });
+        }
+    }
+    return items;
+}
+/**
+ * Folder-kanban write-back View: move each item's file into the folder matching its authoritative
+ * status (pending→todo, in_progress→in-progress, done/failed→done). The visible board reflects state.
+ */
+export function writeFolderView(base, items) {
+    let moved = 0;
+    for (const it of items) {
+        const file = String(it.data?.["file"] ?? it.id);
+        let curr = null;
+        for (const [name] of KANBAN) {
+            const p = join(base, name, file);
+            if (existsSync(p)) {
+                curr = p;
+                break;
+            }
+        }
+        if (!curr && existsSync(join(base, file)))
+            curr = join(base, file);
+        if (!curr)
+            continue;
+        const dest = join(base, kanbanFolder(it.status));
+        mkdirSync(dest, { recursive: true });
+        const destPath = join(dest, file);
+        if (resolve(curr) !== resolve(destPath)) {
+            renameSync(curr, destPath);
+            moved++;
+        }
+    }
+    return moved;
 }
 /**
  * Checkbox write-back View: re-read the markdown and toggle each checkbox to reflect the

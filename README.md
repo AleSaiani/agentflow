@@ -45,6 +45,37 @@ picks up exactly where it left off, even if the conversation was compacted in be
 > completion with no LLM at all? The 10-second runnable demo is in
 > [docs/getting-started.md](docs/getting-started.md).
 
+## Track work as a file kanban
+
+Point `/flow:foreach` at a folder of task files and it works each one, **moving the file across
+`todo/ → in-progress/ → done/`** as it goes — a board you can watch in your own file tree:
+
+```text
+   before                 …mid-run                 done
+   tasks/                 tasks/                   tasks/
+     todo/                  todo/                     done/
+       refactor-auth.md       write-docs.md             refactor-auth.md
+       add-tests.md         in-progress/                add-tests.md
+       write-docs.md          add-tests.md              write-docs.md
+                            done/
+                              refactor-auth.md
+```
+
+```text
+/flow:foreach --folder tasks --prompt "Do the task described in this file"
+```
+
+Check the state at any point — `/flow:board` shows what's in flight, with progress and cost:
+
+```text
+=== Workspace board (1 active, 0 done, 0 failed) ===
+ACTIVE (1):
+  [foreach   ] tasks-run    2/3 done    updated 2026-05-24T10:42:07Z
+```
+
+(Sources are pluggable: a folder, a markdown checklist, a JSON list, or another run's output — same
+engine underneath.)
+
 ## Highlights
 
 - **A programmatic vocabulary** — `enumerate` (unfold 1→N), `foreach` (map N→N), `reduce` (fold N→1),
@@ -63,7 +94,7 @@ picks up exactly where it left off, even if the conversation was compacted in be
 | Command | Like | What it does |
 |---|---|---|
 | `/flow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec (outline → chapters); produces an items.json |
-| `/flow:foreach` | `map` (N→N) | Apply one operation to each item — inline or parallel subagents; per-item overrides + content-hash cache |
+| `/flow:foreach` | `map` (N→N) | Apply a **prompt** to each item of a list — inline or in parallel; model/subagent optional; per-item overrides + content-hash cache |
 | `/flow:reduce` | `fold` (N→1) | Collapse N inputs into 1 digest (markdown or JSON) |
 | `/flow:group` | `group by` | Partition N items into K groups — path-prefix / regex / jsonpath, or LLM-classify |
 | `/flow:repeat` · `until` · `while` | `for` · `do…until` · `while…do` | Loop a stage a fixed count, until a predicate, or while one holds (one engine) |

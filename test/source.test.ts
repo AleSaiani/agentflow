@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { parseChecklist, writeChecklistView, loadSource } from "../dist/source.js";
+import { parseChecklist, writeChecklistView, loadSource, loadFolder, writeFolderView } from "../dist/source.js";
 
 const CHECKLIST = `# Plan
 Some intro prose.
@@ -49,6 +49,44 @@ test("writeChecklistView toggles boxes from item status, preserves prose", () =>
   assert.match(out, /- \[x\] Review the parser \{model:opus/);
   assert.match(out, /Some intro prose\./); // prose preserved
   assert.match(out, /not a checkbox line/);
+});
+
+test("folder-kanban source: reads todo/in-progress/done and the view moves files", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kanban-"));
+  mkdirSync(join(dir, "todo"), { recursive: true });
+  mkdirSync(join(dir, "in-progress"), { recursive: true });
+  writeFileSync(join(dir, "todo", "a.md"), "task a", "utf8");
+  writeFileSync(join(dir, "todo", "b.md"), "task b", "utf8");
+  writeFileSync(join(dir, "in-progress", "c.md"), "task c", "utf8");
+
+  const items = loadFolder(dir);
+  assert.equal(items.length, 3);
+  const byId: Record<string, any> = {};
+  for (const it of items) byId[it.id] = it;
+  assert.equal(byId["a.md"].status, "pending");
+  assert.equal(byId["c.md"].status, "in_progress");
+
+  // a → done, c → done; view moves the files to match
+  byId["a.md"].status = "done";
+  byId["c.md"].status = "done";
+  const moved = writeFolderView(dir, items);
+  assert.equal(moved, 2);
+  assert.ok(existsSync(join(dir, "done", "a.md")));
+  assert.ok(existsSync(join(dir, "done", "c.md")));
+  assert.ok(existsSync(join(dir, "todo", "b.md"))); // untouched
+  assert.ok(!existsSync(join(dir, "todo", "a.md")));
+  assert.ok(!existsSync(join(dir, "in-progress", "c.md")));
+});
+
+test("folder-kanban source: a flat folder treats every file as a pending todo", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kanban-"));
+  writeFileSync(join(dir, "one.txt"), "x", "utf8");
+  writeFileSync(join(dir, "two.txt"), "y", "utf8");
+  const items = loadFolder(dir);
+  assert.equal(items.length, 2);
+  assert.ok(items.every((i) => i.status === "pending"));
+  // via loadSource too
+  assert.equal(loadSource({ source: "folder", path: dir }).length, 2);
 });
 
 test("loadSource inline + checkbox; run is orchestrator-only", () => {

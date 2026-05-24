@@ -19,7 +19,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, cacheKey, cacheLookup, cacheStore, die, loadState, loadTaskKindTemplate, makeBaseState, markDone, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
-import { loadSource, writeChecklistView } from "../source.js";
+import { loadSource, writeChecklistView, writeFolderView } from "../source.js";
 const CMD = "foreach";
 // Valid kinds for --kind. Mirrors `skills/foreach/task-kinds.md`. "unknown" has no
 // template and is treated as a no-op (no enrichment).
@@ -66,12 +66,15 @@ function toStateItem(it) {
 function resolveItems(values) {
     const itemsPath = values["items"];
     const checkbox = values["checkbox"];
+    const folder = values["folder"];
     const sourceJson = values["source"];
-    const provided = [itemsPath, checkbox, sourceJson].filter(Boolean).length;
+    const provided = [itemsPath, checkbox, folder, sourceJson].filter(Boolean).length;
     if (provided !== 1)
-        die("error: provide exactly one of --items, --checkbox, --source");
+        die("error: provide exactly one of --items, --checkbox, --folder, --source");
     if (checkbox)
         return loadSource({ source: "checkbox", path: checkbox });
+    if (folder)
+        return loadSource({ source: "folder", path: folder });
     if (sourceJson)
         return loadSource(JSON.parse(sourceJson));
     // --items: JSON array in the legacy enumerate shape ({id?, data?, task?, ...}).
@@ -99,6 +102,7 @@ function cmdInit(args) {
         options: {
             items: { type: "string" },
             checkbox: { type: "string" },
+            folder: { type: "string" },
             source: { type: "string" },
             "task-prompt": { type: "string", default: "" },
             prompt: { type: "string" },
@@ -420,18 +424,24 @@ function cmdView(args) {
         args,
         allowPositionals: true,
         strict: true,
-        options: { checkbox: { type: "string" } },
+        options: { checkbox: { type: "string" }, folder: { type: "string" } },
     });
     const runId = positionals[0];
     const checkbox = values["checkbox"];
-    if (!runId || !checkbox)
-        die("error: view requires run_id and --checkbox <path>");
+    const folder = values["folder"];
+    if (!runId || (!checkbox && !folder))
+        die("error: view requires run_id and --checkbox <path> or --folder <path>");
     const state = load(runId);
     const items = Object.values(state["items"]).map((i) => ({
         id: i["id"],
         data: i["data"],
         status: i["status"],
     }));
+    if (folder) {
+        const moved = writeFolderView(folder, items);
+        print({ run_id: runId, view: folder, moved });
+        return;
+    }
     const changed = writeChecklistView(checkbox, items);
     print({ run_id: runId, view: checkbox, toggled: changed });
 }

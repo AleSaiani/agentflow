@@ -43,7 +43,7 @@ import {
   saveAtomic,
   statePath,
 } from "../common.js";
-import { loadSource, writeChecklistView } from "../source.js";
+import { loadSource, writeChecklistView, writeFolderView } from "../source.js";
 
 const CMD = "foreach";
 
@@ -92,11 +92,13 @@ function toStateItem(it: Item): StateDict {
 function resolveItems(values: Record<string, unknown>): Item[] {
   const itemsPath = values["items"] as string | undefined;
   const checkbox = values["checkbox"] as string | undefined;
+  const folder = values["folder"] as string | undefined;
   const sourceJson = values["source"] as string | undefined;
-  const provided = [itemsPath, checkbox, sourceJson].filter(Boolean).length;
-  if (provided !== 1) die("error: provide exactly one of --items, --checkbox, --source");
+  const provided = [itemsPath, checkbox, folder, sourceJson].filter(Boolean).length;
+  if (provided !== 1) die("error: provide exactly one of --items, --checkbox, --folder, --source");
 
   if (checkbox) return loadSource({ source: "checkbox", path: checkbox });
+  if (folder) return loadSource({ source: "folder", path: folder });
   if (sourceJson) return loadSource(JSON.parse(sourceJson));
 
   // --items: JSON array in the legacy enumerate shape ({id?, data?, task?, ...}).
@@ -123,6 +125,7 @@ function cmdInit(args: string[]): void {
     options: {
       items: { type: "string" },
       checkbox: { type: "string" },
+      folder: { type: "string" },
       source: { type: "string" },
       "task-prompt": { type: "string", default: "" },
       prompt: { type: "string" },
@@ -436,18 +439,24 @@ function cmdView(args: string[]): void {
     args,
     allowPositionals: true,
     strict: true,
-    options: { checkbox: { type: "string" } },
+    options: { checkbox: { type: "string" }, folder: { type: "string" } },
   });
   const runId = positionals[0];
   const checkbox = values["checkbox"] as string | undefined;
-  if (!runId || !checkbox) die("error: view requires run_id and --checkbox <path>");
+  const folder = values["folder"] as string | undefined;
+  if (!runId || (!checkbox && !folder)) die("error: view requires run_id and --checkbox <path> or --folder <path>");
   const state = load(runId);
   const items: Item[] = (Object.values(state["items"]) as StateDict[]).map((i) => ({
     id: i["id"],
     data: i["data"],
     status: i["status"],
   }));
-  const changed = writeChecklistView(checkbox, items);
+  if (folder) {
+    const moved = writeFolderView(folder, items);
+    print({ run_id: runId, view: folder, moved });
+    return;
+  }
+  const changed = writeChecklistView(checkbox as string, items);
   print({ run_id: runId, view: checkbox, toggled: changed });
 }
 

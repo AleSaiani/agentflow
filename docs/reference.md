@@ -54,14 +54,17 @@ Generate a list of items from a higher-level spec (outline → chapters, feature
 Apply one operation to every item, in parallel chunks across subagents **or** inline in the main
 thread. The operation is a **prompt**; model and subagent are optional.
 
-**Invoke:** `/flow:foreach (--items <json> | --checkbox <md> | --source <spec>) --prompt "<operation>" [--kind …] [--execution main-thread|subagent] [--cache]`
+**Invoke:** `/flow:foreach (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) --prompt "<operation>" [--kind …] [--execution main-thread|subagent] [--cache]`
+
+The operation is, primarily, a **`--prompt`** (the instructions applied per item); `--model` and
+`--subagent-type` are optional specialist knobs, and `--execution main-thread` skips subagents entirely.
 
 **CLI** (`dist/state/foreach.js`):
 - `init <id> (--items <path> | --checkbox <path> | --source <json>) [--prompt "…"] [--kind code-review|transformation|extraction|validation|audit] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
 - `claim <id> --count N` · `complete <id> <item-id> [--result <json>]` · `fail <id> <item-id> [--error "…"] [--retry]`
 - `complete-batch <id> --results <file>` (array of `{id, ok, result, error}`)
 - `status <id>` · `list <id> [--status …] [--limit N]` · `reset <id> [--failed-to-pending] [--in-progress-to-pending]`
-- `view <id> --checkbox <path>` (write-back: toggle boxes from item status) · `runs` · `budget-add` · `increment-continues`
+- `view <id> (--checkbox <path> | --folder <dir>)` (write-back: toggle checklist boxes / move kanban files to match status) · `runs` · `budget-add` · `increment-continues`
 
 **Per-item overrides:** items may carry `task: {prompt, model, subagentType}`; dispatch resolves
 `item.task?.X ?? config.X`. Checkbox annotations (`{model:opus, subagent:code-reviewer}`) populate it.
@@ -201,10 +204,14 @@ A **Source** produces the `Item[]` a run consumes:
 | file | `{"source":"file","path":"…"}` | a JSON array of items |
 | run | `{"source":"run","cmd":"foreach","run_id":"…"}` | another run's item-level output |
 | checkbox | `{"source":"checkbox","path":"TODO.md"}` | a markdown checklist; `[x]`=done, `[ ]`=pending; `{model:…, subagent:…}` → per-item `task` |
+| folder | `{"source":"folder","path":"tasks/"}` | a file kanban: one file per item in `todo/` / `in-progress/` / `done/` (status from the folder); a flat folder = all pending. The file's contents are the task |
 
-A **View** reflects state back onto a human artifact — currently the checkbox write-back
-(`foreach view <id> --checkbox <path>` toggles `[ ]`↔`[x]`). Authoritative state always stays in
-`state.json`.
+A **View** reflects authoritative state back onto a human artifact:
+- checkbox: `foreach view <id> --checkbox <path>` toggles `[ ]`↔`[x]`.
+- folder: `foreach view <id> --folder <dir>` moves each task file into the folder matching its status
+  (`todo` / `in-progress` / `done`) — a live kanban.
+
+Authoritative state always stays in `state.json`; the View is a projection.
 
 ---
 

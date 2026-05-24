@@ -26,6 +26,21 @@ overrides), processes them in parallel chunks across subagents, and persists pro
 session mid-run and it resumes. Reflect results back onto the file with the checkbox **view** so done
 items flip to `[x]`.
 
+### 1b. Track a folder of task files (file kanban)
+
+> "Each file in `tasks/todo/` is a job — work through them."
+
+```text
+/flow:foreach --folder tasks --prompt "Do the task described in this file"
+# then, to reflect progress on disk:
+/flow:foreach view <run-id> --folder tasks
+```
+
+One file = one item; status comes from the folder (`todo/` / `in-progress/` / `done/`). The **view**
+moves each file into the folder matching its status — a kanban you watch in your file tree. A flat
+folder (no subfolders) is treated as all-pending. Same engine as the checklist; just a different
+**Source**.
+
 ### 2. Summarize many results into one report
 
 > "Summarize these 20 review files into an executive digest."
