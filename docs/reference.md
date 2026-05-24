@@ -54,14 +54,16 @@ Generate a list of items from a higher-level spec (outline → chapters, feature
 Apply one operation to every item, in parallel chunks across subagents **or** inline in the main
 thread. The operation is a **prompt**; model and subagent are optional.
 
-**Invoke:** `/flow:foreach (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) --prompt "<operation>" [--kind …] [--execution main-thread|subagent] [--cache]`
+**Invoke:** `/flow:foreach (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind …] [--serial] [--carry] [--execution main-thread|subagent] [--cache]`
 
-The operation is, primarily, a **`--prompt`** (the instructions applied per item); `--model` and
-`--subagent-type` are optional specialist knobs, and `--execution main-thread` skips subagents entirely.
+The operation is, primarily, a **`--prompt`** (the instructions applied per item) — or `--prompt-file
+<path>` to read it from a file. `--model`, `--subagent-type` (which agent runs each item) and
+`--execution main-thread` are optional knobs. **`--serial`** processes one item at a time in list
+order (no fan-out); **`--carry`** implies serial and threads each item the previous item's output.
 
 **CLI** (`dist/state/foreach.js`):
-- `init <id> (--items <path> | --checkbox <path> | --source <json>) [--prompt "…"] [--kind code-review|transformation|extraction|validation|audit] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
-- `claim <id> --count N` · `complete <id> <item-id> [--result <json>]` · `fail <id> <item-id> [--error "…"] [--retry]`
+- `init <id> (--items <path> | --checkbox <path> | --folder <dir> | --source <json>) (--prompt "…" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--serial] [--carry] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
+- `claim <id> --count N` · `claim-serial <id>` (next item in order + `prev_result` for `--carry`) · `complete <id> <item-id> [--result <json>]` · `fail <id> <item-id> [--error "…"] [--retry]`
 - `complete-batch <id> --results <file>` (array of `{id, ok, result, error}`)
 - `status <id>` · `list <id> [--status …] [--limit N]` · `reset <id> [--failed-to-pending] [--in-progress-to-pending]`
 - `view <id> (--checkbox <path> | --folder <dir>)` (write-back: toggle checklist boxes / move kanban files to match status) · `runs` · `budget-add` · `increment-continues`

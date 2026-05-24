@@ -17,7 +17,7 @@ description: |
 
   Explicit invocation (`/flow:foreach …`) skips the count check — the user already chose the mechanism.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) --prompt "<operation>" [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--concurrency N] [--cache] [--no-auto-continue]
+argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--subagent-type <name>] [--serial] [--carry] [--concurrency N] [--cache] [--no-auto-continue]
 ---
 
 # /flow:foreach
@@ -51,11 +51,19 @@ You are the **orchestrator** of a `/flow:foreach` run. Your only job:
 - `--folder <dir>` — a file kanban (`todo/` / `in-progress/` / `done/`, or a flat folder = all pending)
 - `--source '<json>'` — an explicit SourceSpec (incl. `{"source":"run","cmd":"…","run_id":"…"}`)
 
-**Operation:**
-- `--prompt "<instructions applied to each item>"` — the primary config
-- optional knobs: `--kind <code-review|…>`, `--model …`, `--execution main-thread|subagent`,
-  `--concurrency N`, `--chunk-size N|auto`, `--max-retries N`, `--cache`, `--run-id NAME`,
-  `--no-auto-continue`, `--force`
+**Operation (the per-item instructions, one of):**
+- `--prompt "<instructions applied to each item>"` — inline, the primary config
+- `--prompt-file <path>` — read the operation from a file (use for long/multi-line prompts);
+  mutually exclusive with `--prompt`
+
+**Optional knobs:** `--kind <code-review|…>`, `--model …`, `--subagent-type <name>` (which agent
+runs each item; per-item override via `{subagent:…}` in a checklist), `--execution main-thread|subagent`,
+`--concurrency N`, `--chunk-size N|auto`, `--max-retries N`, `--cache`, `--run-id NAME`,
+`--no-auto-continue`, `--force`, plus **serial mode**:
+- `--serial` — process **one item at a time, in list order** (no fan-out; forces `concurrency 1`,
+  `chunk 1`). Use when items must not run concurrently (shared resource, rate limit, ordering matters).
+- `--carry` — implies `--serial` **and** feeds each item the **previous item's output** (a sequential
+  scan / accumulation). Each step depends on the one before it.
 
 **Invoked with natural language?** (e.g. `/flow:foreach review every .cs file in src/ for bugs`) —
 translate the user's words into a source + `--prompt`, don't ask them for flags. If they name files you
@@ -134,10 +142,10 @@ Confirm to the user in a single line: `run-id`, `kind`, `effective model`, `conc
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" init <run-id> \
      (--items <file> | --checkbox <md> | --folder <dir> | --source '<json>') \
-     --prompt "<operation, verbatim>" \
+     (--prompt "<operation, verbatim>" | --prompt-file <path>) \
      [--kind <code-review|transformation|extraction|validation|audit>] \
-     [--execution main-thread|subagent] [--model <inherit|haiku|sonnet|opus>] \
-     [--concurrency <N>] [--chunk-size <N|auto>] [--max-retries <N>] [--cache] \
+     [--execution main-thread|subagent] [--model <inherit|haiku|sonnet|opus>] [--subagent-type <name>] \
+     [--serial] [--carry] [--concurrency <N>] [--chunk-size <N|auto>] [--max-retries <N>] [--cache] \
      [--max-auto-continues <N>] [--auto-continue|--no-auto-continue] [--force]
    ```
    The state helper applies `--kind` (prepends the matching `task-kinds.md` template to `--prompt` and
@@ -161,6 +169,11 @@ instructions). `--model` and `--subagent-type` are optional. `--execution` choos
   in this thread, `complete` it — with no `Agent` dispatch. Use for cheap/short operations or when
   you want everything in one context. The state mechanics (`claim` → `complete-batch`) are identical;
   only who does the work changes. Read `config.execution` and branch accordingly.
+
+**Serial / carry** (`config.serial` / `config.carry`): when either is set, do **not** fan out. Process
+one item at a time in list order using `claim-serial` (see Step 4b). `serial` alone is a throttle
+(items stay independent); `carry` additionally threads each item the previous item's result. These
+work with either execution mode (a single subagent per item, or inline).
 
 ## Step 4 — Dispatch loop
 
@@ -220,6 +233,30 @@ For each iteration (safety cap: max 100):
    - File `results-chunk-<N>.json` missing or unparseable: mark every item in the chunk as `fail --retry` with error "agent crashed / no result file". Use `claim` + manual `fail --retry` for each item in the chunk.
    - File present but only covers M < N items: `complete-batch` applies the M present; the rest stay `in_progress`. Mark them manually as `fail --retry` with error "missing in agent output".
 7. **Continue?**: if `auto_continue == false`, exit and show status. Otherwise go back to step 1.
+
+## Step 4b — Serial / carry dispatch (when `config.serial` or `config.carry`)
+
+If either flag is set, **replace Step 4's wave/fan-out** with this one-at-a-time loop (no parallel
+Agents). Each iteration handles a single item, in list order, and is resumable across turns:
+
+1. **Claim the next item**:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" claim-serial <run-id>
+   ```
+   Returns `{item, prev_id, prev_result}`. If `item == null` → done, go to Step 5. `prev_result` is the
+   output of the item that ran just before this one (reconstructed from disk, so it's correct even after
+   a resume).
+2. **Process the item** (one item, so no chunk file needed):
+   - `config.execution == "subagent"`: dispatch **one** Agent for this item (same self-contained prompt
+     + strict I/O rules as Step 4.5, writing a 1-element results array).
+   - `config.execution == "main-thread"`: do the work inline.
+   - **If `config.carry`**: prepend the previous result to the operation, e.g. *"Previous item's output
+     (build on it): <prev_result>"*. On the first item `prev_result` is null — say "this is the first item".
+3. **Commit** with `complete <run-id> <item-id> --result '<json>'` (or `fail … --retry`), record budget,
+   then loop to 1. Honor `auto_continue` exactly as in Step 4.7.
+
+Because items are committed one by one, the Stop hook resumes mid-list cleanly and `claim-serial`
+re-hands an interrupted `in_progress` item without double-counting attempts.
 
 ## Step 5 — Final report
 

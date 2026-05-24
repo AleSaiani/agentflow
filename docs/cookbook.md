@@ -222,6 +222,22 @@ branch itself is always deterministic code — never a judgment on free text.
 short ops. Switch to `--execution subagent` (default) when items are heavy and independent. The state
 mechanics are identical; only who does the work changes.
 
+### 12b. Process one at a time — serial, or a running accumulation
+
+> "Apply these migrations one by one, in order — never two at once." / "Translate each chapter,
+> keeping the glossary the previous chapter established."
+
+```text
+/flow:foreach --items migrations.json --serial --prompt "Apply this migration"
+/flow:foreach --items chapters.json   --carry  --prompt "Translate; reuse terms from the previous chapter's output"
+```
+
+`--serial` runs items strictly one at a time in list order (no parallel subagents) — for shared
+resources, rate limits, or order-sensitive work. `--carry` goes further: it implies serial **and**
+feeds each item the previous item's result, so the operation accumulates (a sequential scan). Both
+checkpoint per item, so they resume mid-list across turns. Long operation? Keep it in a file with
+`--prompt-file ops/translate.md` instead of a giant inline `--prompt`.
+
 ---
 
 ## Level 4 — operating at scale

@@ -135,6 +135,9 @@ function cmdInit(args) {
             source: { type: "string" },
             "task-prompt": { type: "string", default: "" },
             prompt: { type: "string" },
+            "prompt-file": { type: "string" },
+            serial: { type: "boolean", default: false },
+            carry: { type: "boolean", default: false },
             execution: { type: "string", default: "subagent" },
             concurrency: { type: "string", default: "4" },
             "chunk-size": { type: "string", default: "auto" },
@@ -170,8 +173,20 @@ function cmdInit(args) {
             die(`error: duplicate item id '${it.id}'`);
         items[it.id] = toStateItem(it);
     }
-    // `--prompt` is the primary operation config; `--task-prompt` kept as an alias.
-    let effectiveTaskPrompt = (values["prompt"] ?? values["task-prompt"]) || "";
+    // `--prompt` is the primary operation config; `--task-prompt` is an alias; `--prompt-file`
+    // reads the operation from an external file (handy for long/multi-line prompts).
+    const promptFile = values["prompt-file"];
+    if (promptFile && (values["prompt"] !== undefined || values["task-prompt"]))
+        die("error: --prompt-file is mutually exclusive with --prompt/--task-prompt");
+    let effectiveTaskPrompt;
+    if (promptFile) {
+        if (!existsSync(promptFile))
+            die(`error: --prompt-file not found at ${promptFile}`);
+        effectiveTaskPrompt = readFileSync(promptFile, "utf8").trim();
+    }
+    else {
+        effectiveTaskPrompt = (values["prompt"] ?? values["task-prompt"]) || "";
+    }
     if (kind && kind !== "unknown") {
         const template = loadTaskKindTemplate(kind, "foreach") ?? "";
         const sep = effectiveTaskPrompt ? "\n\n" : "";
@@ -182,15 +197,24 @@ function cmdInit(args) {
     const execution = values["execution"];
     if (!["main-thread", "subagent"].includes(execution))
         die(`error: --execution must be main-thread|subagent, got '${execution}'`);
+    // Serial mode: one item at a time, in list order. `--carry` (each item sees the previous
+    // item's output) implies serial. Both force concurrency=1 / chunk_size=1 so the dispatch
+    // loop never fans out — the orchestrator reads these flags and uses `claim-serial`.
+    const carry = Boolean(values["carry"]);
+    const serial = Boolean(values["serial"]) || carry;
+    const concurrency = serial ? 1 : parseInt(values["concurrency"], 10);
+    const chunkSize = serial ? "1" : values["chunk-size"];
     const state = makeBaseState(CMD, runId, {
-        concurrency: parseInt(values["concurrency"], 10),
-        chunk_size: values["chunk-size"],
+        concurrency,
+        chunk_size: chunkSize,
         max_retries: parseInt(values["max-retries"], 10),
         auto_continue: autoContinue,
         max_auto_continues: parseInt(values["max-auto-continues"], 10),
         model,
         subagent_type: values["subagent-type"],
         execution,
+        serial,
+        carry,
         kind,
         cache: Boolean(values["cache"]),
         folder: folderBaseFromValues(values),
@@ -223,7 +247,7 @@ function cmdInit(args) {
     if (existsSync(p) && !values["force"])
         die(`error: state already exists at ${p}; use --force to overwrite`);
     save(runId, state);
-    print({ run_id: runId, total: Object.keys(items).length, kind, cache_hits: cacheHits, path: p });
+    print({ run_id: runId, total: Object.keys(items).length, kind, serial, carry, cache_hits: cacheHits, path: p });
 }
 function maybeStoreCache(state, item) {
     const cfg = state["config"] ?? {};
@@ -271,6 +295,50 @@ function cmdClaim(args) {
         syncKanban(state, item); // todo/ → in-progress/
     save(runId, state);
     print(claimed);
+}
+/**
+ * Serial claim: take the NEXT item in list order (the first pending, or an already-claimed
+ * in_progress one on resume) and return it together with `prev_result` — the result of the
+ * last `done` item that precedes it. Used by `--serial`/`--carry` runs: deterministic and
+ * resume-safe (the carry is reconstructed from disk, not the conversation). Returns
+ * `{item: null}` when nothing is left to do.
+ */
+function cmdClaimSerial(args) {
+    const { positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: {} });
+    const runId = positionals[0];
+    if (!runId)
+        die("error: claim-serial requires a run_id");
+    const state = load(runId);
+    let prevId = null;
+    let prevResult = null;
+    let claimed = null;
+    for (const item of Object.values(state["items"])) {
+        if (item["status"] === STATUS_DONE) {
+            prevId = item["id"];
+            prevResult = item["result"];
+            continue;
+        }
+        if (item["status"] === STATUS_IN_PROGRESS) {
+            // Resume: this item was already claimed in a prior turn — hand it back, don't re-count.
+            claimed = item;
+            break;
+        }
+        if (item["status"] === STATUS_PENDING) {
+            item["status"] = STATUS_IN_PROGRESS;
+            item["started_at"] = now();
+            item["attempts"] = (item["attempts"] ?? 0) + 1;
+            claimed = item;
+            break;
+        }
+        // failed: skip over it (terminal), keep scanning for the next workable item.
+    }
+    if (claimed) {
+        if (state["status"] === STATUS_PENDING)
+            markInProgress(state);
+        syncKanban(state, claimed); // todo/ → in-progress/
+    }
+    save(runId, state);
+    print({ item: claimed, prev_id: prevId, prev_result: prevResult });
 }
 function cmdComplete(args) {
     const { values, positionals } = parseArgs({
@@ -543,6 +611,8 @@ function main(argv) {
             return cmdInit(rest);
         case "claim":
             return cmdClaim(rest);
+        case "claim-serial":
+            return cmdClaimSerial(rest);
         case "complete":
             return cmdComplete(rest);
         case "fail":

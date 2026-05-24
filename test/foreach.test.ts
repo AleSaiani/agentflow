@@ -119,6 +119,50 @@ test("foreach CLI: --folder auto-moves files todo→in-progress→done on claim/
   assert.ok(existsSync(join(board, "todo", other)));
 });
 
+test("foreach CLI: --prompt-file loads operation from a file; --serial forces concurrency/chunk", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const op = join(dir, "op.txt");
+  writeFileSync(op, "Review this file for security bugs.\nReport severity.\n", "utf8");
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }]), "utf8");
+
+  const init = run(dir, ["init", "pf", "--items", items, "--prompt-file", op, "--serial"]);
+  assert.equal(init.serial, true);
+  assert.equal(init.carry, false);
+
+  const state = JSON.parse(readFileSync(join(dir, "pf", "state.json"), "utf8"));
+  assert.match(state.task_prompt, /Review this file for security bugs/);
+  assert.equal(state.config.concurrency, 1);
+  assert.equal(state.config.chunk_size, "1");
+
+  // --prompt and --prompt-file are mutually exclusive (non-zero exit → throws)
+  assert.throws(() => run(dir, ["init", "pf2", "--items", items, "--prompt", "x", "--prompt-file", op]));
+});
+
+test("foreach CLI: --carry implies serial; claim-serial returns the previous item's result", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }, { id: "c" }]), "utf8");
+  const init = run(dir, ["init", "cr", "--items", items, "--carry", "--prompt", "step"]);
+  assert.equal(init.serial, true);
+  assert.equal(init.carry, true);
+
+  const c1 = run(dir, ["claim-serial", "cr"]);
+  assert.equal(c1.item.id, "a"); // first pending, in list order
+  assert.equal(c1.prev_result, null);
+
+  run(dir, ["complete", "cr", "a", "--result", JSON.stringify({ v: 1 })]);
+  const c2 = run(dir, ["claim-serial", "cr"]);
+  assert.equal(c2.item.id, "b");
+  assert.equal(c2.prev_id, "a");
+  assert.deepEqual(c2.prev_result, { v: 1 }); // carry from the previous item
+
+  // resume-safe: re-claiming without completing returns the same in_progress item, attempts not bumped
+  const again = run(dir, ["claim-serial", "cr"]);
+  assert.equal(again.item.id, "b");
+  assert.equal(again.item.attempts, 1);
+});
+
 test("foreach CLI: validate-only does not read items or write state", () => {
   const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
   const v = run(dir, ["init", "rX", "--items", join(dir, "nope.json"), "--validate-only"]);
