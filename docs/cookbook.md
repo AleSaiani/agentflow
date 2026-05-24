@@ -64,7 +64,8 @@ all-pending. Same engine as the checklist; just a different **Source**.
 ```
 
 One agent reads all inputs (files, inline data, or another run's output) and writes a single digest.
-The artifact lands at `.flow/reduce/<run-id>/` and is returned to you.
+The digest lands as a **visible file in your workspace** — `./<run-id>.md` (e.g. name the run
+`audit-digest` and you get `audit-digest.md`), not buried under `.flow/`.
 
 ### 3. Turn an outline into a structured list
 

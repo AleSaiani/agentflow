@@ -113,7 +113,10 @@ Launch ONE Agent (no fan-out). The prompt is **self-contained**:
 - `prompt`:
   - the user's task-prompt verbatim
   - inputs file path: `.flow/reduce/<run-id>/inputs.json` (read this with the `Read` tool)
-  - output file path: `.flow/reduce/<run-id>/digest.<md|json>` (extension matches `output_format`)
+  - output file path: `./<run-id>.<md|json>` — a **visible file in the workspace root** (extension
+    matches `output_format`), so the digest is easy to find and commit instead of being buried under
+    `.flow/`. Only the *internal* materialized inputs live under `.flow/reduce/<run-id>/`. Pick a
+    descriptive `--run-id` (Step 2) so the filename reads well — e.g. `audit-digest` → `audit-digest.md`.
   - **strict I/O rules**:
     - "Read the inputs file. Synthesize the requested digest. Do NOT comment while working."
     - "Write the digest to the output path via the `Write` tool. The file MUST be ONLY the digest — no preamble, no markdown fence around the whole thing (markdown content inside is fine for `format: markdown`)."
@@ -135,7 +138,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" budget-add <run-id> \
 If the agent returned `OK` and the output file exists:
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" complete <run-id> \
-  --output-path .flow/reduce/<run-id>/digest.<md|json>
+  --output-path ./<run-id>.<md|json>
 ```
 
 Otherwise:
@@ -147,7 +150,7 @@ If `auto_continue == true` and we failed mid-way (no output file), the Stop hook
 
 ## Step 7 — Final report
 
-Print a one-liner: `run-id`, `status`, `output_pointer`, byte size of the digest, `model` used. If `format: markdown`, optionally `Read` the first 30 lines and show them inline so the user does not have to open the file.
+Print a one-liner: `run-id`, `status`, `output_pointer` (the visible `./<run-id>.<ext>` file), byte size of the digest, `model` used. If `format: markdown`, optionally `Read` the first 30 lines and show them inline so the user does not have to open the file.
 
 ## Cross-turn auto-continue
 
