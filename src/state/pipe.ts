@@ -59,6 +59,7 @@ import "./foreach.js";
 import "./group.js";
 import "./iterate.js";
 import "./reduce.js";
+import "./step.js";
 
 const CMD = "pipe";
 const SUPPORTED_CHILD_CMDS = ["enumerate", "foreach", "group", "iterate", "reduce", "step"];

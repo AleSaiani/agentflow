@@ -153,7 +153,9 @@ npm install && npm run build
 claude --plugin-dir .
 ```
 
-> Requires Node ≥ 22 and `git bash` on `PATH` (shell stages run under bash for POSIX semantics on every OS).
+> Requires Node ≥ 22 and **Git Bash** (shell stages run under bash for POSIX semantics on every OS). On
+> Windows, Agent Flow auto-prefers Git Bash and **skips the WSL/Store `bash.exe`** (`System32`); set
+> `$AGENTFLOW_BASH` to point at a specific bash if needed.
 
 ## How it works (the short version)
 

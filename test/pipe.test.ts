@@ -206,6 +206,25 @@ test("pipe: conditional `next` branches (fork) route forward and skip the not-ta
   assert.deepEqual(s2, { a: "done", b: "done", c: "done" });
 });
 
+test("pipe: a `step` child stage is a registered primitive (drive→needs_agent, advance resolves)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const sdir = mkdtempSync(join(tmpdir(), "pipe-step-"));
+  const env = { PIPE_STATE_DIR: dir, STEP_STATE_DIR: sdir };
+  const wf = join(dir, "step.json");
+  writeFileSync(wf, JSON.stringify({ stages: [{ name: "ask", type: "primitive", spec: { cmd: "step", init_args: ["--prompt", "hi", "--runtime", "main"] } }] }), "utf8");
+  run(env, ["init", "sp", "--workflow", wf]);
+  const d = run(env, ["drive", "sp"]);
+  assert.equal(d.action, "needs_agent");
+  assert.equal(d.cmd, "step");
+  // orchestrator does the step, then advance must resolve getPrimitive("step") without error
+  const STEP = resolve("dist/state/step.js");
+  execFileSync("node", [STEP, "init", d.suggested_child_run_id, "--prompt", "hi", "--runtime", "main", "--force"], { env: { ...process.env, ...env } });
+  run(env, ["start-primitive-child", "sp", "--child-cmd", "step", "--child-run-id", d.suggested_child_run_id]);
+  execFileSync("node", [STEP, "complete", d.suggested_child_run_id, "--output", "done"], { env: { ...process.env, ...env } });
+  const adv = run(env, ["advance", "sp"]);
+  assert.equal(adv.pipe_status, "done");
+});
+
 test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };

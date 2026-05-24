@@ -277,22 +277,9 @@ function cmdRunIteration(args: string[]): void {
     return;
   }
 
-  if (state["config"]["convergence_check"] && iterIndex > 0) {
-    const prevHash = state["iterations"].at(-1)?.["convergence_hash"];
-    if (prevHash === outputHash) {
-      state["iterations"].push(iterRecord);
-      state["iteration_count"] += 1;
-      state["result_pointer"] = outPath;
-      state["stop_reason"] = "convergence";
-      markDone(state, outPath);
-      save(runId, state);
-      print({ action: "stop", reason: "convergence", iter: iterIndex });
-      return;
-    }
-  }
-
-  // check-last (do-until / do-while, default): evaluate the predicate AFTER the stage. In
-  // check-first mode the predicate already ran before the stage, so it is skipped here.
+  // Evaluate the post-stage predicate FIRST (check-last / do-until / do-while). The predicate is
+  // AUTHORITATIVE; convergence is only a fallback for when the predicate says "keep going" but the
+  // output has stopped changing. (In check-first mode the predicate already ran before the stage.)
   let shouldStop = false;
   if (!state["config"]["check_first"]) {
     let predProc: ShellResult;
@@ -312,6 +299,9 @@ function cmdRunIteration(args: string[]): void {
     shouldStop = state["stop"]["mode"] === "until" ? predProc.status === 0 : predProc.status !== 0;
     iterRecord["predicate_value"] = shouldStop;
   }
+
+  // Capture the previous iteration's hash BEFORE pushing this one (convergence fallback).
+  const prevHash = state["iterations"].at(-1)?.["convergence_hash"];
   state["iterations"].push(iterRecord);
   state["iteration_count"] += 1;
   state["result_pointer"] = outPath;
@@ -321,6 +311,15 @@ function cmdRunIteration(args: string[]): void {
     markDone(state, outPath);
     save(runId, state);
     print({ action: "stop", reason: "predicate_satisfied", iter: iterIndex });
+    return;
+  }
+
+  // Convergence fallback: only after the predicate declined to stop.
+  if (state["config"]["convergence_check"] && iterIndex > 0 && prevHash === outputHash) {
+    state["stop_reason"] = "convergence";
+    markDone(state, outPath);
+    save(runId, state);
+    print({ action: "stop", reason: "convergence", iter: iterIndex });
     return;
   }
 

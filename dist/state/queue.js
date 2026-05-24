@@ -14,6 +14,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { hostname } from "node:os";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -37,9 +38,15 @@ function save(runId, state) {
     state["updated_at"] = now();
     saveAtomic(pathFor(runId), state);
 }
-/** Filesystem-safe filename for an item id (real id is also stored inside the file). */
+/**
+ * Collision-free, filesystem-safe filename for an item id. A readable slug + a hash of the FULL id,
+ * so distinct ids that slug to the same text (`a/b`, `a:b`, `a b`) get distinct files — no silent
+ * work loss. Deterministic, so complete/fail recompute the same name from the id.
+ */
 function sanitize(id) {
-    return (id.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120) || "item") + ".json";
+    const slug = id.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "item";
+    const hash = createHash("sha256").update(id).digest("hex").slice(0, 10);
+    return `${slug}-${hash}.json`;
 }
 function countDir(runId, name) {
     const d = sub(runId, name);

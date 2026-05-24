@@ -73,6 +73,22 @@ test("iterate: until-loop stops when predicate satisfied", () => {
   assert.equal(status.iteration_count, 3);
 });
 
+test("iterate: a satisfied predicate beats convergence (stable output must not preempt it)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "iter-"));
+  const env = { ITERATE_STATE_DIR: dir };
+  // STABLE output every iteration (would converge after iter 1) but the predicate is satisfied at
+  // iter>=1. The predicate is authoritative → stop_reason must be predicate_satisfied, not convergence.
+  run(ITERATE, env, ["init", "conv", "--stage", "echo same-output", "--stop", '[ "$ITER_INDEX" -ge 1 ]']);
+  const actions: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const r = run(ITERATE, env, ["run-iteration", "conv"]);
+    actions.push(r.reason ?? r.action);
+    if (r.action === "stop") break;
+  }
+  assert.deepEqual(actions, ["continue", "predicate_satisfied"]);
+  assert.equal(run(ITERATE, env, ["status", "conv"]).stop_reason, "predicate_satisfied");
+});
+
 test("iterate: accepts plain-string --stage/--stop (no JSON needed)", () => {
   const dir = mkdtempSync(join(tmpdir(), "iter-"));
   const env = { ITERATE_STATE_DIR: dir };

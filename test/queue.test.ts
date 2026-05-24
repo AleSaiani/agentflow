@@ -46,6 +46,20 @@ test("queue: atomic claims never hand out the same item twice; drains to done", 
   assert.equal(status.pending + status.claimed, 0);
 });
 
+test("queue: ids that slugify to the same name do NOT collide (no silent work loss)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "queue-"));
+  const items = join(dir, "items.json");
+  // a/b, a:b, a b all slugify to "a-b" — must still enqueue as 3 distinct items
+  writeFileSync(items, JSON.stringify([{ id: "a/b" }, { id: "a:b" }, { id: "a b" }]), "utf8");
+  const init = run(dir, ["init", "col", "--items", items, "--prompt", "x"]);
+  assert.equal(init.enqueued, 3);
+  assert.equal(run(dir, ["status", "col"]).pending, 3);
+  // each is independently claimable and identifiable by its real id
+  const ids = new Set<string>();
+  for (let i = 0; i < 3; i++) ids.add(run(dir, ["claim", "col"]).item.id);
+  assert.deepEqual([...ids].sort(), ["a b", "a/b", "a:b"]);
+});
+
 test("queue: --stop-file pauses claiming; reclaim returns stale claims; add enqueues more", () => {
   const dir = mkdtempSync(join(tmpdir(), "queue-"));
   const items = join(dir, "items.json");
