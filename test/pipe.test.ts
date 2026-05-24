@@ -225,6 +225,17 @@ test("pipe: a `step` child stage is a registered primitive (drive→needs_agent,
   assert.equal(adv.pipe_status, "done");
 });
 
+test("pipe: shipped release-gate workflow validates + wires retry/approval (dogfood)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const repo = resolve(".");
+  const env = { PIPE_STATE_DIR: dir, CLAUDE_PLUGIN_ROOT: repo };
+  run(env, ["init", "rg", "--workflow", join(repo, "workflows", "release-gate", "WORKFLOW.md"), "--param", "test_cmd=echo ok"]);
+  const st = run(env, ["status", "rg"]);
+  assert.deepEqual(st.stages.map((s: any) => `${s.name}:${s.type}`), ["test:bash", "approve:bash", "deploy:bash"]);
+  // happy path: test passes → pauses at the approval gate
+  assert.equal(run(env, ["drive", "rg"]).action, "needs_approval");
+});
+
 test("pipe: a human-approval gate pauses drive until approved", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };
