@@ -3,9 +3,9 @@ name: run-workflow
 description: |
   Run a declarative workflow-file end to end: init a `/agentflow:pipe` from a JSON `WorkflowSpec`, then drive it to completion — auto-running every bash/json/deterministic stage and dispatching agents only where genuinely needed. Use `--dry-run` to preview the resolved plan without executing anything. The one-command way to execute a reusable, versioned workflow.
 
-  USE when the user points at a workflow JSON ("run this workflow", "run workflows/audit/workflow.json", "run my pipeline") or wants to run a saved `WorkflowSpec`. Workflows are normally self-contained folders (`workflows/<name>/workflow.json` + sibling scripts), but a bare `.json` path also works.
+  USE when the user points at a workflow file ("run this workflow", "run workflows/audit/WORKFLOW.md", "run my pipeline") or wants to run a saved `WorkflowSpec`. Workflows are normally self-contained folders (`workflows/<name>/WORKFLOW.md` + sibling scripts), but a bare `.json` path also works.
 allowed-tools: Bash, Read, Write, Agent
-argument-hint: <workflow.json> [--param name=value ...] [--run-id NAME] [--dry-run]
+argument-hint: <WORKFLOW.md | workflow.json> [--param name=value ...] [--run-id NAME] [--dry-run]
 ---
 
 # /agentflow:run-workflow — execute a workflow-file
@@ -14,14 +14,14 @@ argument-hint: <workflow.json> [--param name=value ...] [--run-id NAME] [--dry-r
 > run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
 A thin wrapper over `/agentflow:pipe`: it inits from a workflow-file and drives. The workflow-file is
-typically `workflows/<name>/workflow.json` — a self-contained folder whose `bash` stages call sibling
+typically `workflows/<name>/WORKFLOW.md` — a self-contained folder whose `bash` stages call sibling
 scripts via `{{workflow.dir}}`, so it runs unchanged wherever the folder is. Pick a stable `<run-id>`
 (default: derive from the workflow name) so re-runs resume.
 
 ## 1. Init the pipe from the workflow
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> --workflow <workflow.json> \
+node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> --workflow <workflow.md> \
   [--param name=value ...] [--force]
 ```
 

@@ -28,7 +28,7 @@ For each: `name`, `format`, stage count + declared `params` (when a `workflow.js
 path, and a one-line description. Use it to find the right workflow + its params, then run it:
 
 ```bash
-/agentflow:run-workflow workflows/<name>/workflow.json --param <name>=<value> …
+/agentflow:run-workflow workflows/<name>/WORKFLOW.md --param <name>=<value> …
 ```
 
 Related: `/agentflow:create-workflow` (author a new workflow), `/agentflow:run-workflow` (execute one),

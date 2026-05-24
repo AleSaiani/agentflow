@@ -15,9 +15,11 @@ argument-hint: "<describe the workflow>" [--name NAME]
 > **Make it visible:** tell the user in one line when you start authoring (and the target file path),
 > so it's clear this skill is running.
 
-You design a `WorkflowSpec` JSON that wires the primitives, save it as a **self-contained folder**
-`workflows/<name>/workflow.json` (with any helper scripts alongside it), validate it, and hand it to
-`/agentflow:run-workflow`. Compiles 1:1 into a `/agentflow:pipe` — no new engine.
+You author a **`WORKFLOW.md`** — a human-readable markdown file (frontmatter + one heading per stage,
+coherent with `SKILL.md`) — save it as a **self-contained folder** `workflows/<name>/WORKFLOW.md`
+(with any helper scripts alongside it), validate it, and hand it to `/agentflow:run-workflow`. A
+deterministic parser compiles it 1:1 into a `/agentflow:pipe` — no new engine, no LLM at run time.
+(A `.json` WorkflowSpec is still accepted by the engine, but `WORKFLOW.md` is the format to author.)
 
 **Self-contained & movable.** A workflow lives in its own folder; any script a `bash` stage needs
 (e.g. a discover/fetch helper) is written **into that same folder** and referenced via the
@@ -25,44 +27,49 @@ You design a `WorkflowSpec` JSON that wires the primitives, save it as a **self-
 anywhere (another repo, another machine) and it still runs.
 
 **Input** — you can author from a plain description **or from a file**: if the user passes a path (e.g.
-`/agentflow:create-workflow ./my-flow.md`), read that file with `Read` and treat its contents as the
-description/spec. This is the "import" side of the round-trip below — re-deriving a workflow from an
-exported `.md` (the result may differ slightly from the original; that's expected).
+`/agentflow:create-workflow ./notes.md`), read that file with `Read` and treat its contents as the
+description. (Since `WORKFLOW.md` *is* the readable source, "editing" a workflow is just editing its
+md, or re-running this skill on it; a re-derivation may differ slightly — that's expected.)
 
-## WorkflowSpec shape
+## WORKFLOW.md format
 
-```jsonc
-{
-  "name": "my-flow",
-  "description": "...",
-  "params": {                                             // optional: per-invocation inputs
-    "target":  { "required": true, "description": "..." },// required → must be passed with --param
-    "glob":    { "default": "**/*", "description": "..." },// default used when --param omitted
-    "exclude": ""                                          // bare value = its default
-  },
-  "config": { "context_policy": "summary", "max_auto_continues": 50, "stop_on_failure": true },
-  "stages": [ /* Stage[] */ ]
-}
+```markdown
+---
+name: my-flow
+description: One line on what this does.
+params:                                    # optional: per-invocation inputs
+  target: { required: true, description: ... }   # required → must be passed with --param
+  glob:   { default: "**/*" }                    # default used when --param omitted
+  exclude: ""                                    # bare value = its default
+config: { stop_on_failure: true, max_auto_continues: 50 }
+---
+
+## 1. <stage-name> · bash            # heading: "## [n.] <name> · <type>"  (or "<name> (<type>)")
+Prose here is ignored — use it for human notes.
+```sh
+<shell that writes to "$PIPE_OUTPUT_PATH">
+```
+- output_path: {{run.dir}}/out.json
+
+## 2. <stage-name> · foreach          # a primitive: each bullet → an init_arg
+- items: {{stages.1-stage-name.result_pointer}}
+- prompt: <the per-item operation>
+- cache: true                         # bare `true` → the flag alone (--cache)
+
+## 3. <stage-name> · json
+- value: { "source": "run", "cmd": "foreach", "run_id": "{{stages.2-stage-name.run_id}}" }
+- output_path: {{run.dir}}/bundle.json
 ```
 
-**Params** make a workflow reusable without editing it: declare them here, reference them as
+**Stage types** (`## name · <type>`): `bash` (a ```sh fence is the command), `json` (a `- value:`
+bullet or a ```json fence), or a primitive — `enumerate` | `foreach` | `group` | `reduce` | `iterate`
+(each `- key: value` bullet becomes `--key value`; a bare `true` becomes the flag alone). Any stage may
+carry `- when: <bash predicate>` (a guard: exit 0 runs, non-zero skips). Forward-compatible: `## … ·
+skill` / `· step` slots are parsed but not yet executable.
+
+**Params** make a workflow reusable without editing it: declare them in frontmatter, reference them as
 `{{params.<name>}}` in any stage (use `|shell` when injecting into a `bash` command), and the user
 supplies values at run time with `--param name=value`. Prefer params over hardcoded paths/globs.
-
-A **Stage**:
-
-```jsonc
-{
-  "name": "unique-name",                                  // required to wire references
-  "type": "bash" | "json" | "primitive",
-  "when": { "type": "bash", "command": "<predicate>" },   // optional guard: exit 0 runs, non-zero skips
-  "spec": { /* type-specific, below */ }
-}
-```
-
-- **bash** → `{ "command": "<shell; write to $PIPE_OUTPUT_PATH>", "output_path"?: "..." }`
-- **json** → `{ "value": <any JSON; string leaves resolve templates>, "output_path"?: "..." }`
-- **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate", "init_args": [ ... ] }`
 
 ## Wiring templates (resolved by /agentflow:pipe at run time)
 
@@ -73,16 +80,18 @@ parameter) · `{{stages.<name>.result_pointer}}` · `{{stages.<name>.run_id}}` �
 
 ## The primitives as stages
 
-| cmd | role | key init_args |
-|---|---|---|
-| `enumerate` | unfold 1→N (generate a list) | `--prompt "<gen instructions>" [--input <path>]` → produces items.json |
-| `foreach` | map N→N (op per item) | `--items {{stages.X.result_pointer}} --prompt "<op>" [--kind ...] [--execution main-thread\|subagent]` |
-| `group` | partition | `--method path-prefix\|regex\|jsonpath\|llm-classify --input-source <descriptor> [--method-config '{...}']` |
-| `reduce` | fold N→1 | `--inputs <descriptor> --prompt "<synthesis>" --output-format markdown\|json` |
-| `iterate` | loop (or use a bash stage that calls iterate.js) | `--stage '{...}' --stop '{...}'` |
+Each `## name · <cmd>` stage's bullets become that primitive's flags (`- key: value` → `--key value`):
 
-Bridge primitives with small **json** stages that build input descriptors, e.g.
-`{ "source": "run", "cmd": "foreach", "run_id": "{{stages.review.run_id}}" }`.
+| cmd | role | key bullets |
+|---|---|---|
+| `enumerate` | unfold 1→N (generate a list) | `- prompt: <gen instructions>` · `- input: <path>` → produces items.json |
+| `foreach` | map N→N (op per item) | `- items: {{stages.X.result_pointer}}` · `- prompt: <op>` · `- kind: …` · `- serial: true` |
+| `group` | partition | `- method: path-prefix\|regex\|jsonpath\|llm-classify` · `- input-source: <descriptor>` · `- method-config: {…}` |
+| `reduce` | fold N→1 | `- inputs: <descriptor>` · `- prompt: <synthesis>` · `- output-format: markdown\|json` |
+| `iterate` | loop | `- stage: <cmd>` · `- stop: <predicate>` (or use a `bash` stage that calls iterate.js) |
+
+Bridge primitives with small **json** stages that build input descriptors, e.g. a `- value:`
+of `{ "source": "run", "cmd": "foreach", "run_id": "{{stages.review.run_id}}" }`.
 
 ## Determinism boundary
 
@@ -97,32 +106,27 @@ is fuzzy, make it a step whose **structured output** a later guard reads — nev
    default derived from the goal (or `--name` if given) and offer a custom one via `AskUserQuestion`:
    *"Save this workflow as `<deduced>`? (or pick a name)"* — options: the deduced name (recommended),
    "let me type one". Slugify the final choice to `<name>` (lowercase, kebab-case).
-3. Draft `stages`: typically *produce a list* (bash discover or `enumerate`) → *process it*
+3. Draft the stages: typically *produce a list* (bash discover or `enumerate`) → *process it*
    (`foreach` / `group`) → *synthesize* (`reduce`), bridged by `json` stages and wired with `{{…}}`.
    If a `bash` stage needs a helper script, plan to `Write` it into `workflows/<name>/` and call it via
    `{{workflow.dir}}/<script>`.
-4. `Write` the spec to `workflows/<name>/workflow.json`, and `Write` each helper script into the same
-   `workflows/<name>/` folder. Use only `{{workflow.dir}}`-relative references to those scripts.
+4. `Write` the `WORKFLOW.md` to `workflows/<name>/WORKFLOW.md`, and `Write` each helper script into the
+   same `workflows/<name>/` folder. Use only `{{workflow.dir}}`-relative references to those scripts.
 5. Validate + preview (no execution):
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <name>-check --workflow workflows/<name>/workflow.json --force
+   node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <name>-check --workflow workflows/<name>/WORKFLOW.md --force
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" plan <name>-check
    ```
-   The `plan` output shows `{{workflow.dir}}` already resolved to the folder's absolute path — confirm
-   the script references look right.
-6. Surface the plan, then tell the user to run it: `/agentflow:run-workflow workflows/<name>/workflow.json`.
+   The `plan` output shows the parsed stages with `{{workflow.dir}}` resolved to the folder's absolute
+   path — confirm the stage types, init_args, and script references look right.
+6. Surface the plan, then tell the user to run it: `/agentflow:run-workflow workflows/<name>/WORKFLOW.md`.
 
-See `workflows/audit/workflow.json` for a complete worked example (discover via `{{workflow.dir}}/discover.mjs`
+See `workflows/audit/WORKFLOW.md` for a complete worked example (discover via `{{workflow.dir}}/discover.mjs`
 → foreach review → group → reduce digest).
 
-## Export to a human-readable `.md` (a view)
+## Readable by design — no separate export
 
-When the user wants to read, review, or share a workflow, render its `workflow.json` as markdown:
-title + description, a **Params** list (name · default/required · description), and a numbered **Stages**
-list (each: name, type, and a one-line summary of `spec` — the command, the primitive `cmd` + key
-init_args, or the json value — plus any `when` guard and `{{…}}` wiring). Write it next to the spec as
-`workflows/<name>/workflow.md`. This is a lossy *view*, not a second source of truth.
-
-**Round-trip:** that `.md` can be fed straight back to `/agentflow:create-workflow ./workflows/<name>/workflow.md`
-to re-derive a workflow — handy for editing in prose. The rebuilt spec may differ slightly from the
-original (the `.md` is a human summary, not an exact serialization); that's expected.
+`WORKFLOW.md` *is* the human-readable artifact, so there's nothing to export: read it, diff it in PRs,
+edit it by hand, or feed it back to this skill to re-derive. The engine compiles it deterministically
+at run time; you don't keep a separate `.json`. (If a `.json` WorkflowSpec turns up, it still runs —
+the engine accepts either — but author in `WORKFLOW.md`.)

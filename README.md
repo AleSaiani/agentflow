@@ -40,14 +40,14 @@ folder** — the steps plus any helper script it needs, referenced relatively:
 
 ```text
 workflows/code-review/
-  workflow.json     ← the steps, wired together
+  WORKFLOW.md       ← the steps, in readable markdown (frontmatter + one heading per stage)
   discover.mjs      ← a helper script (called via {{workflow.dir}}, so the folder is portable)
 ```
 
 Then run it — now, or any time, on any machine:
 
 ```text
-/agentflow:run-workflow workflows/code-review/workflow.json     # add --dry-run to preview first
+/agentflow:run-workflow workflows/code-review/WORKFLOW.md     # add --dry-run to preview first
 ```
 
 It drives itself: deterministic steps run automatically, LLM steps dispatch agents, and the whole

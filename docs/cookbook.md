@@ -186,12 +186,12 @@ it's cheap.
 ```
 
 `create-workflow` confirms the name (proposing one, or take your own), designs the `WorkflowSpec`, and writes
-a **self-contained folder** `workflows/triage/` (the `workflow.json` plus any scripts it needs,
+a **self-contained folder** `workflows/triage/` (the `WORKFLOW.md` plus any scripts it needs,
 referenced via `{{workflow.dir}}` so the folder is movable), then validates + previews:
 
 ```text
-/agentflow:run-workflow workflows/triage/workflow.json --dry-run    # shows the resolved stage plan, runs nothing
-/agentflow:run-workflow workflows/triage/workflow.json              # init + drive to completion
+/agentflow:run-workflow workflows/triage/WORKFLOW.md --dry-run    # shows the resolved stage plan, runs nothing
+/agentflow:run-workflow workflows/triage/WORKFLOW.md              # init + drive to completion
 ```
 
 The folder is yours to version, move, edit (swap models, depth, prompts), and re-run.

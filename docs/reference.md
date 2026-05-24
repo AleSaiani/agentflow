@@ -6,7 +6,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 
 - [Quick map](#quick-map)
 - [The primitives](#the-primitives) — enumerate · foreach · reduce · group · loops · pipe
-- [Authoring & running workflows](#authoring--running-workflows) — compose · run
+- [Authoring & running workflows](#authoring--running-workflows) — create-workflow · run-workflow
 - [Inspecting](#inspecting) — inspect · board
 - [Workflow-file schema](#workflow-file-schema)
 - [Sources & views](#sources--views)
@@ -151,7 +151,7 @@ with `/agentflow:run-workflow`. See [Workflow-file schema](#workflow-file-schema
 
 ### `run-workflow` — execute a workflow-file
 
-`/agentflow:run-workflow <workflow.json> [--param name=value …] [--run-id NAME] [--dry-run]` = `pipe init --workflow` + `pipe drive` (or
+`/agentflow:run-workflow <workflow.md> [--param name=value …] [--run-id NAME] [--dry-run]` = `pipe init --workflow` + `pipe drive` (or
 `pipe plan` for `--dry-run`). The one-command way to execute a saved pipeline.
 
 ---
