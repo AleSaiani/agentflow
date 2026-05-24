@@ -2,8 +2,7 @@
 # Default config for /flow:group.
 #
 # Override priority (high -> low):
-#   1. CLI flag (--method, --depth, --pattern, ...)
-#   2. Spec frontmatter (when using --file spec.md)
+#   1. CLI flag (--method, --input-source, --method-config, ...)
 #   3. This file
 #   4. Hardcoded fallback in the state helper
 
@@ -21,7 +20,7 @@ path_prefix_depth: 2        # for method=path-prefix: number of leading path seg
 # Notes
 
 - /flow:group is the **partition** primitive. Output is items.json-compatible: each "item"
-  in the output is a group, ready to be consumed by /flow:foreach as `--from-file`.
+  in the output is a group, ready to be consumed by /flow:foreach as `--items`.
   This is the canonical `/flow:group → /flow:foreach (per group)` composition.
 
 - **Deterministic methods** (path-prefix, regex, jsonpath) complete in one shot, no

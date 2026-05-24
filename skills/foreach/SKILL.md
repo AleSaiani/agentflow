@@ -37,59 +37,38 @@ You are the **orchestrator** of a `/flow:foreach` run. Your only job:
 
 **The state file is the source of truth** — not the conversation. You are the only writer of state. Subagents process items and return results; they NEVER write to state.
 
-## List-prompt and task-prompt sources
+## Invocation
 
-Two input forms, never mixed:
+`foreach` **consumes** a list — it does not generate one. To produce a list from a spec, run
+/flow:enumerate first and pass its output here. Provide exactly one source plus the operation:
 
-### Form A — structured markdown file
-```
-/flow:foreach --file path/to/spec.md
-```
-The file has YAML frontmatter (config overrides) plus `## List` and `## Task` sections:
-```markdown
----
-run-id: run-name
-concurrency: 4
-chunk-size: auto
-model: sonnet
-auto-continue: true
----
+**Source (one of):**
+- `--items <file.json>` — a JSON array of `{id, data, task?}`
+- `--checkbox <file.md>` — a markdown checklist (`[x]`/`[ ]`; inline `{model:…, subagent:…}` → per-item task)
+- `--folder <dir>` — a file kanban (`todo/` / `in-progress/` / `done/`, or a flat folder = all pending)
+- `--source '<json>'` — an explicit SourceSpec (incl. `{"source":"run","cmd":"…","run_id":"…"}`)
 
-## List
-<prompt that produces the list — MUST request a JSON array>
+**Operation:**
+- `--prompt "<instructions applied to each item>"` — the primary config
+- optional knobs: `--kind <code-review|…>`, `--model …`, `--execution main-thread|subagent`,
+  `--concurrency N`, `--chunk-size N|auto`, `--max-retries N`, `--cache`, `--run-id NAME`,
+  `--no-auto-continue`, `--force`
 
-## Task
-<prompt to run for each item — receives the item's `data` as context>
-```
-
-### Form B — inline flags
-```
-/flow:foreach --list "<list-prompt>" --task "<task-prompt>" \
-           [--run-id NAME] [--concurrency N] [--chunk-size N|auto] \
-           [--model haiku|sonnet|opus] [--max-retries N] \
-           [--no-auto-continue]
-```
-
-If either list-prompt or task-prompt is missing → stop with a clear message.
+If no source or no `--prompt` is given → stop with a clear message.
 
 ## Step 0 — Load defaults
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/foreach/defaults.md` (YAML frontmatter). Extract defaults. When a value is missing in CLI or spec, use the default from here.
 
-**Override priority** (high → low):
-1. CLI flag
-2. Spec frontmatter (Form A)
-3. defaults.md
-4. Hardcoded fallback in the state helper
-
-If `defaults.md` is missing or unparseable: use the hardcoded fallback and surface a WARNING to the user (non-blocking).
+**Override priority** (high → low): CLI flag > defaults.md > the state helper's built-in fallback. If
+`defaults.md` is missing or unparseable, use the fallback and surface a non-blocking WARNING.
 
 ## Step 1 — Parse and validate
 
-- Determine form A or B.
-- If A: `Read` the spec, parse frontmatter + `## List` / `## Task` sections.
-- Resolve the final config by priority.
-- If `run-id` is missing: generate a deterministic `enum-<8 char hash>` from the hash of the list-prompt.
+- Confirm exactly one source flag (`--items` / `--checkbox` / `--folder` / `--source`) and the
+  operation `--prompt` are present.
+- Resolve config by priority.
+- If `run-id` is missing: derive a deterministic `foreach-<8 char hash>` from the source + prompt.
 
 ## Step 1.5 — Task preflight enrichment
 
@@ -110,64 +89,37 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/foreach/task-kinds.md`. Classify the user's t
 
 Confirm to the user in a single line: `run-id`, `kind`, `effective model`, `concurrency`, `chunk-size`, `auto-continue`, first 150 chars of list-prompt and user task-prompt.
 
-## Step 2 — Resolve list
+## Step 2 — Resolve items, gate by count, init
 
-You execute the list-prompt yourself (DO NOT delegate to a subagent — it's cheap and we want determinism).
+1. **Resolve** the items from the chosen source — `foreach` does NOT invent the list. The state
+   helper reads `--items` / `--checkbox` / `--folder` / `--source` at `init`; you don't pre-generate
+   anything. (Need a list produced from a spec? That's /flow:enumerate — its `items.json` becomes your
+   `--items`.) A `groups.json` from /flow:group is items.json-compatible: pass it as `--items`, and
+   each item is a whole group (`data: {group_id, items, size}`).
 
-**Required output**: a JSON array of objects, each with a unique `id`. Example:
-```json
-[
-  {"id": "src/foo.py", "data": {"path": "src/foo.py"}},
-  {"id": "src/bar.py", "data": {"path": "src/bar.py"}}
-]
-```
+2. **Count gate** (skip if the user invoked `/flow:foreach` explicitly). Read the source to get the
+   item count, then:
+   - **≤ 2** → do the work inline this turn; no state, no subagents.
+   - **~3–10** → `AskUserQuestion`: *"N items — run the durable/parallel mechanism (resumable across
+     turns), or handle them inline now?"* Proceed per the answer.
+   - **> 10** (or fewer but heavy/independent) → proceed.
 
-If the list-prompt does not already specify the format, **add it yourself** before running it: explicitly request "Output: JSON array of {id, data}, no prose, no fence".
+   This is what lets the skill trigger on a casual "do X for each of these" without forcing the full
+   mechanism onto a handful of items.
 
-If the prompt is of the form "find files matching X" and you can do it deterministically with `Glob`/`Grep`, do that directly — preferable to generating the list from memory.
-
-**Pre-existing items file (`/flow:group` composition)**: if the user already has a JSON array of `{id, data}` (e.g. the `groups.json` produced by `/flow:group`), skip list resolution entirely. Copy or read the file and write it as `.foreach/<run-id>/items.json`, then call `init`. This is the canonical `/flow:group → /flow:foreach` composition: each "item" foreach processes is a whole group with `data: {group_id, items, size}`.
-
-**Threshold guardrail** (after the list is resolved, BEFORE init): if `len(items) < min_items` from defaults (default 15) AND this is an autonomous invocation (not the user typing `/flow:foreach` explicitly), STOP and use `AskUserQuestion`:
-> "Only <N> items found. /flow:foreach adds orchestration overhead (state file, chunk dispatch, Stop hook). For this size it's usually faster to read them inline in this agent. Proceed with /flow:foreach anyway?"
-> Options: **inline** (cancel /flow:foreach, the main agent processes them directly) | **proceed** (continue with /flow:foreach as planned)
-
-If the user typed `/flow:foreach` explicitly → skip the guardrail (consider it consent).
-
-Save the JSON to `.foreach/<run-id>/items.json` with `Write`. Then:
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" init <run-id> \
-  --items .foreach/<run-id>/items.json \
-  --task-prompt "<user task-prompt verbatim>" \
-  --kind <code-review|transformation|extraction|validation|audit|unknown> \
-  --concurrency <N> --chunk-size <N|auto> \
-  --max-retries <N> --max-auto-continues <N> \
-  --model <inherit|haiku|sonnet|opus> \
-  [--auto-continue|--no-auto-continue] \
-  [--force]
-```
-
-The state helper handles `--kind` by reading `${CLAUDE_PLUGIN_ROOT}/skills/foreach/task-kinds.md`, prepending the matching template to the user task-prompt, and storing the result in `state.task_prompt`. After init the prompt is already enriched; downstream dispatch uses it as-is.
-
-If the run-id exists **without `--force`**: ask the user to choose `resume` (skip init, process pending) or `reset` (start over). DO NOT overwrite without confirmation.
-
-## Step 2.5 — Count gate (inline vs ask vs run)
-
-Now that the list is resolved, decide whether `/flow:foreach` is worth its overhead — **unless the
-user invoked `/flow:foreach` explicitly** (then skip this gate and proceed). Judge by the item count
-`total`:
-
-- **`total` ≤ 2** → don't run the machinery. Just do the work inline in this turn and report. (No
-  state file, no subagents — it would only add latency.)
-- **`total` ~3–10** → borderline. Use **AskUserQuestion** to offer the choice, e.g. *"N items — run
-  the durable/parallel mechanism (resumable across turns, one subagent per chunk) or just handle them
-  inline now?"* Proceed per the answer; default to inline if they don't care.
-- **`total` > 10** (or fewer but heavy/long/independent items) → proceed with `/flow:foreach`: it's
-  where persistence + parallelism pay off.
-
-This gate is what lets the skill trigger on a casual "do X for each of these" without forcing the full
-mechanism onto a handful of items.
+3. **Init** (when proceeding):
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" init <run-id> \
+     (--items <file> | --checkbox <md> | --folder <dir> | --source '<json>') \
+     --prompt "<operation, verbatim>" \
+     [--kind <code-review|transformation|extraction|validation|audit>] \
+     [--execution main-thread|subagent] [--model <inherit|haiku|sonnet|opus>] \
+     [--concurrency <N>] [--chunk-size <N|auto>] [--max-retries <N>] [--cache] \
+     [--max-auto-continues <N>] [--auto-continue|--no-auto-continue] [--force]
+   ```
+   The state helper applies `--kind` (prepends the matching `task-kinds.md` template to `--prompt` and
+   stores the enriched prompt in `state.task_prompt`). If the run-id exists **without `--force`**: ask
+   `resume` (process pending) or `reset` (start over) — never overwrite silently.
 
 ## Step 3 — Compute effective chunk_size
 
@@ -282,12 +234,14 @@ Cap: `max_auto_continues` per run (default 20). Beyond that, the hook stops.
 
 ## Quick example
 
-```
-/flow:foreach --file examples/spec-example.md
+```bash
+# files.json: [{"id":"src/a.cs","data":{"path":"src/a.cs"}}, {"id":"src/b.cs","data":{"path":"src/b.cs"}}]
+/flow:foreach --items files.json --kind code-review --cache \
+           --prompt "Review this file for bugs; report {severity, findings}"
 ```
 
-```
-/flow:foreach --list "find every .md under examples/ — output JSON array of {id: path, data: {path}}" \
-           --task "read the file and report {wc, has_frontmatter, sections}" \
-           --concurrency 3 --chunk-size auto --model sonnet
+Or drive a checklist / a folder kanban directly (no JSON to build):
+```bash
+/flow:foreach --checkbox TODO.md --prompt "Complete this task"
+/flow:foreach --folder tasks    --prompt "Do the task described in this file"
 ```

@@ -28,41 +28,27 @@ You are the **orchestrator** of a `/flow:group` run. Job:
 2. apply the chosen grouping method (deterministic in pure Python, or LLM-classify via one Agent),
 3. produce `groups.json` — an items.json-compatible array of group items, ready for downstream `/flow:foreach`.
 
-**Composition pattern**: the output of `/flow:group` IS a valid input for `/flow:foreach`. Pipe them: `/flow:group → /flow:foreach --from-file <groups.json>`. Each "item" foreach sees is a whole group, with `data: {group_id, items, size}`.
+**Composition pattern**: the output of `/flow:group` IS a valid input for `/flow:foreach`. Pipe them: `/flow:group → /flow:foreach --items <groups.json>`. Each "item" foreach sees is a whole group, with `data: {group_id, items, size}`.
 
-## Input forms
+## Invocation
 
-### Form A — structured markdown file
 ```
-/flow:group --file path/to/spec.md
-```
-With YAML frontmatter (config + input source + method config) and an optional `## Classify` section (only for method=llm-classify):
-```markdown
----
-run-id: cs-by-component
-method: llm-classify
-model: sonnet
-input:
-  source: run
-  cmd: foreach
-  run_id: enum-abc123
-method_config:
-  prompt-style: short
----
-
-## Classify
-<prompt instructing the agent how to assign each item to a group — only for llm-classify>
+/flow:group --method path-prefix|regex|jsonpath|llm-classify \
+        --input-source <descriptor.json> [--method-config '{…}'] \
+        [--model haiku|sonnet|opus] [--run-id NAME]
 ```
 
-### Form B — inline flags
-```
-/flow:group --from-run <enum-run-id> --method path-prefix --depth 2 [--run-id NAME]
-/flow:group --from-file <items.json> --method regex --pattern "^src/([^/]+)/" --field id
-/flow:group --from-file <items.json> --method jsonpath --path data.component
-/flow:group --from-run <enum-run-id> --method llm-classify --classify-prompt "Group by intent: auth, billing, api, infra, other" --model sonnet
+`--input-source` is a descriptor file:
+```json
+{"source": "run",  "cmd": "foreach", "run_id": "…"}   // or
+{"source": "file", "path": "<items.json>"}            // or
+{"source": "inline", "data": [ {"id": "…", "data": {…}} ]}
 ```
 
-If neither input source nor method are provided → stop with a clear message.
+`--method-config` per method: `path-prefix` `'{"depth":2}'` · `regex`
+`'{"pattern":"^src/([^/]+)/","field":"id"}'` · `jsonpath` `'{"path":"data.component"}'`. For
+`llm-classify`, the classify instructions are given to the agent at dispatch time (Step 4b). If no
+method or input source is provided → stop with a clear message.
 
 ## Step 0 — Load defaults
 
@@ -70,13 +56,12 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/group/defaults.md` (YAML frontmatter). Use de
 
 ## Step 1 — Parse and validate
 
-- Determine form A or B.
-- Resolve the final config by priority (CLI > spec frontmatter > defaults > hardcoded).
-- If `run-id` is missing: generate `grp-<8 char hash>` from the hash of the input source + method + method_config.
+- Resolve config by priority (CLI > defaults > hardcoded).
+- If `run-id` is missing: generate `group-<8 char hash>` from the input source + method + method_config.
 - Validate method ∈ {`path-prefix`, `regex`, `jsonpath`, `llm-classify`}.
 - For `regex`: `pattern` is required; `field` defaults to `id`.
 - For `jsonpath`: `path` is required (e.g. `data.component`, `data.labels.0`).
-- For `llm-classify`: a classify prompt is required (the section `## Classify` in spec, or `--classify-prompt`).
+- For `llm-classify`: classify instructions are required (given to the agent at dispatch, Step 4b).
 
 ## Step 2 — Threshold guardrail (autonomous invocation only)
 
@@ -137,7 +122,7 @@ Skip to Step 5.
    - `model`: from config if not `inherit`
    - `description`: `group:<run-id>:classify`
    - `prompt`:
-     - the user's classify prompt (from spec `## Classify` section or `--classify-prompt`)
+     - the user's classify instructions
      - input file: `.group/<run-id>/items-to-classify.json` (JSON array of `{id, data, ...}`)
      - output file: `.group/<run-id>/classification.json` (JSON object `{"<item_id>": "<group_id>", ...}` covering EVERY item)
      - **strict I/O rules**:
@@ -164,7 +149,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/group.js" status <run-id>
 
 Print: `run-id`, `method`, `items_total`, `groups_count`, `output_pointer`, plus a one-line summary of group sizes (e.g. "auth: 12, billing: 8, api: 5, unclassified: 2").
 
-Suggest the next step explicitly: "Output `.group/<run-id>/groups.json` is items.json-compatible. Run `/flow:foreach --list-file .group/<run-id>/groups.json --task '...'` to process per group, or `/flow:reduce` it for a partition-aware digest."
+Suggest the next step explicitly: "Output `.group/<run-id>/groups.json` is items.json-compatible. Run `/flow:foreach --items .group/<run-id>/groups.json --prompt '...'` to process per group, or `/flow:reduce` it for a partition-aware digest."
 
 ## Cross-turn auto-continue
 
@@ -181,16 +166,16 @@ A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.group/`.
 
 ## Quick example
 
-Group .cs files by directory and validate each group:
-```
-/flow:group --from-run enum-cs-files --method path-prefix --method-config '{"depth": 2}' --run-id cs-by-dir
-/flow:foreach --list-file .group/cs-by-dir/groups.json \
-           --task "review every file in this group as a coherent unit; cross-reference for cross-file bugs"
+Group .cs files by directory, then review each group together:
+```bash
+# src.json: {"source":"run","cmd":"foreach","run_id":"review-cs"}
+/flow:group --method path-prefix --method-config '{"depth":2}' --input-source src.json --run-id cs-by-dir
+/flow:foreach --items .group/cs-by-dir/groups.json \
+           --prompt "Review every file in this group together; cross-reference for cross-file bugs"
 ```
 
-LLM-classify Jira issues by intent:
-```
-/flow:group --from-file .pipe/<run>/issues.json --method llm-classify \
-       --classify-prompt "Read each issue. Assign to one of: regression, feature-request, ux, performance, infra. Use 'other' if unclear." \
-       --model sonnet
+LLM-classify Jira issues by intent (the classify instructions go to the agent at dispatch, Step 4b):
+```bash
+# issues.json: {"source":"file","path":".pipe/triage/issues.json"}
+/flow:group --method llm-classify --input-source issues.json --model sonnet
 ```

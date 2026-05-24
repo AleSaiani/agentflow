@@ -86,37 +86,17 @@ Stage names MUST be unique; that's the lookup key for `{{stages.<name>...}}`.
 ```
 The orchestrator generates the child run-id (the `tick` output suggests one), runs the child's `init` CLI, then calls `state/pipe.js start-primitive-child` to record it. The Stop hook resumes the CHILD on subsequent turns. When the child is done, the next pipe `tick` returns `advance_after_child` and the orchestrator calls `state/pipe.js advance`.
 
-## Input forms
+## Invocation
 
-### Form A — structured markdown file
 ```
-/flow:pipe --file path/to/pipeline-spec.md
-```
-With YAML frontmatter (config) and a `## Stages` section that holds JSON:
-```markdown
----
-run-id: jira-triage
-context-policy: summary
-stop-on-failure: true
----
-
-## Stages
-```json
-[
-  {"type": "bash", "name": "fetch", "spec": {"command": "..."}},
-  {"type": "primitive", "name": "classify", "spec": {"cmd": "group", "init_args": [...]}},
-  {"type": "primitive", "name": "review", "spec": {"cmd": "foreach", "init_args": [...]}},
-  {"type": "primitive", "name": "digest", "spec": {"cmd": "reduce", "init_args": [...]}}
-]
-```
+/flow:pipe (--stages <stages.json> | --workflow <workflow.json>) \
+       [--run-id NAME] [--context-policy summary|none|last-only|full] [--no-stop-on-failure]
 ```
 
-### Form B — pre-built stages.json
-```
-/flow:pipe --stages <path-to-stages.json> [--run-id NAME] [--context-policy summary]
-```
-
-If `--stages` is missing → stop with a clear message.
+`--stages` is a JSON array of stage descriptors (see Stage types below); `--workflow` is a declarative
+`WorkflowSpec` (`{name, config, stages}`) that compiles into the same stages. If neither is given →
+stop with a clear message. To AUTHOR a workflow-file use /flow:compose; to RUN one in a single step
+use /flow:run.
 
 ## Step 0 — Load defaults
 
@@ -124,12 +104,11 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/pipe/defaults.md`. Use defaults when CLI/spec
 
 ## Step 1 — Parse and validate (init turn only)
 
-- Determine form A or B.
-- If A: `Read` the spec, parse frontmatter + `## Stages` JSON block. Save the parsed array to `.pipe/<run-id>/stages.json`.
-- If B: `Read` and parse the provided stages.json directly (still write it under `.pipe/<run-id>/stages.json` for canonical storage).
-- Resolve final config by priority (CLI > spec frontmatter > defaults > hardcoded).
-- If `run-id` missing: generate `pipe-<8 char hash>` from a hash of the stages JSON.
-- Validate each stage's `type` and `spec` (the state CLI's `init` does its own validation too, but a clear early failure is nicer).
+- `--stages`: read/parse the JSON array. `--workflow`: pass the file straight to `init --workflow`
+  (it reads `stages` + optional `config`). Either way the canonical state lands under `.pipe/<run-id>/`.
+- Resolve config by priority (CLI > workflow `config` > defaults).
+- If `run-id` is missing: generate `pipe-<8 char hash>` from the stages/workflow JSON.
+- `init` validates every primitive stage's flags; a clear early failure beats a mid-run one.
 
 ## Step 2 — Init state (first turn only)
 

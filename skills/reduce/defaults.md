@@ -2,8 +2,7 @@
 # Default config for /flow:reduce.
 #
 # Override priority (high -> low):
-#   1. CLI flag (--model, --format, ...)
-#   2. Spec frontmatter (when using --file spec.md)
+#   1. CLI flag (--model, --output-format, ...)
 #   3. This file
 #   4. Hardcoded fallback in the state helper
 

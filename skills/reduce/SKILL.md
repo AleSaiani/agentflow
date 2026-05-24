@@ -29,55 +29,36 @@ You are the **orchestrator** of a `/flow:reduce` run. Job:
 
 **Single-step primitive**: no fan-out, no per-item parallelism. /flow:reduce is the "fold" of the toolkit — N in, 1 out.
 
-## Input forms
+## Invocation
 
-### Form A — structured markdown file
 ```
-/flow:reduce --file path/to/spec.md
-```
-With YAML frontmatter (config + inputs) and a `## Task` section:
-```markdown
----
-run-id: audit-digest
-model: opus
-format: markdown
-inputs:
-  - run: enum-abc123          # pull results from this /flow:foreach run
-  - run: enum-def456
-  - file: ./extra-data.json   # raw JSON file
-  - inline: {"note": "..."}   # inline data
----
-
-## Task
-<digest prompt — what synthesis to produce, output schema if json>
+/flow:reduce --inputs <descriptors.json> --prompt "<digest instructions>" \
+        [--output-format markdown|json] [--model haiku|sonnet|opus] [--run-id NAME] [--no-auto-continue]
 ```
 
-### Form B — inline flags
-```
-/flow:reduce --from-run <enum-run-id> --task "<digest-prompt>" \
-        [--from-file <path>]... [--from-run <id>]... \
-        [--run-id NAME] [--model haiku|sonnet|opus] \
-        [--format markdown|json] [--no-auto-continue]
+`--inputs` is a JSON array of input descriptors:
+```json
+[
+  {"source": "run", "cmd": "foreach", "run_id": "…"},
+  {"source": "file", "path": "./extra-data.json"},
+  {"source": "inline", "data": {"note": "…"}}
+]
 ```
 
-If neither inputs nor task-prompt are provided → stop with a clear message.
+`--prompt` (alias `--task-prompt`) is the synthesis instruction; `--output-format` defaults to
+`markdown`. If neither `--inputs` nor `--prompt` is given → stop with a clear message.
 
 ## Step 0 — Load defaults
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/reduce/defaults.md` (YAML frontmatter). Use defaults when CLI/spec do not provide a value.
 
-**Override priority** (high → low):
-1. CLI flag
-2. Spec frontmatter (Form A)
-3. defaults.md
-4. Hardcoded fallback in the state helper
+**Override priority** (high → low): CLI flag > defaults.md > the state helper's built-in fallback.
 
 ## Step 1 — Parse and validate
 
-- Determine form A or B.
-- If A: `Read` the spec, parse frontmatter (`inputs` list + config) and the `## Task` section.
-- Resolve final config by priority.
-- If `run-id` is missing: generate `red-<8 char hash>` from the hash of the task-prompt + inputs descriptor.
+- Confirm `--inputs` (a descriptors file) and `--prompt` are present.
+- Resolve config by priority.
+- If `run-id` is missing: derive `reduce-<8 char hash>` from the inputs descriptor + prompt.
 
 **Validate inputs**:
 - Every entry has `source` in {`run`, `file`, `inline`}, with the right field (`run_id`, `path`, `data`).
@@ -181,12 +162,8 @@ A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.reduce/`
 
 ## Quick example
 
-```
-/flow:reduce --from-run enum-a0b460e3 \
-        --task "Group findings by severity. Top-5 hotspot files. Recurring patterns." \
-        --model opus --format markdown
-```
-
-```
-/flow:reduce --file examples/audit-digest-spec.md
+```bash
+# inputs.json: [{"source":"run","cmd":"foreach","run_id":"review-cs"}]
+/flow:reduce --inputs inputs.json --model opus --output-format markdown \
+        --prompt "Group findings by severity. Top-5 hotspot files. Recurring patterns."
 ```

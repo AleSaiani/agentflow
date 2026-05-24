@@ -3,7 +3,6 @@
 #
 # Override priority (high -> low):
 #   1. CLI flag (--concurrency, --chunk-size, ...)
-#   2. Spec frontmatter (when using --file spec.md)
 #   3. This file
 #   4. Hardcoded fallback in the state helper
 #

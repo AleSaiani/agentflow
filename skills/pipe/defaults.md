@@ -17,7 +17,7 @@ stop_on_failure: true       # if a stage fails, the pipe fails (rather than skip
   (/flow:repeat / /flow:until / /flow:while) if you need one. It holds no map semantics — use
   /flow:foreach. It holds no fold semantics —
   use /flow:reduce. Each stage produces a `result_pointer`; the next stage consumes it via
-  env vars (bash stages) or via `--from-run`/`--from-file` (primitive stages).
+  env vars (bash stages) or via wiring templates `{{stages.X.result_pointer}}` (primitive stages).
 
 - **Stage types in v1**: `bash` (synchronous, single command) and `primitive` (spawn one of
   /flow:foreach, /flow:group, /flow:reduce, or an iterate-engine loop; /flow:pipe waits for the child to be done, then advances).
