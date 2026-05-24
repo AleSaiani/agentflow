@@ -9,7 +9,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
 [![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](https://nodejs.org)
 
-`agentflow` · a Claude Code plugin · `/agentflow:create-workflow` · `/agentflow:run-workflow`
+`agentflow` · a Claude Code plugin · `/agentflow:create-workflow` · `/agentflow:run-workflow` · [**Docs**](docs/)
 
 </div>
 
@@ -35,82 +35,107 @@ You say:
 /agentflow:create-workflow "review every .cs file in src → group findings by area → one digest"
 ```
 
-Agent Flow designs the workflow, confirms a name with you, and writes a **self-contained, movable
-folder** — the steps plus any helper script it needs, referenced relatively:
+Agent Flow designs the workflow, confirms a name, and writes a **self-contained, movable folder** — a
+human-readable `WORKFLOW.md` (frontmatter + one heading per stage, like a `SKILL.md`) plus any helper
+script, referenced relatively so the folder runs anywhere:
 
 ```text
 workflows/code-review/
-  WORKFLOW.md       ← the steps, in readable markdown (frontmatter + one heading per stage)
+  WORKFLOW.md       ← the steps, in readable markdown (you can read, diff, and hand-edit it)
   discover.mjs      ← a helper script (called via {{workflow.dir}}, so the folder is portable)
 ```
 
 Then run it — now, or any time, on any machine:
 
 ```text
-/agentflow:run-workflow workflows/code-review/WORKFLOW.md     # add --dry-run to preview first
+/agentflow:run-workflow workflows/code-review/WORKFLOW.md     # --dry-run to preview · --param k=v for inputs
 ```
 
 It drives itself: deterministic steps run automatically, LLM steps dispatch agents, and the whole
-thing **resumes across turns** if interrupted. The digest lands as a plain file in your workspace,
-not buried in a hidden folder.
+thing **resumes across turns** if interrupted. The digest lands as a plain file in your workspace.
 
-## Or: run a shipped recipe
+## What you get
 
-`audit` is a ready-made workflow — discover files → review each → group by area → executive digest:
+- **Durable & resumable** — every run is a `state.json` on disk; a Stop hook auto-continues in-flight
+  runs across turns, and they survive context compaction. A second hook even **snapshots the chat
+  transcript** to `.agentflow/chat/` before compaction.
+- **A programmatic vocabulary** — `enumerate` (unfold) · `foreach` (map) · `reduce` (fold) · `group`
+  (partition) · `repeat`/`until`/`while` (loop) · `step` (one unit) — composed by `pipe`.
+- **Workflows as readable markdown** — author `WORKFLOW.md`, parameterize with `params` + `--param`,
+  branch with conditional `fork` routing, and validate a step's structured output against a schema.
+- **Any runtime for a step** — run one prompt inline, in a subagent, or **sessionlessly via `claude -p`
+  / `codex exec`** — the basis for cross-model (adversarial/cooperative) conversations.
+- **Scale safely** — split a list across terminals with `--shard`, or have many workers drain one
+  **lock-free queue** (atomic-rename claim, no double-processing); coordinate instances via a
+  **mailbox** (directed outbox/inbox).
+- **Stay in control** — **cost caps** (`--max-usd`) pause a run; a `--stop-file` pauses on demand;
+  `board`/`history`/`inspect` show what's in flight and what it cost; `notify` pings you when done.
+- **Zero runtime dependencies** — TypeScript compiled to a committed `dist/`; Node builtins only.
 
-```text
-/agentflow:audit --target src --file-glob "**/*.cs"
-```
+## Commands
 
-## Or: reach for a single primitive
+`create-workflow` wires the primitives for you, but each is callable directly.
 
-When you just want **one operation over a list**, call the primitive directly — no workflow needed:
+**Author & run workflows**
 
-```text
-/agentflow:foreach --folder tasks --prompt "Do the task described in this file"
-```
+| Command | What it does |
+|---|---|
+| `/agentflow:create-workflow` | Author a reusable `WORKFLOW.md` (validates + previews) |
+| `/agentflow:run-workflow` | Run a workflow end to end (`--dry-run`, `--param k=v`) |
+| `/agentflow:workflows` | List the workflows authored in this workspace |
+| `/agentflow:audit` | Shipped recipe: discover → review each → group → executive digest |
 
-Point `foreach` at a folder of task files and it works each one, **moving the file across
-`todo/ → in-progress/ → done/`** automatically — a board you watch in your own file tree:
-
-```text
-   before                 …mid-run                 done
-   tasks/                 tasks/                   tasks/
-     todo/                  todo/                     done/
-       refactor-auth.md       write-docs.md             refactor-auth.md
-       add-tests.md         in-progress/                add-tests.md
-       write-docs.md          add-tests.md              write-docs.md
-                            done/
-                              refactor-auth.md
-```
-
-Check progress any time — `/agentflow:board` shows what's in flight, with cost:
-
-```text
-=== Workspace board (1 active, 0 done, 0 failed) ===
-ACTIVE (1):
-  [foreach   ] tasks-run    2/3 done    updated 2026-05-24T10:42:07Z
-```
-
-## Under the hood — the primitives
-
-`create-workflow` wires these together for you, but you can call any of them directly. They're the
-functional vocabulary (`map` / `fold` / `group by` / `loop`), each a **persisted, resumable run**:
+**Iteration primitives** (the FP vocabulary, each a persisted, resumable run)
 
 | Command | Like | What it does |
 |---|---|---|
-| `/agentflow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec (outline → chapters) |
-| `/agentflow:foreach` | `map` (N→N) | Apply a **prompt** to each item — inline or in parallel; `--serial`/`--carry`, `--shard`, per-item overrides, content-hash cache |
-| `/agentflow:reduce` | `fold` (N→1) | Collapse N inputs into one digest (markdown or JSON) |
-| `/agentflow:group` | `group by` | Partition N items into K groups — path-prefix / regex / jsonpath, or LLM-classify |
-| `/agentflow:repeat` · `until` · `while` | `for` · `do…until` · `while…do` | Loop a stage by count, until a predicate, or while one holds |
-| `/agentflow:pipe` | pipeline | Compose stages with declarative wiring + per-stage `when` guards |
-| `/agentflow:create-workflow` · `run-workflow` | author · execute | Build a reusable workflow-folder · run one end to end (`--dry-run` to preview) |
-| `/agentflow:inspect` · `board` · `history` | observe | Inspect a run · session dashboard · chronological run log |
-| `/agentflow:audit` | recipe | A shipped workflow: discover → review → group → digest |
+| `/agentflow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec |
+| `/agentflow:foreach` | `map` (N→N) | A prompt per item — parallel or `--serial`/`--carry`, `--shard`, folder-kanban, cache |
+| `/agentflow:reduce` | `fold` (N→1) | Collapse N inputs into one digest (md/json) |
+| `/agentflow:group` | `group by` | Partition into K groups — path-prefix / regex / jsonpath / LLM-classify |
+| `/agentflow:repeat` · `until` · `while` | loop | Run a stage by count / do…until / while…do |
+| `/agentflow:step` | one unit | Run ONE prompt once — inline / subagent / `claude -p` / `codex exec` |
+| `/agentflow:pipe` | compose | Ordered stages + `when` guards + conditional `fork` routing + `output_schema` |
 
-Sources are pluggable: a folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON list, or
-another run's output — same engine underneath.
+**Scale, coordinate & observe**
+
+| Command | What it does |
+|---|---|
+| `/agentflow:queue` | A lock-free shared work queue — many workers drain it safely (atomic-rename claim) |
+| `/agentflow:mailbox` | Directed messages between instances (outbox/inbox, atomic FIFO recv) |
+| `/agentflow:board` · `inspect` · `history` | Read-only: live dashboard · one run's detail/tree/budget · run log |
+| `/agentflow:notify` | Ping a webhook (Slack/Discord) and/or desktop when a long run finishes |
+
+Sources are pluggable everywhere: a folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON
+list, or another run's output — same engine underneath.
+
+## Real examples
+
+Described in plain language (left) → what Agent Flow runs (right). Full versions in the
+**[Cookbook](docs/cookbook.md)**.
+
+| You say | It runs |
+|---|---|
+| "Audit `src` for bugs and give me a report." | `/agentflow:audit --target src --file-glob "**/*.cs"` |
+| "Draft every chapter of this outline." | `enumerate` outline → chapters · `foreach` draft each · `reduce` stitch |
+| "Work through every task file in `tasks/`." | `/agentflow:foreach --folder tasks --prompt "Do the task in this file"` (file kanban) |
+| "Keep fixing the build until it passes." | `/agentflow:until --stage "npm run build" --stop "npm run build"` |
+| "Chew through this list from 3 terminals." | `/agentflow:queue --items work.json --prompt "…"` in each terminal |
+| "Have a second model critique the draft, loop until solid." | two `/agentflow:step` (different `--model`) inside `/agentflow:until` |
+| "Review the diff; only deploy if it's safe." | a `step` emits `{blocking}` → `fork` routes to `ship` or `fix` |
+| "Audit `src`, but stop if it passes $5." | `/agentflow:audit … ` with `--max-usd 5` (pauses at the cap) |
+
+## Documentation
+
+| Page | What it covers |
+|---|---|
+| **[Getting started](docs/getting-started.md)** | Install · see the engine work in ~10s (no LLM) · your first real run |
+| **[Concepts](docs/concepts.md)** | The mental model: runs as state on disk, the Stop hook, the determinism boundary, the workflow layer |
+| **[Cookbook](docs/cookbook.md)** | Real scenarios, one command → full workflow → operating at scale → composing operators |
+| **[Reference](docs/reference.md)** | Every command, flag, and CLI subcommand · the WORKFLOW.md schema · sources & views · conventions |
+| **[Beta testing](docs/beta-test.md)** | A graded protocol to verify the promises live (cross-turn resume, compaction) |
+
+New here? Read **Getting started**, skim **Concepts**, then keep the **Cookbook** open and copy from it.
 
 ## Install
 
@@ -130,28 +155,23 @@ claude --plugin-dir .
 
 > Requires Node ≥ 22 and `git bash` on `PATH` (shell stages run under bash for POSIX semantics on every OS).
 
-## Docs
-
-**📚 Full docs in [`docs/`](docs/):** [Getting started](docs/getting-started.md) ·
-[Concepts](docs/concepts.md) · [Cookbook](docs/cookbook.md) (real scenarios, simple → complex) ·
-[Reference](docs/reference.md) (every skill, flag, and subcommand) ·
-[Beta testing](docs/beta-test.md) (try it live).
-
 ## How it works (the short version)
 
-Every run is a `state.json` under `.agentflow/<cmd>/<run-id>/`; Claude is the only writer. A `Stop` hook
-finds any in-flight run and resumes it across turns — purely from disk, so runs survive compaction.
-The control flow is deterministic; only the work *inside* each step is the LLM (**it produces
-structured data; branching is always code over that data, never a judgment on free text**). The
-engine is TypeScript compiled to a committed `dist/`, **zero runtime dependencies** (Node builtins
-only). See [docs/concepts.md](docs/concepts.md) for the full model.
+Every run is a `state.json` under `.agentflow/<cmd>/<run-id>/`; Claude is the only writer (atomic
+writes). A `Stop` hook finds any in-flight run and resumes it across turns — purely from disk, so runs
+survive compaction. The control flow is deterministic; only the work *inside* each step is the LLM
+(**it produces structured data; branching is always code over that data, never a judgment on free
+text**). The engine is TypeScript compiled to a committed `dist/`, **zero runtime dependencies**. See
+[Concepts](docs/concepts.md) for the full model.
 
 ## Status
 
-`1.0.0-beta.1`. Primitives, the workflow layer, inspect/board, and the Stop hook are implemented and
-covered by an automated suite (including a simulated cross-turn resumption loop). A **live multi-turn
-Claude Code session smoke test** is the recommended final check before relying on it in production.
-Roadmap and deferred items live in [CHANGELOG.md](CHANGELOG.md).
+`1.0.0-beta.1`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation),
+`queue`/`mailbox`/`step`, inspect/board, and the hooks (cross-turn resume + preserve-chat) are
+implemented and covered by an automated suite (74 tests, including a simulated cross-turn loop). The
+recommended final check before production is a **live multi-turn Claude Code session smoke test**
+(install, real turns, a real `claude -p`/`codex` step). Roadmap and deferred items live in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

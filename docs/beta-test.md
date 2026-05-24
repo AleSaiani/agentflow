@@ -47,19 +47,19 @@ language separately to test whether *triggering* fires on its own — and confir
 
 ## Install
 
-From the plugin directory (no GitHub needed — `dist/` is committed):
+From a local clone (no GitHub needed — `dist/` is committed):
 
 **(you)** launch a session with the plugin loaded, from a scratch workspace you don't mind writing to
-(the repo itself is fine — runtime dirs are gitignored):
+(the clone itself is fine — runtime dirs are gitignored):
 
 ```
-! claude --plugin-dir AleSaiani/agentflow
+! claude --plugin-dir /path/to/agentflow
 ```
 
-Or install it as a local marketplace inside an existing session:
+Or install it as a local marketplace inside an existing session (point at the clone directory):
 
 ```
-/plugin marketplace add AleSaiani/agentflow
+/plugin marketplace add /path/to/agentflow
 /plugin install agentflow@agentflow
 ```
 
