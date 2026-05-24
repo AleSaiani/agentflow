@@ -63,6 +63,21 @@ can list deterministically (a glob, a folder), build the items list yourself wit
 `--folder`); only if the list must be *generated* from a higher-level spec do you need /flow:enumerate
 first. If no source and no operation can be inferred → ask one short clarifying question.
 
+## Folder-kanban flow (`--folder`)
+
+With `--folder`, status is tracked in `state.json` (authoritative) — **the engine does not move files
+on its own.** You don't need to read the engine source; the flow is:
+
+- `claim` marks an item `in_progress`; `complete`/`complete-batch` marks it `done` (or `failed`).
+- To project that onto the folders, run the **view** write-back — it moves each task file into
+  `todo/` / `in-progress/` / `done/` to match its status (creating the subfolders as needed):
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" view <run-id> --folder <dir>
+  ```
+- Run `view` **at the end** (everything lands in `done/`), and optionally **after each claim wave** to
+  show items passing through `in-progress/`. Each item's `data.file` is its filename; `data.path` is
+  the absolute path to read while processing.
+
 ## Step 0 — Load defaults
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/foreach/defaults.md` (YAML frontmatter). Extract defaults. When a value is missing in CLI or spec, use the default from here.
