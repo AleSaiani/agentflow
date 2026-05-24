@@ -51,6 +51,7 @@ import {
 } from "../common.js";
 import { runBash } from "../shell.js";
 import { parseWorkflowMd } from "../workflow_md.js";
+import { validateSchema } from "../schema.js";
 
 // Side-effect imports: register child primitives so getPrimitive() works in tick/advance.
 import "./enumerate.js";
@@ -202,6 +203,7 @@ function validateStages(stagesRaw: unknown): StateDict[] {
       when: when ?? null,
       when_result: null,
       next: next ?? null,
+      output_schema: raw["output_schema"] ?? null, // optional: validate the stage's JSON output
       status: STATUS_PENDING,
       child_cmd: null,
       child_run_id: null,
@@ -504,6 +506,18 @@ function cmdTick(args: string[]): void {
   return cmdTick(args);
 }
 
+/** Mark a stage failed because its output violated `output_schema`; fail the pipe unless stop_on_failure is off. */
+function failStageOnSchema(state: StateDict, cur: StateDict, kind: string, err: string): void {
+  cur["status"] = STATUS_FAILED;
+  cur["error"] = `output schema: ${err}`.slice(0, PREVIEW_CHARS);
+  if (state["config"]["stop_on_failure"] ?? true) {
+    state["stop_reason"] = "schema_failed";
+    markFailed(state, `stage ${cur["index"]} (${kind}) output failed schema: ${err}`);
+  } else {
+    state["stage_index"] = nextIndex(state, cur);
+  }
+}
+
 function cmdCompleteJsonStage(args: string[]): void {
   const { values, positionals } = parseArgs({
     args, allowPositionals: true, strict: true,
@@ -520,10 +534,18 @@ function cmdCompleteJsonStage(args: string[]): void {
   mkdirSync(dirname(outputPath), { recursive: true });
   const resolved = resolveValueTemplates(cur["spec"]["value"], state);
   writeFileSync(outputPath, JSON.stringify(resolved), "utf8");
+  cur["result_pointer"] = outputPath;
+
+  const schemaErr = cur["output_schema"] ? validateSchema(resolved, cur["output_schema"]) : null;
+  if (schemaErr) {
+    failStageOnSchema(state, cur, "json", schemaErr);
+    save(runId, state);
+    print({ recorded: true, advanced: false, schema_error: schemaErr, pipe_status: state["status"] });
+    return;
+  }
 
   cur["status"] = STATUS_DONE;
   cur["completed_at"] = now();
-  cur["result_pointer"] = outputPath;
   state["stage_index"] = nextIndex(state, cur);
   save(runId, state);
   print({ recorded: true, advanced: true, next_stage: state["stage_index"], wrote: outputPath, bytes: statSync(outputPath).size });
@@ -543,19 +565,45 @@ function cmdCompleteBashStage(args: string[]): void {
   if (cur === null || cur["type"] !== "bash") die("error: current stage is not a bash stage");
   if (cur["status"] === STATUS_DONE) die("error: bash stage already complete");
 
-  cur["status"] = exitCode === 0 ? STATUS_DONE : STATUS_FAILED;
   cur["exit_code"] = exitCode;
   cur["completed_at"] = now();
   cur["result_pointer"] = outputPath;
   if (values["error"]) cur["error"] = (values["error"] as string).slice(0, PREVIEW_CHARS);
 
-  if (exitCode !== 0 && (state["config"]["stop_on_failure"] ?? true)) {
-    state["stop_reason"] = "stage_failed";
-    markFailed(state, `stage ${cur["index"]} (bash) failed: exit=${exitCode}`);
+  if (exitCode !== 0) {
+    cur["status"] = STATUS_FAILED;
+    if (state["config"]["stop_on_failure"] ?? true) {
+      state["stop_reason"] = "stage_failed";
+      markFailed(state, `stage ${cur["index"]} (bash) failed: exit=${exitCode}`);
+      save(runId, state);
+      print({ recorded: true, advanced: false, pipe_status: STATUS_FAILED });
+      return;
+    }
+    state["stage_index"] = nextIndex(state, cur);
     save(runId, state);
-    print({ recorded: true, advanced: false, pipe_status: STATUS_FAILED });
+    print({ recorded: true, advanced: true, next_stage: state["stage_index"] });
     return;
   }
+
+  // exit 0 → optional output-schema check before advancing
+  if (cur["output_schema"]) {
+    let parsed: unknown;
+    let parseErr: string | null = null;
+    try {
+      parsed = JSON.parse(readFileSync(outputPath, "utf8"));
+    } catch (e) {
+      parseErr = `output is not valid JSON: ${(e as Error).message}`;
+    }
+    const schemaErr = parseErr ?? validateSchema(parsed, cur["output_schema"]);
+    if (schemaErr) {
+      failStageOnSchema(state, cur, "bash", schemaErr);
+      save(runId, state);
+      print({ recorded: true, advanced: false, schema_error: schemaErr, pipe_status: state["status"] });
+      return;
+    }
+  }
+
+  cur["status"] = STATUS_DONE;
   state["stage_index"] = nextIndex(state, cur);
   save(runId, state);
   print({ recorded: true, advanced: true, next_stage: state["stage_index"] });

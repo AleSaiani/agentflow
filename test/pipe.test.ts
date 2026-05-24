@@ -151,6 +151,30 @@ test("pipe: workflow params — defaults, --param override, required-missing err
   assert.match(cmd, /echo src \*\.cs hello/); // target default, glob overridden, must provided
 });
 
+test("pipe: a stage's output_schema gates advancement (fail on mismatch)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const wf = join(dir, "schema.json");
+  writeFileSync(
+    wf,
+    JSON.stringify({
+      stages: [
+        {
+          name: "emit",
+          type: "json",
+          output_schema: { type: "object", required: ["ok", "n"] },
+          spec: { value: { ok: true }, output_path: "{{run.dir}}/o.json" }, // missing 'n'
+        },
+      ],
+    }),
+    "utf8",
+  );
+  run(env, ["init", "sch", "--workflow", wf]);
+  const driven = run(env, ["drive", "sch"]);
+  assert.equal(driven.action, "failed");
+  assert.match(String(driven.error), /output failed schema: \$\.n: required/);
+});
+
 test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };

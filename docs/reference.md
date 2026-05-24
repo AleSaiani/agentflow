@@ -190,6 +190,7 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
       "type": "bash" | "json" | "primitive",
       "when": { "type": "bash", "command": "<predicate>" },  // optional guard: exit 0 runs, else skip
       "next": "<stage-name>" | <index> | null,               // graph edge (v1: linear; schema-ready)
+      "output_schema": { "type": "object", "required": [] }, // optional: validate the stage's JSON output
       "spec": { /* type-specific */ }
     }
   ]
@@ -203,6 +204,10 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
 **Params** are supplied at run time with `--param name=value` (repeatable) and referenced anywhere as
 `{{params.<name>}}` (use `|shell` when injecting into a `bash` command). A `required` param with no
 value aborts `init`; declared defaults apply otherwise.
+
+**`output_schema`** (bash/json stages) validates the stage's JSON output against a restricted
+JSON-schema (`type`, `required`, `properties`, `items`, `enum`) before advancing; a mismatch fails the
+stage with a precise path. In WORKFLOW.md: `- output-schema: { type: object, required: [severity] }`.
 
 **Wiring templates** (resolved at run time): `{{run.id}}`, `{{run.dir}}`, `{{workflow.dir}}`,
 `{{params.<name>}}`, `{{stages.<name>.result_pointer}}`, `{{stages.<name>.run_id}}` — with filters

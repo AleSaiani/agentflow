@@ -210,6 +210,8 @@ function compileStage(s: RawStage): Record<string, unknown> {
   const stage: Record<string, unknown> = { name: s.name };
   const when = bulletGet(bullets, "when");
   if (when !== undefined) stage["when"] = { type: "bash", command: String(when) };
+  const schema = bulletGet(bullets, "output-schema") ?? bulletGet(bullets, "output_schema");
+  if (schema !== undefined) stage["output_schema"] = schema;
 
   if (s.type === "bash") {
     stage["type"] = "bash";
@@ -232,7 +234,7 @@ function compileStage(s: RawStage): Record<string, unknown> {
     stage["type"] = "primitive";
     const initArgs: string[] = [];
     for (const [k, v] of bullets) {
-      if (k === "when") continue;
+      if (k === "when" || k === "output-schema" || k === "output_schema") continue;
       const flag = `--${k}`;
       if (v === true) {
         initArgs.push(flag);

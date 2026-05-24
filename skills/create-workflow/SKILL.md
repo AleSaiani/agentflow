@@ -98,6 +98,11 @@ of `{ "source": "run", "cmd": "foreach", "run_id": "{{stages.review.run_id}}" }`
 A stage's `when` guard is **deterministic bash over data the previous steps produced**. If a decision
 is fuzzy, make it a step whose **structured output** a later guard reads — never branch on free text.
 
+To harden that, a `bash` or `json` stage may declare **`- output-schema: { … }`** (a restricted
+JSON-schema: `type`, `required`, `properties`, `items`, `enum`). The engine validates the stage's JSON
+output before advancing; on mismatch the stage fails with a precise path (e.g. `$.severity: not in
+enum`). Use it on the step that produces the data a later guard branches on.
+
 ## Process
 
 1. Clarify the goal and the steps (ask if ambiguous — what's the input, what's processed per item,

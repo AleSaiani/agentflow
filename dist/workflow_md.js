@@ -213,6 +213,9 @@ function compileStage(s) {
     const when = bulletGet(bullets, "when");
     if (when !== undefined)
         stage["when"] = { type: "bash", command: String(when) };
+    const schema = bulletGet(bullets, "output-schema") ?? bulletGet(bullets, "output_schema");
+    if (schema !== undefined)
+        stage["output_schema"] = schema;
     if (s.type === "bash") {
         stage["type"] = "bash";
         const cmd = fences["sh"] ?? fences["bash"] ?? fences["shell"] ?? fences[""];
@@ -241,7 +244,7 @@ function compileStage(s) {
         stage["type"] = "primitive";
         const initArgs = [];
         for (const [k, v] of bullets) {
-            if (k === "when")
+            if (k === "when" || k === "output-schema" || k === "output_schema")
                 continue;
             const flag = `--${k}`;
             if (v === true) {
