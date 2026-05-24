@@ -214,7 +214,7 @@ function hasResidualWork(state: StateDict): ResidualWork | null {
 function resumeMsg(runId: string, residual: ResidualWork): string {
   const [status] = residual as [string];
   return (
-    `/flow:enumerate run '${runId}' is not complete (status=${status}). ` +
+    `/agentflow:enumerate run '${runId}' is not complete (status=${status}). ` +
     `Resume by generating the items list per the run's task_prompt (dispatch the generator agent, ` +
     `or produce it inline if config.execution is main-thread), then call \`complete --items-path <file>\`. Do NOT re-init.`
   );

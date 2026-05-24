@@ -8,14 +8,14 @@ description: |
   - the user says "what's going on", "show me everything", "any active runs", "where are we", "any pipelines running";
   - the user wants a one-shot health check + suggested next action.
 
-  DON'T use this to inspect a specific run in depth (use `/flow:inspect show <id>` or `tree <id>`), or
-  to modify state (board is read-only). Explicit: `/flow:board` or `/flow:board --json`.
+  DON'T use this to inspect a specific run in depth (use `/agentflow:inspect show <id>` or `tree <id>`), or
+  to modify state (board is read-only). Explicit: `/agentflow:board` or `/agentflow:board --json`.
 allowed-tools: Bash, Read
 argument-hint: [--json] [--no-failed]
 disable-model-invocation: false
 ---
 
-# /flow:board
+# /agentflow:board
 
 Surface the workspace's current state in one screen. Read-only, no mutation.
 
@@ -27,7 +27,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" board [--json] [--no-failed]
 
 - **Counts**: `N active, M done, K failed`
 - **Cumulative cost**: total tokens + USD recorded across all runs
-- **ACTIVE section**: every non-terminal run with its primitive-specific progress (e.g. `foreach: 12/30`, `pipe: 2/4 stages`, `iterate: 3/10 iters`), plus the parent run if it is a /flow:pipe child
+- **ACTIVE section**: every non-terminal run with its primitive-specific progress (e.g. `foreach: 12/30`, `pipe: 2/4 stages`, `iterate: 3/10 iters`), plus the parent run if it is a /agentflow:pipe child
 - **BLOCKERS section**: runs that need manual attention — items stuck `in_progress` from a dead session, `auto_continues` cap exhausted, etc.
 - **FAILED section** (top 5; suppress with `--no-failed`): runs that ended in `failed` status, with error preview
 - **Suggested next actions**: concrete commands the user can run — `pipe drive`, `inspect tree`, `state/foreach.js reset`, etc.
@@ -37,14 +37,14 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" board [--json] [--no-failed]
 After (re)opening Claude Code in this workspace:
 
 ```
-user: /flow:board
+user: /agentflow:board
 assistant: (calls the CLI, surfaces the output)
 ```
 
-If something is active, sending any next message will trigger the Stop hook at end-of-turn and auto-resume the work. `/flow:board` does not resume anything itself — it only reports.
+If something is active, sending any next message will trigger the Stop hook at end-of-turn and auto-resume the work. `/agentflow:board` does not resume anything itself — it only reports.
 
 ## Important rules
 
 - **Read-only**: never mutates state.
-- **Different from `/flow:inspect runs`**: `/flow:board` is for the "session start" overview with suggestions; `/flow:inspect runs` is the bare tabular listing. `/flow:board` is opinionated, `/flow:inspect` is plumbing.
+- **Different from `/agentflow:inspect runs`**: `/agentflow:board` is for the "session start" overview with suggestions; `/agentflow:inspect runs` is the bare tabular listing. `/agentflow:board` is opinionated, `/agentflow:inspect` is plumbing.
 - **Always safe to run**: no flags, no risk. Use it freely.

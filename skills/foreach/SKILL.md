@@ -12,18 +12,18 @@ description: |
   - a borderline handful (~3–10) → ask whether to use the durable/parallel mechanism or handle inline;
   - genuinely many, or heavy/independent items → use foreach.
 
-  DON'T use when the list must first be generated from a spec (→ /flow:enumerate, then foreach), or you
-  need one combined output (→ /flow:reduce). For the prebuilt "review every file → digest", use /flow:audit.
+  DON'T use when the list must first be generated from a spec (→ /agentflow:enumerate, then foreach), or you
+  need one combined output (→ /agentflow:reduce). For the prebuilt "review every file → digest", use /agentflow:audit.
 
-  Explicit invocation (`/flow:foreach …`) skips the count check — the user already chose the mechanism.
+  Explicit invocation (`/agentflow:foreach …`) skips the count check — the user already chose the mechanism.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--subagent-type <name>] [--serial] [--carry] [--shard k/N] [--stop-file <path>] [--concurrency N] [--cache] [--no-auto-continue]
 ---
 
-# /flow:foreach
+# /agentflow:foreach
 
-> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
-> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear an Agent Flow
+> run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/foreach/` (this folder: SKILL.md + defaults.md + task-kinds.md)
@@ -33,7 +33,7 @@ argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <sp
 >
 > All paths in this file are **relative to the workspace root** (the dir where Claude Code runs). No absolute references.
 
-You are the **orchestrator** of a `/flow:foreach` run. Your only job:
+You are the **orchestrator** of a `/agentflow:foreach` run. Your only job:
 1. resolve a (deterministic) list of items from a source,
 2. dispatch items to subagents in parallel chunks,
 3. persist state at every step.
@@ -43,7 +43,7 @@ You are the **orchestrator** of a `/flow:foreach` run. Your only job:
 ## Invocation
 
 `foreach` **consumes** a list — it does not generate one. To produce a list from a spec, run
-/flow:enumerate first and pass its output here. Provide exactly one source plus the operation:
+/agentflow:enumerate first and pass its output here. Provide exactly one source plus the operation:
 
 **Source (one of):**
 - `--items <file.json>` — a JSON array of `{id, data, task?}`
@@ -71,10 +71,10 @@ runs each item; per-item override via `{subagent:…}` in a checklist), `--execu
   new items and the Stop hook does **not** auto-resume the run. Delete the file (and send a message)
   to continue. Lets you halt/resume external workers by touching a file.
 
-**Invoked with natural language?** (e.g. `/flow:foreach review every .cs file in src/ for bugs`) —
+**Invoked with natural language?** (e.g. `/agentflow:foreach review every .cs file in src/ for bugs`) —
 translate the user's words into a source + `--prompt`, don't ask them for flags. If they name files you
 can list deterministically (a glob, a folder), build the items list yourself with `Glob`/`Grep` (or use
-`--folder`); only if the list must be *generated* from a higher-level spec do you need /flow:enumerate
+`--folder`); only if the list must be *generated* from a higher-level spec do you need /agentflow:enumerate
 first. If no source and no operation can be inferred → ask one short clarifying question.
 
 ## Folder-kanban flow (`--folder`)
@@ -122,7 +122,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/foreach/task-kinds.md`. Classify the user's t
 
 **Effective model**: the kind template suggests a model (haiku/sonnet/opus). If the user did NOT force `--model`, use the suggested one. If they did force, honor the user's choice but log "kind=X would suggest Y, forced to Z".
 
-**Enriched task-prompt**: do NOT pre-enrich manually in this step. Instead, pass `--kind <name>` to `state/foreach.js init` (Step 2). The state helper loads the matching template from `task-kinds.md`, prepends it to the user task-prompt, and stores the enriched prompt in state.task_prompt + the chosen kind in state.config.kind. This way the enrichment happens once, in one place, and any downstream resume (including /flow:pipe-spawned children whose dispatch loop bypasses this SKILL flow) uses the already-enriched prompt without re-doing the work.
+**Enriched task-prompt**: do NOT pre-enrich manually in this step. Instead, pass `--kind <name>` to `state/foreach.js init` (Step 2). The state helper loads the matching template from `task-kinds.md`, prepends it to the user task-prompt, and stores the enriched prompt in state.task_prompt + the chosen kind in state.config.kind. This way the enrichment happens once, in one place, and any downstream resume (including /agentflow:pipe-spawned children whose dispatch loop bypasses this SKILL flow) uses the already-enriched prompt without re-doing the work.
 
 Confirm to the user in a single line: `run-id`, `kind`, `effective model`, `concurrency`, `chunk-size`, `auto-continue`, first 150 chars of list-prompt and user task-prompt.
 
@@ -130,11 +130,11 @@ Confirm to the user in a single line: `run-id`, `kind`, `effective model`, `conc
 
 1. **Resolve** the items from the chosen source — `foreach` does NOT invent the list. The state
    helper reads `--items` / `--checkbox` / `--folder` / `--source` at `init`; you don't pre-generate
-   anything. (Need a list produced from a spec? That's /flow:enumerate — its `items.json` becomes your
-   `--items`.) A `groups.json` from /flow:group is items.json-compatible: pass it as `--items`, and
+   anything. (Need a list produced from a spec? That's /agentflow:enumerate — its `items.json` becomes your
+   `--items`.) A `groups.json` from /agentflow:group is items.json-compatible: pass it as `--items`, and
    each item is a whole group (`data: {group_id, items, size}`).
 
-2. **Count gate** (skip if the user invoked `/flow:foreach` explicitly). Read the source to get the
+2. **Count gate** (skip if the user invoked `/agentflow:foreach` explicitly). Read the source to get the
    item count, then:
    - **≤ 2** → do the work inline this turn; no state, no subagents.
    - **~3–10** → `AskUserQuestion`: *"N items — run the durable/parallel mechanism (resumable across
@@ -228,7 +228,7 @@ For each iteration (safety cap: max 100):
      --event-type agent_dispatch \
      --meta '{"chunk": <N>, "wave": <W>}'
    ```
-   Do this once per Agent return (one `budget-add` per chunk). Cost tracking aggregates across all chunks; `/flow:inspect budget <run-id>` will show the cumulative figures.
+   Do this once per Agent return (one `budget-add` per chunk). Cost tracking aggregates across all chunks; `/agentflow:inspect budget <run-id>` will show the cumulative figures.
 
    **6b. State commit**:
    ```bash
@@ -274,16 +274,16 @@ run-ids, each taking one shard of the items (positions where `index % N == k`):
 
 ```bash
 # terminal 1
-/flow:foreach --items work.json --shard 0/3 --run-id work-0 --prompt "<op>"
+/agentflow:foreach --items work.json --shard 0/3 --run-id work-0 --prompt "<op>"
 # terminal 2
-/flow:foreach --items work.json --shard 1/3 --run-id work-1 --prompt "<op>"
+/agentflow:foreach --items work.json --shard 1/3 --run-id work-1 --prompt "<op>"
 # terminal 3
-/flow:foreach --items work.json --shard 2/3 --run-id work-2 --prompt "<op>"
+/agentflow:foreach --items work.json --shard 2/3 --run-id work-2 --prompt "<op>"
 ```
 
 Each run is its own `state.json`, so there are no concurrent writers (read-partition, no locks). The
 shards are disjoint, so even a `--folder` source is safe (each terminal only moves its own files).
-Pair with `--stop-file` to pause every worker by touching one file. `/flow:board` shows all shards.
+Pair with `--stop-file` to pause every worker by touching one file. `/agentflow:board` shows all shards.
 
 ## Step 5 — Final report
 
@@ -299,7 +299,7 @@ Print: totals per status, and — if any `failed` — a compact list with error 
 A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) exists that:
 - at the end of each turn, scans `.flow/foreach/`,
 - if it finds a run with `auto_continue=true` and residual work,
-- forces Claude to continue in the next turn with the instruction "resume /flow:foreach <run-id>".
+- forces Claude to continue in the next turn with the instruction "resume /agentflow:foreach <run-id>".
 
 Cap: `max_auto_continues` per run (default 20). Beyond that, the hook stops.
 
@@ -317,18 +317,18 @@ Cap: `max_auto_continues` per run (default 20). Beyond that, the hook stops.
 - **No silent skip**: every item ends `done` or `failed`. Never left `in_progress`.
 - **Safety cap**: max 100 iterations of the loop. If reached, stop.
 - **Context economy**: store only the structured result (the final JSON) in state, not the subagent's full text output.
-- **Idempotence**: `/flow:foreach` with the same run-id without `--force` must be able to resume.
+- **Idempotence**: `/agentflow:foreach` with the same run-id without `--force` must be able to resume.
 
 ## Quick example
 
 ```bash
 # files.json: [{"id":"src/a.cs","data":{"path":"src/a.cs"}}, {"id":"src/b.cs","data":{"path":"src/b.cs"}}]
-/flow:foreach --items files.json --kind code-review --cache \
+/agentflow:foreach --items files.json --kind code-review --cache \
            --prompt "Review this file for bugs; report {severity, findings}"
 ```
 
 Or drive a checklist / a folder kanban directly (no JSON to build):
 ```bash
-/flow:foreach --checkbox TODO.md --prompt "Complete this task"
-/flow:foreach --folder tasks    --prompt "Do the task described in this file"
+/agentflow:foreach --checkbox TODO.md --prompt "Complete this task"
+/agentflow:foreach --folder tasks    --prompt "Do the task described in this file"
 ```

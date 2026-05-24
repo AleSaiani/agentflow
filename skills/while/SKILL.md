@@ -3,15 +3,15 @@ name: while
 description: |
   Loop a stage WHILE a predicate holds, checking the condition BEFORE each run — `while (cond) { body }`. If the condition is already false up front, the body never runs. Full loop safety: hard cap, convergence detection, kill switch.
 
-  USE when the guard must be checked first — "while there are pending PRs, process the next", "keep refining while the reviewer disagrees", "process the queue while it's non-empty". For running the body first and then checking (at least one run), use `/flow:until`. For a fixed count, use `/flow:repeat`.
+  USE when the guard must be checked first — "while there are pending PRs, process the next", "keep refining while the reviewer disagrees", "process the queue while it's non-empty". For running the body first and then checking (at least one run), use `/agentflow:until`. For a fixed count, use `/agentflow:repeat`.
 allowed-tools: Bash, Read, Agent
 argument-hint: --stage "<bash>" --stop "<bash predicate>" --mode while [--max-iterations N]
 ---
 
-# /flow:while — while…do loop (check-first)
+# /agentflow:while — while…do loop (check-first)
 
-> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
-> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear an Agent Flow
+> run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
 Engine: `iterate` with `--check-first`. `while` mode: the predicate exits **0 while still true** →
 keep running; non-zero → stop. Because the check runs first, the stage may execute zero times.

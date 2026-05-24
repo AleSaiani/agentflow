@@ -624,7 +624,7 @@ function hasResidualWork(state) {
 }
 function resumeMsg(runId, residual) {
     const [pending, inProgress] = residual;
-    return (`/flow:foreach run '${runId}' is not complete: ${pending} pending, ${inProgress} in_progress. ` +
+    return (`/agentflow:foreach run '${runId}' is not complete: ${pending} pending, ${inProgress} in_progress. ` +
         `Resume the foreach loop for this run-id (do NOT re-init; read the state and process the next batch, ` +
         `dispatching subagents or processing inline per config.execution). ` +
         `If items are stuck in 'in_progress' from a prior session, reset them with the foreach \`reset ${runId} --in-progress-to-pending\` subcommand.`);

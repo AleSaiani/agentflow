@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0-beta.1] - 2026-05-23
 
-First public beta. Brand: **Flow** (`/flow:*`), distributed as `flow@flow-cc`.
+First public beta. Brand: **Agent Flow** (`/agentflow:*`), distributed as `agentflow@agentflow`.
 
 ### Added
 - Project scaffold: TypeScript (strict, ESM/NodeNext) build to committed `dist/`,
@@ -23,7 +23,7 @@ First public beta. Brand: **Flow** (`/flow:*`), distributed as `flow@flow-cc`.
   - `iterate` engine surfaced as three loop skills: `repeat` (fixed count, `--times`),
     `until` (do…until), `while` (while…do, `--check-first`); hard cap + convergence + kill switch.
   - `pipe` — composer with declarative wiring templates and a `plan` dry-run.
-- `run` (execute a workflow-file end to end, `--dry-run`) and `compose` (author a workflow-file
+- `run-workflow` (execute a workflow-file end to end, `--dry-run`) and `create-workflow` (author a workflow-file
   from the primitives).
 - Workflow layer: `Source`/`View` seam (inline | file | run | checkbox), per-stage
   `when` guard (conditional steps), and a declarative JSON workflow-file that compiles
@@ -36,4 +36,4 @@ First public beta. Brand: **Flow** (`/flow:*`), distributed as `flow@flow-cc`.
 - Documentation: branded README, `docs/getting-started.md`, `docs/concepts.md`, and a
   runnable no-LLM demo workflow (`examples/workflows/demo.json`).
 
-[1.0.0-beta.1]: https://github.com/AleSaiani/flow-cc/releases/tag/v1.0.0-beta.1
+[1.0.0-beta.1]: https://github.com/AleSaiani/agentflow/releases/tag/v1.0.0-beta.1

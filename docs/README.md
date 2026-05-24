@@ -1,4 +1,4 @@
-# Flow documentation
+# Agent Flow documentation
 
 Start here.
 
@@ -12,5 +12,5 @@ Start here.
 
 New here? Read **Getting started**, skim **Concepts**, then keep **Cookbook** open and copy from it.
 The headline idea: **`enumerate` makes a list → `foreach` works each item → `reduce` digests** — with
-`group`, the loop trio (`repeat`/`until`/`while`), and `pipe`/`compose`/`run` to wire it into reusable,
+`group`, the loop trio (`repeat`/`until`/`while`), and `pipe`/`create-workflow`/`run-workflow` to wire it into reusable,
 turn-durable workflows.

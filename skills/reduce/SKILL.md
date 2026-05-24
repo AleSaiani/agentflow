@@ -3,20 +3,20 @@ name: reduce
 description: |
   Collapse N results into 1 digest (markdown or JSON) via a single agent — the **fold** (N→1).
 
-  USE when finished work needs synthesizing into one artifact — a /flow:foreach run, several result
+  USE when finished work needs synthesizing into one artifact — a /agentflow:foreach run, several result
   files, or inline data: "summarize all these", "roll this up", "give me one report / top-N / hotspot
   list from these". Best with a persisted source and many inputs.
 
   DON'T use for a handful of results (summarize inline), a one-off question about results, or when
-  there's no persisted source to read. Explicit invocation (`/flow:reduce …`) skips these checks.
+  there's no persisted source to read. Explicit invocation (`/agentflow:reduce …`) skips these checks.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --inputs <descriptors.json> --prompt "<synthesis>" [--output-format markdown|json] [--model haiku|sonnet|opus]
 ---
 
-# /flow:reduce
+# /agentflow:reduce
 
-> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
-> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear an Agent Flow
+> run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/reduce/` (this folder: SKILL.md + defaults.md)
@@ -24,18 +24,18 @@ argument-hint: --inputs <descriptors.json> --prompt "<synthesis>" [--output-form
 > - `${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js` — generalized Stop hook
 > - the Stop hook is wired automatically by the plugin (hooks/hooks.json)
 
-You are the **orchestrator** of a `/flow:reduce` run. Job:
+You are the **orchestrator** of a `/agentflow:reduce` run. Job:
 1. resolve N inputs (from another run, a file, or inline),
 2. materialize them into a single JSON file the digest agent can read,
 3. dispatch ONE agent that produces 1 digest output,
 4. persist the output pointer in state.
 
-**Single-step primitive**: no fan-out, no per-item parallelism. /flow:reduce is the "fold" of the toolkit — N in, 1 out.
+**Single-step primitive**: no fan-out, no per-item parallelism. /agentflow:reduce is the "fold" of the toolkit — N in, 1 out.
 
 ## Invocation
 
 ```
-/flow:reduce --inputs <descriptors.json> --prompt "<digest instructions>" \
+/agentflow:reduce --inputs <descriptors.json> --prompt "<digest instructions>" \
         [--output-format markdown|json] [--model haiku|sonnet|opus] [--run-id NAME] [--no-auto-continue]
 ```
 
@@ -68,10 +68,10 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/reduce/defaults.md` (YAML frontmatter). Use d
 - For `run` inputs: verify the referenced state exists (run `node "${CLAUDE_PLUGIN_ROOT}/dist/state/<cmd>.js" status <run-id>`). Warn if the upstream run has `failed` items but proceed (the digest agent will see them as `result: null`).
 
 **Threshold guardrail** (autonomous invocation only): after resolving inputs, count the total result objects (sum of `done` items across run inputs + length of file inputs + length of inline inputs). If total < `min_inputs` (default 5) AND this is an autonomous invocation, STOP and use `AskUserQuestion`:
-> "Only <N> total inputs to reduce. For this size, summarizing inline in chat is usually faster than running /flow:reduce (which dispatches an agent and writes a file). Proceed with /flow:reduce?"
-> Options: **inline** (cancel /flow:reduce, summarize directly in chat) | **proceed** (continue with /flow:reduce)
+> "Only <N> total inputs to reduce. For this size, summarizing inline in chat is usually faster than running /agentflow:reduce (which dispatches an agent and writes a file). Proceed with /agentflow:reduce?"
+> Options: **inline** (cancel /agentflow:reduce, summarize directly in chat) | **proceed** (continue with /agentflow:reduce)
 
-If the user typed `/flow:reduce` explicitly → skip the guardrail.
+If the user typed `/agentflow:reduce` explicitly → skip the guardrail.
 
 ## Step 2 — Init state
 
@@ -154,7 +154,7 @@ Print a one-liner: `run-id`, `status`, `output_pointer` (the visible `./<run-id>
 
 ## Cross-turn auto-continue
 
-A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.flow/reduce/` (alongside other primitives). For /flow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /flow:reduce run-id:
+A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.flow/reduce/` (alongside other primitives). For /agentflow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /agentflow:reduce run-id:
 - DO NOT re-init.
 - Read the state. If `status == in_progress` and the output file is absent → re-dispatch (Step 5).
 - If the output file IS present → call `complete` (Step 6).
@@ -164,12 +164,12 @@ A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.flow/red
 - **Single-writer**: only you (orchestrator) call `start`/`complete`/`fail`. The agent only writes the output file.
 - **Materialize once per run**: `inputs.json` is built at init; if upstream runs change, the user must call `--force` to rebuild.
 - **No partial digests**: either the file is fully written and `complete` is called, or it stays `failed`. Half-written outputs are discarded by `complete` (it requires the file to exist).
-- **Idempotence**: re-running `/flow:reduce` with the same run-id without `--force` resumes (re-dispatches if needed).
+- **Idempotence**: re-running `/agentflow:reduce` with the same run-id without `--force` resumes (re-dispatches if needed).
 
 ## Quick example
 
 ```bash
 # inputs.json: [{"source":"run","cmd":"foreach","run_id":"review-cs"}]
-/flow:reduce --inputs inputs.json --model opus --output-format markdown \
+/agentflow:reduce --inputs inputs.json --model opus --output-format markdown \
         --prompt "Group findings by severity. Top-5 hotspot files. Recurring patterns."
 ```

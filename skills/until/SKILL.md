@@ -3,15 +3,15 @@ name: until
 description: |
   Loop a stage and stop once a predicate is satisfied — `do … until (cond)`: the body runs FIRST, then the condition is checked. The loop always runs at least once. Full loop safety: hard cap on iterations, convergence detection (stops if output stops changing), and a clean kill switch.
 
-  USE when the user wants semantic termination after acting — "fix the build until it passes", "extract issues until none remain", "retry until it succeeds". For checking the condition BEFORE running (the body may not run at all), use `/flow:while`. For a fixed count, use `/flow:repeat`.
+  USE when the user wants semantic termination after acting — "fix the build until it passes", "extract issues until none remain", "retry until it succeeds". For checking the condition BEFORE running (the body may not run at all), use `/agentflow:while`. For a fixed count, use `/agentflow:repeat`.
 allowed-tools: Bash, Read, Agent
 argument-hint: --stage "<bash>" --stop "<bash predicate>" [--max-iterations N]
 ---
 
-# /flow:until — do…until loop
+# /agentflow:until — do…until loop
 
-> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
-> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear an Agent Flow
+> run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
 Engine: `iterate`. `until` mode: the stop predicate exits **0 when satisfied** → stop.
 

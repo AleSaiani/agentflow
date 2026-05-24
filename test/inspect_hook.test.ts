@@ -42,7 +42,7 @@ test("Stop hook blocks on an active foreach run and pre-increments auto_continue
   const out = run(HOOK, env, [], "{}");
   const decision = lastJson(out);
   assert.equal(decision.decision, "block");
-  assert.match(decision.reason, /flow:foreach run 'r1'/);
+  assert.match(decision.reason, /agentflow:foreach run 'r1'/);
 
   // pre-increment persisted
   const state = JSON.parse(readFileSync(join(env["FOREACH_STATE_DIR"]!, "r1", "state.json"), "utf8"));

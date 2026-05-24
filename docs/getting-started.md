@@ -1,20 +1,20 @@
 # Getting started
 
-Flow is a Claude Code plugin. This page takes you from install to a real run in a few minutes.
+Agent Flow is a Claude Code plugin. This page takes you from install to a real run in a few minutes.
 
 ## 1. Install
 
 **From the marketplace** (inside Claude Code):
 
 ```shell
-/plugin marketplace add AleSaiani/flow-cc
-/plugin install flow@flow-cc
+/plugin marketplace add AleSaiani/agentflow
+/plugin install agentflow@agentflow
 ```
 
 **From a clone** (development / trying it out):
 
 ```shell
-git clone https://github.com/AleSaiani/flow-cc && cd flow-cc
+git clone https://github.com/AleSaiani/agentflow && cd agentflow
 npm install && npm run build
 claude --plugin-dir .
 ```
@@ -24,7 +24,7 @@ semantics on every OS).
 
 ## 2. See the engine work — no LLM, ~10 seconds
 
-You normally use the `/flow:*` skills and let Claude drive things. Under the hood those skills run an
+You normally use the `/agentflow:*` skills and let Claude drive things. Under the hood those skills run an
 **engine CLI** (`node "$CLAUDE_PLUGIN_ROOT/dist/state/<cmd>.js" …`). Running it directly on a bundled
 demo is the fastest way to *see the state machine work* — and because this demo's stages are all
 bash/json/deterministic-group, `drive` takes it all the way to `done` with **no LLM calls at all**.
@@ -53,7 +53,7 @@ thing the LLM adds is the *work inside* the stages that need judgment.
 executive digest. On the bundled corpus:
 
 ```shell
-/flow:audit --target examples/fake-repo
+/agentflow:audit --target examples/fake-repo
 ```
 
 Claude drives the pipe, dispatches review agents per file (cached, so re-runs are cheap), partitions
@@ -72,7 +72,7 @@ Any markdown checklist is a valid item source. Inline `{...}` annotations become
 ```
 
 ```shell
-/flow:foreach --checkbox TODO.md
+/agentflow:foreach --checkbox TODO.md
 ```
 
 Each unchecked line becomes an item processed in parallel; `[x]` lines start done. The authoritative

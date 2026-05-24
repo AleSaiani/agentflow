@@ -1,23 +1,23 @@
 ---
-name: compose
+name: create-workflow
 description: |
-  Author a reusable workflow-file by composing the Flow primitives (enumerate, foreach, group, reduce, iterate) and bash/json stages into a declarative JSON `WorkflowSpec`, then validate it — ready to run with `/flow:run`. The builder counterpart to `/flow:run`.
+  Author a reusable workflow-file by composing the Agent Flow primitives (enumerate, foreach, group, reduce, iterate) and bash/json stages into a declarative JSON `WorkflowSpec`, then validate it — ready to run with `/agentflow:run-workflow`. The builder counterpart to `/agentflow:run-workflow`.
 
   USE when the user wants to design / create / scaffold a multi-step workflow ("build a workflow that…", "create a pipeline for…", "compose a flow that does X then Y"), especially one to save and reuse.
 
-  DO NOT use for a one-off single step — call the primitive directly. `compose` is for durable, reusable multi-stage flows.
+  DO NOT use for a one-off single step — call the primitive directly. `create-workflow` is for durable, reusable multi-stage flows.
 allowed-tools: Bash, Read, Write
 argument-hint: "<describe the workflow>" [--name NAME]
 ---
 
-# /flow:compose — author a workflow-file
+# /agentflow:create-workflow — author a workflow-file
 
 > **Make it visible:** tell the user in one line when you start authoring (and the target file path),
 > so it's clear this skill is running.
 
 You design a `WorkflowSpec` JSON that wires the primitives, save it as a **self-contained folder**
 `workflows/<name>/workflow.json` (with any helper scripts alongside it), validate it, and hand it to
-`/flow:run`. Compiles 1:1 into a `/flow:pipe` — no new engine.
+`/agentflow:run-workflow`. Compiles 1:1 into a `/agentflow:pipe` — no new engine.
 
 **Self-contained & movable.** A workflow lives in its own folder; any script a `bash` stage needs
 (e.g. a discover/fetch helper) is written **into that same folder** and referenced via the
@@ -50,7 +50,7 @@ A **Stage**:
 - **json** → `{ "value": <any JSON; string leaves resolve templates>, "output_path"?: "..." }`
 - **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate", "init_args": [ ... ] }`
 
-## Wiring templates (resolved by /flow:pipe at run time)
+## Wiring templates (resolved by /agentflow:pipe at run time)
 
 `{{run.id}}` · `{{run.dir}}` · `{{workflow.dir}}` (the folder this workflow-file lives in — use it to
 call sibling scripts: `node "{{workflow.dir}}/discover.mjs"`) · `{{stages.<name>.result_pointer}}` ·
@@ -96,7 +96,7 @@ is fuzzy, make it a step whose **structured output** a later guard reads — nev
    ```
    The `plan` output shows `{{workflow.dir}}` already resolved to the folder's absolute path — confirm
    the script references look right.
-6. Surface the plan, then tell the user to run it: `/flow:run workflows/<name>/workflow.json`.
+6. Surface the plan, then tell the user to run it: `/agentflow:run-workflow workflows/<name>/workflow.json`.
 
 See `workflows/audit/workflow.json` for a complete worked example (discover via `{{workflow.dir}}/discover.mjs`
 → foreach review → group → reduce digest).

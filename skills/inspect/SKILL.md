@@ -2,21 +2,21 @@
 name: inspect
 description: |
   Read-only inspector over runs of any primitive (enumerate / foreach / group / reduce / iterate /
-  pipe). Lists runs, shows a run's status, draws a /flow:pipe child tree, aggregates budget across a
+  pipe). Lists runs, shows a run's status, draws a /agentflow:pipe child tree, aggregates budget across a
   run and its children, prints a timeline. Never mutates state.
 
   USE whenever the user wants to debug, inspect, or report on a run — "show me", "what happened", "how
   much did X cost", "why did Y fail", "list active runs".
 
-  DON'T use to do work (the other skills do that) or for non-Flow state (it only knows `.flow/enumerate/`,
+  DON'T use to do work (the other skills do that) or for non-Agent Flow state (it only knows `.flow/enumerate/`,
   `.flow/foreach/`, `.flow/group/`, `.flow/iterate/`, `.flow/reduce/`, `.flow/pipe/`).
-  Explicit: `/flow:inspect runs | show <id> | tree <id> | budget <id> | timeline <id>`.
+  Explicit: `/agentflow:inspect runs | show <id> | tree <id> | budget <id> | timeline <id>`.
 allowed-tools: Bash, Read
 argument-hint: runs | show <run-id> | tree <run-id> | budget <run-id> | timeline <run-id>
 disable-model-invocation: false
 ---
 
-# /flow:inspect
+# /agentflow:inspect
 
 You are operating the read-only inspector. There is no state to manage and nothing to write. Your job is to dispatch the right subcommand and surface the output to the user.
 
@@ -35,18 +35,18 @@ List every run across every primitive: cmd, run_id, status, is_done, agents, usd
 
 ### `show <run-id>`
 Auto-detect which primitive owns the run-id and print a JSON summary with primitive-specific extras:
-- /flow:foreach adds items-by-status counts
-- /flow:pipe adds the stages list (index/name/type/status/child_cmd/child_run_id)
+- /agentflow:foreach adds items-by-status counts
+- /agentflow:pipe adds the stages list (index/name/type/status/child_cmd/child_run_id)
 - iterate (loop) runs add iteration_count, max_iterations, stop_reason
-- /flow:group adds items_total, groups_count, method
+- /agentflow:group adds items_total, groups_count, method
 
 Use `--cmd` to disambiguate when two primitives have a run with the same id.
 
 ### `tree <pipe-run-id>`
-For a /flow:pipe run, recursively walk the stage tree and show each child run's status, agent count, and USD estimate. Indented ASCII tree. Useful to see at a glance "stage 1 done, stage 2 in_progress, stage 3 pending".
+For a /agentflow:pipe run, recursively walk the stage tree and show each child run's status, agent count, and USD estimate. Indented ASCII tree. Useful to see at a glance "stage 1 done, stage 2 in_progress, stage 3 pending".
 
 ### `budget <run-id>`
-Walk the run and (if /flow:pipe) all its children recursively. Sum `tokens_used`, `agents_dispatched`, `usd_estimate` and break down per-node. Answers "how much did this pipeline cost?"
+Walk the run and (if /agentflow:pipe) all its children recursively. Sum `tokens_used`, `agents_dispatched`, `usd_estimate` and break down per-node. Answers "how much did this pipeline cost?"
 
 ### `timeline <run-id>`
 Print created_at / started_at / updated_at / completed_at plus the last N budget events (`--limit`). Useful for "where did the time go?"
@@ -56,7 +56,7 @@ Print created_at / started_at / updated_at / completed_at plus the last N budget
 1. `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" runs --cmd pipe` — find the failed pipe.
 2. `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" tree <pipe-run-id>` — identify which stage failed.
 3. `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" show <failed-child-run-id> --cmd <its-primitive>` — get details on the failure.
-4. For /flow:foreach failures: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" list <run-id> --status failed` for per-item errors.
+4. For /agentflow:foreach failures: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" list <run-id> --status failed` for per-item errors.
 
 ## Pattern: cost audit
 
@@ -64,6 +64,6 @@ Print created_at / started_at / updated_at / completed_at plus the last N budget
 
 ## Important rules
 
-- **Read-only**: `/flow:inspect` never modifies state. If you need to fix something (reset stuck items, force a transition), use the primitive's own state CLI (`state/foreach.js reset`, etc.).
-- **No auto-continue interaction**: `/flow:inspect` does not appear in the Stop hook's PRIMITIVES registry — it has no runs to resume.
+- **Read-only**: `/agentflow:inspect` never modifies state. If you need to fix something (reset stuck items, force a transition), use the primitive's own state CLI (`state/foreach.js reset`, etc.).
+- **No auto-continue interaction**: `/agentflow:inspect` does not appear in the Stop hook's PRIMITIVES registry — it has no runs to resume.
 - **Output is for humans first, JSON second**: most subcommands print a readable table or tree. Pass `--json` (or `--pretty` for `show`) when you need structured output for further processing.

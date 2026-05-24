@@ -1,5 +1,5 @@
 {
-  "name": "flow-cc",
+  "name": "agentflow",
   "version": "1.0.0-beta.1",
   "description": "Deterministic, composable iteration inside a single Claude Code session, shipped as a plugin.",
   "license": "Apache-2.0",
@@ -10,9 +10,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AleSaiani/flow-cc.git"
+    "url": "git+https://github.com/AleSaiani/agentflow.git"
   },
-  "homepage": "https://github.com/AleSaiani/flow-cc",
+  "homepage": "https://github.com/AleSaiani/agentflow",
   "keywords": [
     "claude-code",
     "claude-code-plugin",

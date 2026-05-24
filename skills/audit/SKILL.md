@@ -2,7 +2,7 @@
 name: audit
 description: |
   Deep code-audit recipe: discover files in a target → review each (LLM, cached) → partition by
-  component → executive digest with hotspots and recurring patterns. A layer-3 recipe over /flow:pipe
+  component → executive digest with hotspots and recurring patterns. A layer-3 recipe over /agentflow:pipe
   (the 6-stage pipeline and caching are detailed in the body).
 
   USE when the user asks to "review / audit / find bugs across" a folder, repo, or glob and wants a
@@ -10,18 +10,18 @@ description: |
   plus a digest beats reading inline.
 
   DON'T use for a few named files (read them inline), exploratory questions ("what does this do?"), or
-  generic per-item work that isn't a code review (→ /flow:foreach).
-  Explicit invocation (`/flow:audit …`) skips these checks.
+  generic per-item work that isn't a code review (→ /agentflow:foreach).
+  Explicit invocation (`/agentflow:audit …`) skips these checks.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|sonnet|opus] [--group-depth N] [--digest-model opus|sonnet|haiku] [--run-id NAME]
 ---
 
-# /flow:audit
+# /agentflow:audit
 
-> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
-> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear an Agent Flow
+> run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
-You are the orchestrator of a `/flow:audit` recipe. Your job is to **construct a 6-stage pipeline.json**, hand it to `/flow:pipe`, and let the framework drive execution. The recipe itself adds no new primitives.
+You are the orchestrator of a `/agentflow:audit` recipe. Your job is to **construct a 6-stage pipeline.json**, hand it to `/agentflow:pipe`, and let the framework drive execution. The recipe itself adds no new primitives.
 
 ## Step 0 — Resolve config + compute manifest hash for the run-id
 
@@ -51,7 +51,7 @@ The 6-stage structure is shipped as a **self-contained declarative workflow-file
 `${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json` (this is the canonical, reusable
 artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the sibling
 `discover.mjs` via `{{workflow.dir}}` (so the whole `workflows/audit/` folder is movable);
-the script reads the target/glob from the environment and emits a /flow:foreach-compatible
+the script reads the target/glob from the environment and emits a /agentflow:foreach-compatible
 items array with a per-file `content_hash` (for the review `--cache`).
 
 Export these before init (resolve `${CLAUDE_PLUGIN_ROOT}` to its real path here):
@@ -70,9 +70,9 @@ the review/digest models or group depth, copy the whole `workflows/audit/` folde
 
 No stages.json to build. The workflow-file already wires the 6 stages with declarative
 templates (`{{stages.<name>.run_id}}`, `{{stages.<name>.result_pointer}}`, `{{run.dir}}`),
-resolved by /flow:pipe at tick time. The stages are: `discover` (bash) → `review` (/flow:foreach,
-`--kind code-review --cache`) → `build-group-input` (json) → `partition` (/flow:group path-prefix)
-→ `build-digest-inputs` (json) → `digest` (/flow:reduce, markdown).
+resolved by /agentflow:pipe at tick time. The stages are: `discover` (bash) → `review` (/agentflow:foreach,
+`--kind code-review --cache`) → `build-group-input` (json) → `partition` (/agentflow:group path-prefix)
+→ `build-digest-inputs` (json) → `digest` (/agentflow:reduce, markdown).
 
 ## Step 4 — Validate and init the pipe
 
@@ -83,7 +83,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> \
   [--force if --run-id was explicitly provided and overrides existing]
 ```
 
-`/flow:pipe init` automatically runs schema validation on every primitive stage's init_args (catches typos in flags / bad kind values / missing required configs BEFORE the pipeline starts). A clear error listing surfaces here, not mid-run.
+`/agentflow:pipe init` automatically runs schema validation on every primitive stage's init_args (catches typos in flags / bad kind values / missing required configs BEFORE the pipeline starts). A clear error listing surfaces here, not mid-run.
 
 ## Step 5 — Drive the pipe
 
@@ -98,18 +98,18 @@ Output is JSON:
 - `{"action": "done", "result_pointer": "..."}` — pipeline complete, surface the digest.
 - `{"action": "failed", ...}` — surface the error.
 
-### When `needs_agent` for `/flow:foreach review`:
+### When `needs_agent` for `/agentflow:foreach review`:
 
 1. Run the child init: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" init <suggested_child_run_id> <init_args...> --force`
 2. Record in pipe: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" start-primitive-child <run-id> --child-cmd foreach --child-run-id <suggested>`
-3. Follow `/flow:foreach` SKILL.md Step 4 dispatch loop: status → claim → split into chunks → fan-out parallel Agents in ONE message → complete-batch each result file.
+3. Follow `/agentflow:foreach` SKILL.md Step 4 dispatch loop: status → claim → split into chunks → fan-out parallel Agents in ONE message → complete-batch each result file.
 4. After every Agent return, record token usage: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" budget-add <enum-run-id> --tokens <total_tokens> --model <review_model>` so the budget aggregates correctly.
 5. When `complete-batch` reports `run_status: done`, call `drive` again — it advances past the review stage, auto-runs the bash bridges + group, and stops at `digest`.
 
-### When `needs_agent` for `/flow:reduce digest`:
+### When `needs_agent` for `/agentflow:reduce digest`:
 
 1. Init the reduce child + record + materialize (the reduce SKILL covers Steps 2-4).
-2. Dispatch ONE digest agent (no fan-out for /flow:reduce).
+2. Dispatch ONE digest agent (no fan-out for /agentflow:reduce).
 3. After Agent returns: `state/reduce.js budget-add` for the tokens, then `state/reduce.js complete
    <child-id> --output-path ./<run-id>-audit.md` — write the digest to a **visible file in the
    workspace root** (e.g. `audit-3f2a-audit.md`), not buried under `.flow/`.
@@ -121,7 +121,7 @@ When `drive` returns `done`:
 - `Read` the first 30 lines of `result_pointer` (the digest markdown) and surface inline.
 - Run `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" budget <run-id>` and surface the total cost.
 - Run `node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" tree <run-id>` for the full child tree breakdown.
-- Suggest follow-ups (e.g. "to refine the auth component, run `/flow:foreach --kind audit --model opus --items <groups.json filtered>`").
+- Suggest follow-ups (e.g. "to refine the auth component, run `/agentflow:foreach --kind audit --model opus --items <groups.json filtered>`").
 
 ## Important rules
 
@@ -131,21 +131,21 @@ When `drive` returns `done`:
   `.flow/pipe/<run-id>/`, `.flow/foreach/<run-id>-s1-foreach/`, `.flow/group/<run-id>-s3-partition/`,
   `.flow/reduce/<run-id>-s5-digest/`.
 - **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.flow/cache/foreach-code-review/`.
-- **Validate then drive**: trust the dry-run validation `/flow:pipe init` performs. Catches recipe typos before any agent dispatch.
+- **Validate then drive**: trust the dry-run validation `/agentflow:pipe init` performs. Catches recipe typos before any agent dispatch.
 
 ## Quick example
 
 ```
-/flow:audit --target examples/fake-repo
+/agentflow:audit --target examples/fake-repo
 ```
 
 Expected on the bundled fake-repo (8 files, 4 components, 6 with intentional bugs):
 - stage discover finds 8 .cs files (each with sha256 content_hash)
-- stage review dispatches /flow:foreach (sonnet, conc=4, --cache) → 6 bug reports + 2 clean
+- stage review dispatches /agentflow:foreach (sonnet, conc=4, --cache) → 6 bug reports + 2 clean
 - stage build-group-input materializes the run reference
-- stage partition runs /flow:group path-prefix depth=1 → 4 groups (auth, billing, api, data)
+- stage partition runs /agentflow:group path-prefix depth=1 → 4 groups (auth, billing, api, data)
 - stage build-digest-inputs materializes the reduce inputs
-- stage digest dispatches /flow:reduce (opus, markdown) → executive report
+- stage digest dispatches /agentflow:reduce (opus, markdown) → executive report
 - Final digest written to a visible `./<run-id>-audit.md` in the workspace
 
 Re-running the same command without changing fake-repo: the same run-id is regenerated, all 8 review items become cache hits → no agent dispatch for review → only the digest runs again (still costs ~$0.10 for the opus call). If you change one file, only that file dispatches a new review agent.

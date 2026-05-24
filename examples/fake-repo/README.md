@@ -1,6 +1,6 @@
-# fake-repo — intentional-bug corpus for /flow:audit validation
+# fake-repo — intentional-bug corpus for /agentflow:audit validation
 
-This is **not real code**. It exists solely to exercise the `/flow:audit`
+This is **not real code**. It exists solely to exercise the `/agentflow:audit`
 recipe end-to-end (and any future recipes that operate on source files).
 
 ## Layout
@@ -22,7 +22,7 @@ data/
 
 8 files, 4 components, **6 with intentional bugs** + **2 clean baselines**.
 
-## Expected /flow:audit behavior
+## Expected /agentflow:audit behavior
 
 - Stage 1 (bash): finds 8 `.cs` files under `examples/fake-repo/`.
 - Stage 2 (/enumerate code-review): per-file review. Should flag the 6 buggy files

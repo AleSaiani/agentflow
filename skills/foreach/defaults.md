@@ -1,5 +1,5 @@
 ---
-# Default config for /flow:foreach.
+# Default config for /agentflow:foreach.
 #
 # Override priority (high -> low):
 #   1. CLI flag (--concurrency, --chunk-size, ...)
@@ -15,7 +15,7 @@ auto_continue: true         # if true, the command loops until exhaustion
 max_auto_continues: 20      # safety cap for the cross-turn Stop hook
 model: sonnet               # inherit | haiku | sonnet | opus — preflight (see task-kinds.md) may suggest a different one based on task_kind
 subagent_type: general-purpose
-min_items: 15               # autonomous-invocation guardrail: if Claude triggers /flow:foreach but resolves < min_items, ask the user to confirm (avoids orchestration overhead for tiny batches). Bypassed when the user types /flow:foreach explicitly.
+min_items: 15               # autonomous-invocation guardrail: if Claude triggers /agentflow:foreach but resolves < min_items, ask the user to confirm (avoids orchestration overhead for tiny batches). Bypassed when the user types /agentflow:foreach explicitly.
 ---
 
 # Notes
@@ -31,6 +31,6 @@ min_items: 15               # autonomous-invocation guardrail: if Claude trigger
   times. Beyond that, it stops and lets the user decide — a guard against
   infinite loops on broken runs.
 
-- `min_items: 15` is the threshold below which an *autonomous* /flow:foreach invocation
-  triggers a confirmation prompt. Tune up if you find /flow:foreach firing too eagerly
+- `min_items: 15` is the threshold below which an *autonomous* /agentflow:foreach invocation
+  triggers a confirmation prompt. Tune up if you find /agentflow:foreach firing too eagerly
   on small batches; tune down (or set to 0) to disable the guardrail entirely.

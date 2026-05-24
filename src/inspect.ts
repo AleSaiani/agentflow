@@ -380,7 +380,7 @@ function cmdBoard(args: string[]): void {
   const enumActive = active.filter((e) => e["cmd"] === "foreach");
   if (enumActive.length && !pipeRuns.length) {
     const top = enumActive[0] as StateDict;
-    lines.push(`  - Send any message and the Stop hook will resume /flow:foreach '${top["run_id"]}' automatically`);
+    lines.push(`  - Send any message and the Stop hook will resume /agentflow:foreach '${top["run_id"]}' automatically`);
   }
   for (const e of stuck.slice(0, 2)) {
     if (String(e["reason"]).includes("stuck in_progress")) lines.push(`  - \`${nodeCmd(`state/${e["cmd"]}.js`)} reset ${e["run_id"]} --in-progress-to-pending\``);

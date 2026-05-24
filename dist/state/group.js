@@ -6,7 +6,7 @@
  * {item_id -> group_id} mapping). Single-writer: the orchestrator owns state writes.
  *
  * Output `.flow/group/<run-id>/groups.json` is items.json-compatible: a JSON array of group
- * items `{id, data:{group_id, items, size}}` — feed directly to /flow:foreach. Faithful port
+ * items `{id, data:{group_id, items, size}}` — feed directly to /agentflow:foreach. Faithful port
  * of `group_state.py`.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

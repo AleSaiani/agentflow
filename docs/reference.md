@@ -1,6 +1,6 @@
 # Reference
 
-Everything Flow can do, and how. You normally invoke a **skill** (`/flow:<name>`) and Claude drives
+Everything Agent Flow can do, and how. You normally invoke a **skill** (`/agentflow:<name>`) and Claude drives
 the underlying CLI for you; the CLI is documented here too for power users and for understanding what
 the skill does. All state lives in `state.json` under `.flow/<cmd>/<run-id>/` at the workspace root.
 
@@ -22,8 +22,8 @@ the skill does. All state lives in `state.json` under `.flow/<cmd>/<run-id>/` at
 | `group` | partition | split items into K groups by key |
 | `repeat` / `until` / `while` | loop | run a stage by count / do…until / while…do |
 | `pipe` | compose | run an ordered pipeline of stages |
-| `run` | execute | run a workflow-file end to end |
-| `compose` | author | build a reusable workflow-file |
+| `run-workflow` | execute | run a workflow-file end to end |
+| `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` | observe | read-only status, trees, budget, dashboard, and a time-ordered run log |
 | `audit` | recipe | discover → review → partition → digest |
 
@@ -40,7 +40,7 @@ share the `iterate.js` engine.
 Generate a list of items from a higher-level spec (outline → chapters, feature → tasks). Produces an
 `items.json` array consumed by `foreach` or `group`. The complement of `reduce`.
 
-**Invoke:** `/flow:enumerate --prompt "<what list to produce>" [--input <source>]`
+**Invoke:** `/agentflow:enumerate --prompt "<what list to produce>" [--input <source>]`
 
 **CLI** (`dist/state/enumerate.js`):
 - `init <id> --prompt "<instructions>" [--input <path>] [--model …] [--execution main-thread|subagent] [--max-auto-continues N] [--force] [--validate-only]`
@@ -54,7 +54,7 @@ Generate a list of items from a higher-level spec (outline → chapters, feature
 Apply one operation to every item, in parallel chunks across subagents **or** inline in the main
 thread. The operation is a **prompt**; model and subagent are optional.
 
-**Invoke:** `/flow:foreach (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind …] [--serial] [--carry] [--execution main-thread|subagent] [--cache]`
+**Invoke:** `/agentflow:foreach (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind …] [--serial] [--carry] [--execution main-thread|subagent] [--cache]`
 
 The operation is, primarily, a **`--prompt`** (the instructions applied per item) — or `--prompt-file
 <path>` to read it from a file. `--model`, `--subagent-type` (which agent runs each item) and
@@ -77,7 +77,7 @@ a list, no locks); **`--stop-file <path>`** pauses the run (and the Stop hook) w
 
 Collapse N inputs into one digest (markdown or JSON) via a single agent.
 
-**Invoke:** `/flow:reduce --inputs <descriptors> --prompt "<synthesis instructions>" [--output-format markdown|json]`
+**Invoke:** `/agentflow:reduce --inputs <descriptors> --prompt "<synthesis instructions>" [--output-format markdown|json]`
 
 **CLI** (`dist/state/reduce.js`):
 - `init <id> --inputs <path> [--prompt "…"] [--model …] [--output-format markdown|json] [--force] [--validate-only]`
@@ -93,7 +93,7 @@ Collapse N inputs into one digest (markdown or JSON) via a single agent.
 Split items into K groups by key. Output `groups.json` is `items.json`-compatible — feed it to
 `foreach` to process per group.
 
-**Invoke:** `/flow:group --method path-prefix|regex|jsonpath|llm-classify --input-source <descriptor>`
+**Invoke:** `/agentflow:group --method path-prefix|regex|jsonpath|llm-classify --input-source <descriptor>`
 
 **CLI** (`dist/state/group.js`):
 - `init <id> --method <m> --input-source <path> [--method-config '{…}'] [--model …] [--min-items N] [--force] [--validate-only]`
@@ -143,22 +143,22 @@ loops come from an `iterate` stage. Reads children's state to advance; never mut
 
 ## Authoring & running workflows
 
-### `compose` — author a workflow-file
+### `create-workflow` — author a workflow-file
 
 Design a reusable `WorkflowSpec` JSON that wires the primitives, validate it, and save it under
-`workflows/`. Invoke: `/flow:compose "<describe the workflow>" [--name NAME]`. Produces a file you run
-with `/flow:run`. See [Workflow-file schema](#workflow-file-schema).
+`workflows/`. Invoke: `/agentflow:create-workflow "<describe the workflow>" [--name NAME]`. Produces a file you run
+with `/agentflow:run-workflow`. See [Workflow-file schema](#workflow-file-schema).
 
-### `run` — execute a workflow-file
+### `run-workflow` — execute a workflow-file
 
-`/flow:run <workflow.json> [--run-id NAME] [--dry-run]` = `pipe init --workflow` + `pipe drive` (or
+`/agentflow:run-workflow <workflow.json> [--run-id NAME] [--dry-run]` = `pipe init --workflow` + `pipe drive` (or
 `pipe plan` for `--dry-run`). The one-command way to execute a saved pipeline.
 
 ---
 
 ## Inspecting
 
-`/flow:inspect` (read-only), `/flow:board` (dashboard), `/flow:history` (chronological log). CLI: `dist/inspect.js`.
+`/agentflow:inspect` (read-only), `/agentflow:board` (dashboard), `/agentflow:history` (chronological log). CLI: `dist/inspect.js`.
 - `runs [--cmd <name>] [--json]` — list every run
 - `history [--limit N] [--cmd <name>] [--json]` — runs newest-first ("what ran, and when")
 - `show <id> [--cmd <name>] [--pretty]` — one run's status + primitive-specific extras
@@ -225,7 +225,7 @@ Authoritative state always stays in `state.json`; the View is a projection.
 - **Cross-turn.** Set `auto_continue` (default on) and the Stop hook resumes an unfinished run next
   turn, up to `max_auto_continues`. State is on disk, so runs survive context compaction.
 - **Budget.** Record usage with `budget-add <id> --tokens N --model <m>`; inspect with
-  `/flow:inspect budget <id>` (aggregates across children).
+  `/agentflow:inspect budget <id>` (aggregates across children).
 - **Cache.** `foreach --cache` skips items whose `data.content_hash` matched a prior result
   (`.flow/cache/`), making re-runs cheap.
 - **Models.** `--model inherit|haiku|sonnet|opus` (and per-item overrides). Optional — work can run

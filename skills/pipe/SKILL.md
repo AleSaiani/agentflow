@@ -2,24 +2,24 @@
 name: pipe
 description: |
   Run an ordered pipeline of stages — each a bash command, a json write, or another primitive
-  (/flow:enumerate, /flow:foreach, /flow:group, /flow:reduce, or a loop). The composer: it holds no
+  (/agentflow:enumerate, /agentflow:foreach, /agentflow:group, /agentflow:reduce, or a loop). The composer: it holds no
   map/fold/loop of its own; it sequences the primitives that do, with declarative wiring and per-stage
   `when` guards.
 
   USE for a multi-step workflow with ≥ 2 ordered steps where one feeds the next — "fetch issues, triage
   each, then summarize", "review files, group findings, then report". To run a SAVED workflow-file use
-  /flow:run; to AUTHOR one use /flow:compose.
+  /agentflow:run-workflow; to AUTHOR one use /agentflow:create-workflow.
 
   DON'T use for a single step (call the primitive directly) or independent parallel work over a list
-  (that's /flow:foreach). Explicit invocation (`/flow:pipe …`) skips these checks.
+  (that's /agentflow:foreach). Explicit invocation (`/agentflow:pipe …`) skips these checks.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 argument-hint: (--stages <json> | --workflow <json>) [--context-policy summary|none|last-only|full] [--no-stop-on-failure]
 ---
 
-# /flow:pipe
+# /agentflow:pipe
 
-> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
-> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear an Agent Flow
+> run is happening; `/agentflow:board` then lists every run on disk — the audit trail.
 
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/pipe/` (this folder: SKILL.md + defaults.md)
@@ -27,7 +27,7 @@ argument-hint: (--stages <json> | --workflow <json>) [--context-policy summary|n
 > - `${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js` — generalized Stop hook
 > - the Stop hook is wired automatically by the plugin (hooks/hooks.json)
 
-You are the **orchestrator** of a `/flow:pipe` run. The pipe itself is a state machine: each turn you call `state/pipe.js tick <run-id>` and act on the JSON it returns. The composer never mutates child state; it only reads it to decide when to advance.
+You are the **orchestrator** of a `/agentflow:pipe` run. The pipe itself is a state machine: each turn you call `state/pipe.js tick <run-id>` and act on the JSON it returns. The composer never mutates child state; it only reads it to decide when to advance.
 
 ## Stage types (v1)
 
@@ -58,7 +58,7 @@ Bash stages run synchronously inside a turn. Env vars exposed:
 ```
 JSON stages write a JSON document directly to `output_path`, with template substitution applied to every string leaf inside `value`. They run synchronously and are fully auto-drivable. **Use this instead of bash+printf** to construct small JSON files between primitive stages: it handles Windows path escaping correctly, doesn't depend on shell quoting, and the result always parses as valid JSON.
 
-**Template syntax** (resolved by /flow:pipe at tick time, in `bash.command`, `bash.output_path`, `json.value` (recursively), `json.output_path`, and in primitive stages' `init_args`):
+**Template syntax** (resolved by /agentflow:pipe at tick time, in `bash.command`, `bash.output_path`, `json.value` (recursively), `json.output_path`, and in primitive stages' `init_args`):
 - `{{run.id}}`, `{{run.dir}}` — this pipe run's id / working dir
 - `{{stages.<name>.run_id}}` — a named primitive stage's child run-id
 - `{{stages.<name>.result_pointer}}` — a named stage's result_pointer
@@ -92,14 +92,14 @@ The orchestrator generates the child run-id (the `tick` output suggests one), ru
 ## Invocation
 
 ```
-/flow:pipe (--stages <stages.json> | --workflow <workflow.json>) \
+/agentflow:pipe (--stages <stages.json> | --workflow <workflow.json>) \
        [--run-id NAME] [--context-policy summary|none|last-only|full] [--no-stop-on-failure]
 ```
 
 `--stages` is a JSON array of stage descriptors (see Stage types below); `--workflow` is a declarative
 `WorkflowSpec` (`{name, config, stages}`) that compiles into the same stages. If neither is given →
-stop with a clear message. To AUTHOR a workflow-file use /flow:compose; to RUN one in a single step
-use /flow:run.
+stop with a clear message. To AUTHOR a workflow-file use /agentflow:create-workflow; to RUN one in a single step
+use /agentflow:run-workflow.
 
 ## Step 0 — Load defaults
 
@@ -169,7 +169,7 @@ The output includes `cmd`, `suggested_child_run_id`, and `init_args`. Steps:
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" start-primitive-child <run-id> \
      --child-cmd <cmd> --child-run-id <suggested_child_run_id>
    ```
-3. **Exit the turn** — the Stop hook will resume the child primitive on subsequent turns. The child has its own SKILL.md flow (e.g. /flow:foreach dispatch loop). When the child is done, the hook resumes /flow:pipe.
+3. **Exit the turn** — the Stop hook will resume the child primitive on subsequent turns. The child has its own SKILL.md flow (e.g. /agentflow:foreach dispatch loop). When the child is done, the hook resumes /agentflow:pipe.
 
 DO NOT also run the child's dispatch loop yourself here. Let the child's own SKILL.md handle it via cross-turn auto-continue.
 
@@ -192,16 +192,16 @@ When `tick` returns `done`, print:
 
 ## Cross-turn auto-continue
 
-The Stop hook detects `/flow:pipe` runs with `auto_continue=true` and residual work. /flow:pipe's predicate **yields to running primitive children** — while a child is running, /flow:pipe returns no residual and the hook resumes the child instead. /flow:pipe is re-entered only when the orchestrator needs to act (start a stage, advance after a child, finalize).
+The Stop hook detects `/agentflow:pipe` runs with `auto_continue=true` and residual work. /agentflow:pipe's predicate **yields to running primitive children** — while a child is running, /agentflow:pipe returns no residual and the hook resumes the child instead. /agentflow:pipe is re-entered only when the orchestrator needs to act (start a stage, advance after a child, finalize).
 
 `max_auto_continues: 50` is the pipe-level cap (on top of each child's own cap).
 
 ## Important rules
 
-- **/flow:pipe never mutates child state**. It only reads child state (via `is_done`) to decide when to advance. Children manage their own state per the single-writer rule.
+- **/agentflow:pipe never mutates child state**. It only reads child state (via `is_done`) to decide when to advance. Children manage their own state per the single-writer rule.
 - **Use the suggested_child_run_id** unless you have a reason to override. The default scheme (`<pipe-run-id>-s<N>-<cmd>`) makes provenance obvious.
-- **Pre-existing items file (`/flow:group → /flow:foreach`)**: when a primitive stage's input is the output file of a prior stage, pass it via the appropriate flag of the child primitive — e.g. `/flow:foreach` init expects `--items <path>`. The orchestrator constructs `init_args` accordingly when building the stages.json.
-- **Idempotence**: re-running `/flow:pipe` with the same run-id without `--force` resumes from where it left off.
+- **Pre-existing items file (`/agentflow:group → /agentflow:foreach`)**: when a primitive stage's input is the output file of a prior stage, pass it via the appropriate flag of the child primitive — e.g. `/agentflow:foreach` init expects `--items <path>`. The orchestrator constructs `init_args` accordingly when building the stages.json.
+- **Idempotence**: re-running `/agentflow:pipe` with the same run-id without `--force` resumes from where it left off.
 
 ## Quick example: audit pipeline
 
@@ -255,4 +255,4 @@ stages.json:
 ]
 ```
 
-The orchestrator's job is to prepare those input files between stages (e.g. take the previous stage's `result_pointer` and shape it into the next stage's `--items` / `--inputs`). For v2, /flow:pipe will gain helpers to declare these wiring transformations declaratively. For v1, prep is the orchestrator's responsibility — keep it explicit.
+The orchestrator's job is to prepare those input files between stages (e.g. take the previous stage's `result_pointer` and shape it into the next stage's `--items` / `--inputs`). For v2, /agentflow:pipe will gain helpers to declare these wiring transformations declaratively. For v1, prep is the orchestrator's responsibility — keep it explicit.

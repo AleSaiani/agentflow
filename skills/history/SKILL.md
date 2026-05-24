@@ -1,19 +1,19 @@
 ---
 name: history
 description: |
-  Chronological history of Flow runs in this workspace — every run across all primitives, most recent
+  Chronological history of Agent Flow runs in this workspace — every run across all primitives, most recent
   first, with status, agent count, and cost. The "what have I run, and when" log. Read-only, never
   mutates state.
 
   USE when the user asks "what did I run", "show history", "recent runs", "what flows have run",
-  "did the X run earlier", "list past runs". For a live dashboard of what's *active* use `/flow:board`;
-  for one run's details use `/flow:inspect show <id>`.
+  "did the X run earlier", "list past runs". For a live dashboard of what's *active* use `/agentflow:board`;
+  for one run's details use `/agentflow:inspect show <id>`.
 allowed-tools: Bash, Read
 argument-hint: [--limit N] [--cmd enumerate|foreach|group|iterate|reduce|pipe] [--json]
 disable-model-invocation: false
 ---
 
-# /flow:history
+# /agentflow:history
 
 > **Make it visible:** this is read-only; just run it and surface the table.
 
@@ -27,5 +27,5 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" history [--limit N] [--cmd <name>] 
 Columns: `UPDATED_AT · CMD · RUN_ID · STATUS · AGENTS · USD$`. Defaults to the 20 most recent;
 `--limit 0` for all, `--cmd` to filter to one primitive, `--json` for structured output.
 
-Related: `/flow:board` (active runs + blockers + suggested next action), `/flow:inspect show <id>`
-(one run's detail), `/flow:inspect timeline <id>` (a single run's event log).
+Related: `/agentflow:board` (active runs + blockers + suggested next action), `/agentflow:inspect show <id>`
+(one run's detail), `/agentflow:inspect timeline <id>` (a single run's event log).

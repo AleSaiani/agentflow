@@ -178,7 +178,7 @@ export function writeFolderView(base, items) {
 /**
  * Move ONE kanban file (by its `data.file`, falling back to `id`) into the folder matching `status`
  * (pending→todo, in_progress→in-progress, done/failed→done). Returns true if it actually moved.
- * Called automatically by /flow:foreach on claim/complete so the board stays live without an extra step.
+ * Called automatically by /agentflow:foreach on claim/complete so the board stays live without an extra step.
  */
 export function moveKanbanItem(base, id, data, status) {
     const file = String(data?.["file"] ?? id);

@@ -1,5 +1,5 @@
 ---
-# Default config for /flow:audit (a layer-3 recipe over /flow:pipe).
+# Default config for /agentflow:audit (a layer-3 recipe over /agentflow:pipe).
 
 target: "."                         # path to audit; user MUST override or pass --target
 file_glob: "**/*.cs"                # which files to include (comma-separated multiple globs allowed)
@@ -28,7 +28,7 @@ stop_on_failure: true               # if any stage fails, the audit aborts
 
 # Notes
 
-- `/flow:audit` is a **layer-3 recipe** — a thin shell over `/flow:pipe` that wires
+- `/agentflow:audit` is a **layer-3 recipe** — a thin shell over `/agentflow:pipe` that wires
   4 stages (find → review → group → digest). It introduces no new framework
   primitives; if you find yourself wanting to add one to make this recipe work,
   fix the underlying primitive instead.

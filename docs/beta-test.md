@@ -1,4 +1,4 @@
-# Beta testing Flow
+# Beta testing Agent Flow
 
 A graded protocol to verify the promises end to end in a real Claude Code session. Each level maps to
 a claim; do them in order. Steps marked **(you)** are run interactively in Claude Code.
@@ -16,7 +16,7 @@ a claim; do them in order. Steps marked **(you)** are run interactively in Claud
 There is no daemon and no polling. It's a **Claude Code `Stop` hook**:
 
 1. Every run writes its state to a file on disk (`.flow/foreach/<id>/state.json`, etc.).
-2. When Claude finishes a turn, Claude Code fires the `Stop` hook — Flow wires
+2. When Claude finishes a turn, Claude Code fires the `Stop` hook — Agent Flow wires
    `node "$CLAUDE_PLUGIN_ROOT/dist/hook/continue.js"` (see `hooks/hooks.json`).
 3. The hook scans every run's state. If one has `auto_continue` **and** residual work (items pending,
    a loop iteration left, a pipe stage to advance) **and** is under its `max_auto_continues` cap, it
@@ -34,16 +34,16 @@ Autonomous triggering from natural language is **best-effort**: for small or fam
 often just does the work inline (and for ≤2 items that's the intended count-gate behavior). So don't
 guess — check the ground truth, which is **on disk**:
 
-- **`/flow:board`** (or `node dist/inspect.js runs`) lists every run. **Zero runs after a request means
+- **`/agentflow:board`** (or `node dist/inspect.js runs`) lists every run. **Zero runs after a request means
   the skill did not fire** — Claude handled it inline.
 - The state dirs (`.flow/foreach/`, `.flow/pipe/`, `.flow/audit/`, …) appear only when a skill actually ran.
 - **`claude --debug`** logs plugin/skill/hook activity (including Stop-hook firings).
-- Each Flow skill also **announces itself in one line** when it starts.
+- Each Agent Flow skill also **announces itself in one line** when it starts.
 
-**To exercise a skill deterministically, invoke it explicitly** (`/flow:foreach …`): that bypasses the
+**To exercise a skill deterministically, invoke it explicitly** (`/agentflow:foreach …`): that bypasses the
 model's judgment and the count gate. Use explicit invocation to test the *mechanism*; use natural
 language separately to test whether *triggering* fires on its own — and confirm either way with
-`/flow:board`.
+`/agentflow:board`.
 
 ## Install
 
@@ -60,7 +60,7 @@ Or install it as a local marketplace inside an existing session:
 
 ```
 /plugin marketplace add AleSaiani/agentflow
-/plugin install flow@flow-cc
+/plugin install agentflow@agentflow
 ```
 
 Requirements: **Node ≥ 22** and **git bash on `PATH`** (for the shell stages).
@@ -78,12 +78,12 @@ Expect `{"action":"done", …}`. If this fails, fix the environment before going
 
 ## Level 1 — skill loads + invocation **(you)**
 
-- `/flow:board` → the dashboard ("Nothing active. Clean slate.").
+- `/agentflow:board` → the dashboard ("Nothing active. Clean slate.").
 - **Deterministic first** — invoke explicitly so it definitely runs:
-  `/flow:foreach --checkbox examples/TODO.md --prompt "summarize the file this task names"`.
-  Then `/flow:board` → you should now see a `foreach` run. This proves the skill + state work.
+  `/agentflow:foreach --checkbox examples/TODO.md --prompt "summarize the file this task names"`.
+  Then `/agentflow:board` → you should now see a `foreach` run. This proves the skill + state work.
 - **Then test triggering** — in plain language: *"Work through every unchecked task in
-  `examples/TODO.md`."* Run `/flow:board` again: a new run = it auto-fired; still nothing = Claude did
+  `examples/TODO.md`."* Run `/agentflow:board` again: a new run = it auto-fired; still nothing = Claude did
   it inline (expected for a 3-item list — the count gate prefers inline below ~3). Both are valid; the
   point is you can now *tell* which happened.
 
@@ -93,12 +93,12 @@ Start a loop that needs several turns, then **watch it continue on its own**:
 
 > *"Run a loop that prints the iteration number; do 4 iterations."*
 
-Claude should set up `/flow:repeat` (engine `iterate`, `auto_continue` on, `--times 4`) and run the
+Claude should set up `/agentflow:repeat` (engine `iterate`, `auto_continue` on, `--times 4`) and run the
 first iteration, then end its response. **The Stop hook should immediately fire the next iteration**,
 and the next — without you typing anything. You'll see it count through the iterations and stop at 4.
 
 If it stops after one iteration and waits for you, auto-resume is NOT firing — note it (see "watch
-for" below). Cross-check with `/flow:inspect show <run-id>` → `iteration_count` should reach 4 and
+for" below). Cross-check with `/agentflow:inspect show <run-id>` → `iteration_count` should reach 4 and
 `status: done`.
 
 ## Level 3 — folder kanban **(you)**
@@ -118,7 +118,7 @@ to) and watch the files move from `examples/tasks/todo/` into `examples/tasks/do
 
 > *"Audit `examples/fake-repo` for bugs and give me a report."*
 
-Expect `/flow:audit`: discover → review each file (subagents) → group → digest. It should run the
+Expect `/agentflow:audit`: discover → review each file (subagents) → group → digest. It should run the
 deterministic stages itself and stop only for the two LLM stages, then surface a markdown digest.
 Inspect the tree and cost:
 
@@ -138,7 +138,7 @@ Stop hook doesn't care that the history was compacted.
 - **`${CLAUDE_PLUGIN_ROOT}` in the Bash tool.** Skill *content* is substituted, so commands Claude
   copies from a SKILL run with the real path. If you see `command not found` or a literal
   `${CLAUDE_PLUGIN_ROOT}` in a failed command, that's the one open assumption — report it.
-- **git bash not on PATH** → `/flow:iterate`/`pipe` bash stages fail. Install/expose git bash.
+- **git bash not on PATH** → `/agentflow:iterate`/`pipe` bash stages fail. Install/expose git bash.
 - **Windows paths** in templates — the `|json`/`|shell` filters handle escaping; flag anything odd.
 - **The count gate** asking on tiny lists is by design (≤2 inline, ~3–10 ask, >10 run).
 

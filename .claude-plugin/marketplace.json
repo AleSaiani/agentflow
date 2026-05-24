@@ -1,26 +1,26 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "flow-cc",
+  "name": "agentflow",
   "owner": {
     "name": "Alessandro Saiani",
     "email": "11213486+AleSaiani@users.noreply.github.com"
   },
-  "description": "Self-hosted marketplace for the flow plugin.",
+  "description": "Self-hosted marketplace for the Agent Flow plugin.",
   "plugins": [
     {
-      "name": "flow",
+      "name": "agentflow",
       "source": "./",
-      "description": "Deterministic, composable iteration inside a single Claude Code session: enumerate, group, reduce, iterate, and pipe operations across a sequence.",
+      "description": "Deterministic, composable agent workflows inside a single Claude Code session: describe a workflow in natural language and Agent Flow builds and runs it, durably across turns. Primitives: enumerate, foreach, group, reduce, loop, pipe.",
       "license": "Apache-2.0",
-      "homepage": "https://github.com/AleSaiani/flow-cc",
+      "homepage": "https://github.com/AleSaiani/agentflow",
       "keywords": [
-        "iteration",
+        "workflow",
+        "agent",
+        "orchestration",
         "enumerate",
-        "group",
+        "foreach",
         "reduce",
-        "iterate",
-        "pipe",
-        "workflow"
+        "pipe"
       ]
     }
   ]

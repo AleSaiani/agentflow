@@ -45,7 +45,7 @@ function fireHook(env: Record<string, string>): { decision: string; reason: stri
   return out ? JSON.parse(out) : null;
 }
 
-test("E2E: Stop hook drives an /flow:foreach run to completion across simulated turns", () => {
+test("E2E: Stop hook drives an /agentflow:foreach run to completion across simulated turns", () => {
   const env = baseEnv();
   const items = join(env["FOREACH_STATE_DIR"]!, "..", "items.json");
   writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }, { id: "c" }]), "utf8");
@@ -56,7 +56,7 @@ test("E2E: Stop hook drives an /flow:foreach run to completion across simulated 
     const decision = fireHook(env);
     if (decision === null) break; // hook silent → run complete
     assert.equal(decision.decision, "block");
-    assert.match(decision.reason, /flow:foreach run 'r'/);
+    assert.match(decision.reason, /agentflow:foreach run 'r'/);
     // Simulate one turn of model work: claim + complete exactly one item.
     const claimed = lastJson(run(ENUM, env, ["claim", "r", "--count", "1"]));
     if (claimed.length) run(ENUM, env, ["complete", "r", claimed[0].id]);

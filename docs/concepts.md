@@ -1,6 +1,6 @@
 # Concepts
 
-The mental model behind Flow. Read [getting-started.md](getting-started.md) first if you want to see
+The mental model behind Agent Flow. Read [getting-started.md](getting-started.md) first if you want to see
 it run before you read about it.
 
 ## Runs are state on disk
@@ -30,7 +30,7 @@ changes.
 
 ## The determinism boundary
 
-Flow is deterministic where it matters and fuzzy only where it must be:
+Agent Flow is deterministic where it matters and fuzzy only where it must be:
 
 - **Deterministic predicates** — control flow (a `while` stop condition, a pipe stage's `when` guard)
   is a bash command judged by exit code. Code decides.
@@ -55,8 +55,8 @@ The vocabulary is the functional-programming triad plus partition and loop:
 
 `enumerate` and `group` produce an items.json that `foreach` (map) and `group` consume; `reduce`
 collapses; `iterate` loops. `pipe` composes them — loops inside a pipeline come from using `iterate`
-(or a `repeat`/`until`/`while` stage) as a step. **`compose`** authors a reusable workflow-file from
-these; **`run`** executes one (with `--dry-run`/`plan` to preview).
+(or a `repeat`/`until`/`while` stage) as a step. **`create-workflow`** authors a reusable workflow-file from
+these; **`run-workflow`** executes one (with `--dry-run`/`plan` to preview).
 
 The per-item **operation** is a prompt (the instructions); model and subagent are optional, and
 `foreach` can process items inline in the main thread (`--execution main-thread`) instead of fanning
@@ -85,9 +85,9 @@ calls to a handful.
 
 ## Budget & inspection
 
-Every run logs a budget (tokens, agent dispatches, USD estimate). `/flow:inspect budget <run-id>`
-aggregates cost across a run and its children; `/flow:board` is the session-start dashboard (active
-runs, blockers, cumulative cost, suggested next actions). `/flow:inspect` never mutates state.
+Every run logs a budget (tokens, agent dispatches, USD estimate). `/agentflow:inspect budget <run-id>`
+aggregates cost across a run and its children; `/agentflow:board` is the session-start dashboard (active
+runs, blockers, cumulative cost, suggested next actions). `/agentflow:inspect` never mutates state.
 
 ## Recipes (layer 3)
 

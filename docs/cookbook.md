@@ -3,14 +3,14 @@
 Real scenarios, from a single command to a full multi-stage workflow.
 
 **How to read these.** You **don't type the flags** — you describe the goal in plain language and
-Claude picks the right Flow skill and runs it. Each scenario is laid out as:
+Claude picks the right Agent Flow skill and runs it. Each scenario is laid out as:
 
 - **You say** — what you actually type to Claude (natural language);
 - **Claude runs** — the command it translates that into (shown for transparency);
 - the **input** file(s) and the **result** you get.
 
 Mental model in one line: **`enumerate` makes a list → `foreach` works each item → `reduce` digests
-the results**, with `group` to partition, `repeat`/`until`/`while` to loop, and `pipe`/`compose`/`run`
+the results**, with `group` to partition, `repeat`/`until`/`while` to loop, and `pipe`/`create-workflow`/`run-workflow`
 to wire it all into a reusable workflow. State is on disk, so any of these survives across turns.
 
 ---
@@ -30,7 +30,7 @@ to wire it all into a reusable workflow. State is on disk, so any of these survi
 
 **Claude runs:**
 ```text
-/flow:foreach --checkbox TODO.md --prompt "Complete this task; report what you changed"
+/agentflow:foreach --checkbox TODO.md --prompt "Complete this task; report what you changed"
 ```
 
 Each `- [ ]` line becomes an item (the `[x]` line starts done; inline `{model:opus}` is a per-item
@@ -47,7 +47,7 @@ resumes. **Result** — with the checkbox view, finished tasks flip to `[x]` in 
 > "Each file in `tasks/todo/` is a job — work through them."
 
 ```text
-/flow:foreach --folder tasks --prompt "Do the task described in this file"
+/agentflow:foreach --folder tasks --prompt "Do the task described in this file"
 ```
 
 One file = one item; status comes from the folder (`todo/` / `in-progress/` / `done/`). As each item
@@ -60,7 +60,7 @@ all-pending. Same engine as the checklist; just a different **Source**.
 > "Summarize these 20 review files into an executive digest."
 
 ```text
-/flow:reduce --inputs reviews.json --prompt "Executive digest: severity rollup, top hotspots, recurring patterns" --output-format markdown
+/agentflow:reduce --inputs reviews.json --prompt "Executive digest: severity rollup, top hotspots, recurring patterns" --output-format markdown
 ```
 
 One agent reads all inputs (files, inline data, or another run's output) and writes a single digest.
@@ -72,7 +72,7 @@ The digest lands as a **visible file in your workspace** — `./<run-id>.md` (e.
 > "Break this book outline into a list of chapters I can draft."
 
 ```text
-/flow:enumerate --prompt "Expand this outline into chapters: id, title, one-line brief" --input outline.md
+/agentflow:enumerate --prompt "Expand this outline into chapters: id, title, one-line brief" --input outline.md
 ```
 
 The **unfold**: a spec in, a list out. Produces an `items.json` you can inspect, tweak, and then feed
@@ -83,7 +83,7 @@ to `foreach`. (If the list already exists — a glob, a file — skip this and p
 > "Keep fixing the build until it's green (max 8 tries)."
 
 ```text
-/flow:until --stage "npm run build" --stop "npm run build" --max-iterations 8
+/agentflow:until --stage "npm run build" --stop "npm run build" --max-iterations 8
 ```
 
 `--stage` and `--stop` are plain bash commands (pass JSON only for extra fields). `do…until` runs the
@@ -96,7 +96,7 @@ changing), or a `kill`.
 > "Run the flaky test 10 times and collect the failures."
 
 ```text
-/flow:repeat --stage "pytest tests/flaky_test.py" --times 10
+/agentflow:repeat --stage "pytest tests/flaky_test.py" --times 10
 ```
 
 A bounded count loop — no predicate, just N runs.
@@ -110,8 +110,8 @@ A bounded count loop — no predicate, just N runs.
 > "Draft every chapter of this outline."
 
 ```text
-/flow:enumerate --prompt "Outline → chapters (id, title, brief)" --input outline.md   # → chapters.json
-/flow:foreach --items chapters.json --prompt "Draft this chapter from data.brief; ~800 words"
+/agentflow:enumerate --prompt "Outline → chapters (id, title, brief)" --input outline.md   # → chapters.json
+/agentflow:foreach --items chapters.json --prompt "Draft this chapter from data.brief; ~800 words"
 ```
 
 Inspect `chapters.json` between the two steps to edit the plan before committing compute to drafting.
@@ -122,8 +122,8 @@ Inspect `chapters.json` between the two steps to edit the plan before committing
 
 ```text
 # 1. discover (a quick bash list with per-file content hashes for caching)
-# 2. /flow:foreach --items files.json --kind code-review --cache --prompt "Review this file"
-# 3. /flow:reduce --inputs <foreach run> --prompt "Digest: hotspots + recurring patterns"
+# 2. /agentflow:foreach --items files.json --kind code-review --cache --prompt "Review this file"
+# 3. /agentflow:reduce --inputs <foreach run> --prompt "Digest: hotspots + recurring patterns"
 ```
 
 This is exactly what the shipped `audit` recipe automates (Level 3, scenario 9).
@@ -133,9 +133,9 @@ This is exactly what the shipped `audit` recipe automates (Level 3, scenario 9).
 > "Group these migrations by table, then validate each group."
 
 ```text
-/flow:group --method regex --input-source migrations.json --method-config '{"pattern":"_(\\w+)_table","field":"id"}'
+/agentflow:group --method regex --input-source migrations.json --method-config '{"pattern":"_(\\w+)_table","field":"id"}'
 # groups.json is items.json-compatible:
-/flow:foreach --items <groups.json> --prompt "Validate this group of migrations together"
+/agentflow:foreach --items <groups.json> --prompt "Validate this group of migrations together"
 ```
 
 `group` output drops straight into `foreach`. Use `path-prefix` / `jsonpath` for deterministic keys,
@@ -151,7 +151,7 @@ or `llm-classify` when the key needs judgment (one agent returns the mapping; th
 
 **Claude runs:**
 ```text
-/flow:audit --target examples/fake-repo
+/agentflow:audit --target examples/fake-repo
 ```
 
 A layer-3 recipe: a shipped workflow-file ([`workflows/audit/workflow.json`](../workflows/audit/workflow.json)) wires
@@ -182,16 +182,16 @@ it's cheap.
 > "Build me a reusable workflow: pull open issues, triage each, then summarize."
 
 ```text
-/flow:compose "fetch open issues → triage each by severity → summarize the triage" --name triage
+/agentflow:create-workflow "fetch open issues → triage each by severity → summarize the triage" --name triage
 ```
 
-`compose` confirms the name (proposing one, or take your own), designs the `WorkflowSpec`, and writes
+`create-workflow` confirms the name (proposing one, or take your own), designs the `WorkflowSpec`, and writes
 a **self-contained folder** `workflows/triage/` (the `workflow.json` plus any scripts it needs,
 referenced via `{{workflow.dir}}` so the folder is movable), then validates + previews:
 
 ```text
-/flow:run workflows/triage/workflow.json --dry-run    # shows the resolved stage plan, runs nothing
-/flow:run workflows/triage/workflow.json              # init + drive to completion
+/agentflow:run-workflow workflows/triage/workflow.json --dry-run    # shows the resolved stage plan, runs nothing
+/agentflow:run-workflow workflows/triage/workflow.json              # init + drive to completion
 ```
 
 The folder is yours to version, move, edit (swap models, depth, prompts), and re-run.
@@ -218,7 +218,7 @@ branch itself is always deterministic code — never a judgment on free text.
 > "These are tiny edits — don't spin up 20 subagents."
 
 ```text
-/flow:foreach --items items.json --prompt "Apply this one-line fix" --execution main-thread
+/agentflow:foreach --items items.json --prompt "Apply this one-line fix" --execution main-thread
 ```
 
 `main-thread` processes each item inline in the orchestrator (no fan-out) — cheaper and simpler for
@@ -231,8 +231,8 @@ mechanics are identical; only who does the work changes.
 > keeping the glossary the previous chapter established."
 
 ```text
-/flow:foreach --items migrations.json --serial --prompt "Apply this migration"
-/flow:foreach --items chapters.json   --carry  --prompt "Translate; reuse terms from the previous chapter's output"
+/agentflow:foreach --items migrations.json --serial --prompt "Apply this migration"
+/agentflow:foreach --items chapters.json   --carry  --prompt "Translate; reuse terms from the previous chapter's output"
 ```
 
 `--serial` runs items strictly one at a time in list order (no parallel subagents) — for shared
@@ -248,15 +248,15 @@ checkpoint per item, so they resume mid-list across turns. Long operation? Keep 
 
 ```text
 # one per terminal, each takes a disjoint third of the list:
-/flow:foreach --items work.json --shard 0/3 --run-id work-0 --stop-file PAUSE --prompt "<op>"
-/flow:foreach --items work.json --shard 1/3 --run-id work-1 --stop-file PAUSE --prompt "<op>"
-/flow:foreach --items work.json --shard 2/3 --run-id work-2 --stop-file PAUSE --prompt "<op>"
+/agentflow:foreach --items work.json --shard 0/3 --run-id work-0 --stop-file PAUSE --prompt "<op>"
+/agentflow:foreach --items work.json --shard 1/3 --run-id work-1 --stop-file PAUSE --prompt "<op>"
+/agentflow:foreach --items work.json --shard 2/3 --run-id work-2 --stop-file PAUSE --prompt "<op>"
 ```
 
 `--shard k/N` keeps only the items at `index % N == k`, so the three runs are disjoint — separate
 state files, no locking, no double-processing (works with a `--folder` source too, since each shard
 moves only its own files). `touch PAUSE` and every worker stops claiming at its next checkpoint and
-won't auto-resume; delete `PAUSE` and nudge each session to continue. `/flow:board` shows all shards.
+won't auto-resume; delete `PAUSE` and nudge each session to continue. `/agentflow:board` shows all shards.
 
 ---
 
@@ -271,9 +271,9 @@ re-runs.
 ### 14. Watch cost and progress
 
 ```text
-/flow:board                        # active runs, blockers, cumulative cost, suggested next actions
-/flow:inspect tree <pipe-run-id>   # the full child tree of a pipeline
-/flow:inspect budget <run-id>      # tokens / agents / USD, aggregated across children
+/agentflow:board                        # active runs, blockers, cumulative cost, suggested next actions
+/agentflow:inspect tree <pipe-run-id>   # the full child tree of a pipeline
+/agentflow:inspect budget <run-id>      # tokens / agents / USD, aggregated across children
 ```
 
 Record usage as you go with `budget-add` so the totals are real.
