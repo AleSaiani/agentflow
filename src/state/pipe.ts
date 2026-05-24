@@ -49,6 +49,7 @@ import {
   statePath,
 } from "../common.js";
 import { runBash } from "../shell.js";
+import { parseWorkflowMd } from "../workflow_md.js";
 
 // Side-effect imports: register child primitives so getPrimitive() works in tick/advance.
 import "./enumerate.js";
@@ -270,7 +271,9 @@ function cmdInit(args: string[]): void {
   let workflowDir: string | null = null;
   let paramSpec: Record<string, unknown> = {};
   if (workflowPath) {
-    const wf = JSON.parse(readFileSync(workflowPath, "utf8"));
+    // WORKFLOW.md (human-authored markdown) compiles to the same WorkflowSpec object as a .json file.
+    const raw = readFileSync(workflowPath, "utf8");
+    const wf = workflowPath.toLowerCase().endsWith(".md") ? parseWorkflowMd(raw) : JSON.parse(raw);
     if (typeof wf !== "object" || wf === null || !Array.isArray(wf.stages))
       die("error: workflow file must be an object with a 'stages' array");
     stagesRaw = wf.stages;

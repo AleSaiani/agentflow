@@ -47,8 +47,8 @@ Create `.agentflow/audit/<run-id>/` (recipe scratch) and `.agentflow/pipe/<run-i
 
 ## Step 2 — Resolve the discover params
 
-The 6-stage structure is shipped as a **self-contained declarative workflow-file** at
-`${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json` (this is the canonical, reusable
+The 6-stage structure is shipped as a **self-contained, human-readable workflow-file** at
+`${CLAUDE_PLUGIN_ROOT}/workflows/audit/WORKFLOW.md` (this is the canonical, reusable
 artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the sibling
 `discover.mjs` via `{{workflow.dir}}` (so the whole `workflows/audit/` folder is movable);
 the script emits a /agentflow:foreach-compatible items array with a per-file `content_hash`
@@ -75,7 +75,7 @@ templates (`{{stages.<name>.run_id}}`, `{{stages.<name>.result_pointer}}`, `{{ru
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> \
-  --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json" \
+  --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/audit/WORKFLOW.md" \
   --param target="<resolved-target-path>" \
   [--param glob="**/*.cs"] [--param exclude="<globs>"] \
   [--no-stop-on-failure if user passed --keep-going] \

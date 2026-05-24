@@ -154,7 +154,7 @@ or `llm-classify` when the key needs judgment (one agent returns the mapping; th
 /agentflow:audit --target examples/fake-repo
 ```
 
-A layer-3 recipe: a shipped workflow-file ([`workflows/audit/workflow.json`](../workflows/audit/workflow.json)) wires
+A layer-3 recipe: a shipped workflow-file ([`workflows/audit/WORKFLOW.md`](../workflows/audit/WORKFLOW.md)) wires
 discover (bash) → review (`foreach`, cached) → partition (`group`) → digest (`reduce`). `pipe drive`
 auto-runs the deterministic stages and stops only for the two LLM stages.
 
@@ -291,4 +291,4 @@ session: `… foreach reset <run-id> --in-progress-to-pending`, then send any me
 
 - [reference.md](reference.md) — every skill, flag, and subcommand.
 - [concepts.md](concepts.md) — the model: state on disk, the Stop hook, the determinism boundary.
-- [`workflows/audit/workflow.json`](../workflows/audit/workflow.json) — a complete, real workflow-file to learn from.
+- [`workflows/audit/WORKFLOW.md`](../workflows/audit/WORKFLOW.md) — a complete, real workflow-file to learn from.

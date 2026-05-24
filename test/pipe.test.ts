@@ -105,7 +105,7 @@ test("pipe: the shipped audit workflow-file validates and inits (dogfood)", () =
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const repo = resolve(".");
   const env = { PIPE_STATE_DIR: dir, CLAUDE_PLUGIN_ROOT: repo };
-  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit", "workflow.json"), "--param", "target=examples/fake-repo"]);
+  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit", "WORKFLOW.md"), "--param", "target=examples/fake-repo"]);
   assert.equal(init.stages, 6);
   const status = run(env, ["status", "audit-x"]);
   assert.deepEqual(
@@ -118,7 +118,7 @@ test("pipe: {{workflow.dir}} resolves to the workflow file's folder (self-contai
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const repo = resolve(".");
   const env = { PIPE_STATE_DIR: dir };
-  const wf = join(repo, "workflows", "audit", "workflow.json");
+  const wf = join(repo, "workflows", "audit", "WORKFLOW.md");
   run(env, ["init", "wfdir", "--workflow", wf, "--param", "target=examples/fake-repo"]);
   const plan = run(env, ["plan", "wfdir"]);
   const discover = plan.plan.find((s: any) => s.name === "discover");
