@@ -61,7 +61,7 @@ import "./iterate.js";
 import "./reduce.js";
 
 const CMD = "pipe";
-const SUPPORTED_CHILD_CMDS = ["enumerate", "foreach", "group", "iterate", "reduce"];
+const SUPPORTED_CHILD_CMDS = ["enumerate", "foreach", "group", "iterate", "reduce", "step"];
 const PREVIEW_CHARS = 500;
 const STATUS_SKIPPED = "skipped";
 

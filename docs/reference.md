@@ -23,6 +23,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `repeat` / `until` / `while` | loop | run a stage by count / do…until / while…do |
 | `pipe` | compose | run an ordered pipeline of stages |
 | `queue` | shared queue | many workers drain one queue safely (atomic-rename claim, no locks) |
+| `step` | one unit | run ONE prompt once (inline / subagent / `claude -p` / `codex exec`); capture output |
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |
@@ -140,6 +141,24 @@ loops come from an `iterate` stage. Reads children's state to advance; never mut
 
 `drive` auto-handles bash, json, and deterministic `group` stages; it stops with
 `{"action":"needs_agent", …}` when an `enumerate`/`foreach`/`reduce`/`llm-classify` dispatch is required.
+
+### `step` — one LLM/work unit (any runtime)
+
+Run a single prompt once and capture its output — the unit between `reduce` (N→1) and `foreach`
+(N→N). `--runtime` picks who runs it: `main` (inline), `subagent` (one Agent), or the **sessionless
+CLIs** `claude-cli` (`claude -p <prompt> --output-format json`) / `codex-cli` (`codex exec <prompt>
+--json`), which the engine spawns itself via `step run`. This is what makes a workflow step an
+arbitrary skill, an MCP-using agent, a headless `claude -p`, or a different model (cross-model).
+
+**Invoke:** `/agentflow:step (--prompt "<text>" | --prompt-file <path>) --runtime main|subagent|claude-cli|codex-cli [--model …] [--subagent-type <name>] [--input <file>]`
+
+**CLI** (`dist/state/step.js`):
+- `init <id> (--prompt "…" | --prompt-file <path>) --runtime <r> [--model …] [--subagent-type …] [--input <file>] [--force] [--validate-only]`
+- `run <id>` — **CLI runtimes only**: the engine spawns the binary, captures + extracts the result, marks done/failed (binaries overridable via `$STEP_CLAUDE_BIN` / `$STEP_CODEX_BIN`)
+- `start <id>` · `complete <id> (--output "<text>" | --output-path <file>)` · `fail <id> --error "…"` — orchestrator path (main/subagent)
+- `status <id>` · `runs` · `budget-add`
+
+As a workflow stage: `## name · step` with `- runtime:` / `- model:` / `- prompt:` bullets.
 
 ### `queue` — shared work queue (many workers, no locks)
 

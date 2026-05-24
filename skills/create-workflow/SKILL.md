@@ -62,10 +62,11 @@ Prose here is ignored — use it for human notes.
 ```
 
 **Stage types** (`## name · <type>`): `bash` (a ```sh fence is the command), `json` (a `- value:`
-bullet or a ```json fence), or a primitive — `enumerate` | `foreach` | `group` | `reduce` | `iterate`
-(each `- key: value` bullet becomes `--key value`; a bare `true` becomes the flag alone). Any stage may
-carry `- when: <bash predicate>` (a guard: exit 0 runs, non-zero skips). Forward-compatible: `## … ·
-skill` / `· step` slots are parsed but not yet executable.
+bullet or a ```json fence), or a primitive — `enumerate` | `foreach` | `group` | `reduce` | `iterate` |
+`step` (each `- key: value` bullet becomes `--key value`; a bare `true` becomes the flag alone). Any
+stage may carry `- when: <bash predicate>` (a guard: exit 0 runs, non-zero skips). A `· step` stage runs
+one prompt with a chosen `- runtime:` (`main`/`subagent`/`claude-cli`/`codex-cli`) — the way to invoke
+an arbitrary skill, an MCP-using agent, `claude -p`, or a different model as a step.
 
 **Params** make a workflow reusable without editing it: declare them in frontmatter, reference them as
 `{{params.<name>}}` in any stage (use `|shell` when injecting into a `bash` command), and the user
@@ -89,6 +90,7 @@ Each `## name · <cmd>` stage's bullets become that primitive's flags (`- key: v
 | `group` | partition | `- method: path-prefix\|regex\|jsonpath\|llm-classify` · `- input-source: <descriptor>` · `- method-config: {…}` |
 | `reduce` | fold N→1 | `- inputs: <descriptor>` · `- prompt: <synthesis>` · `- output-format: markdown\|json` |
 | `iterate` | loop | `- stage: <cmd>` · `- stop: <predicate>` (or use a `bash` stage that calls iterate.js) |
+| `step` | one unit | `- runtime: main\|subagent\|claude-cli\|codex-cli` · `- prompt: <text>` · `- model: …` |
 
 Bridge primitives with small **json** stages that build input descriptors, e.g. a `- value:`
 of `{ "source": "run", "cmd": "foreach", "run_id": "{{stages.review.run_id}}" }`.

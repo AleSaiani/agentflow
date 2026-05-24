@@ -27,7 +27,7 @@
  * stage becomes the `{type:"bash", command}` guard.
  */
 const STAGE_HEADING = /^##\s+(?:\d+[.)]\s*)?(.+?)\s*(?:·\s*|\(\s*)([a-z][a-z-]*)\s*\)?\s*$/;
-const PRIMITIVE_TYPES = ["enumerate", "foreach", "group", "reduce", "iterate"];
+const PRIMITIVE_TYPES = ["enumerate", "foreach", "group", "reduce", "iterate", "step"];
 function unquote(s) {
     const t = s.trim();
     if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))

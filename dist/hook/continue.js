@@ -24,6 +24,7 @@ import "../state/group.js";
 import "../state/iterate.js";
 import "../state/reduce.js";
 import "../state/queue.js";
+import "../state/step.js";
 import "../state/pipe.js";
 function findActiveRun() {
     for (const [cmd, spec] of PRIMITIVES) {
