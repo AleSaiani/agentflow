@@ -170,29 +170,37 @@ export function loadFolder(base) {
  */
 export function writeFolderView(base, items) {
     let moved = 0;
-    for (const it of items) {
-        const file = String(it.data?.["file"] ?? it.id);
-        let curr = null;
-        for (const [name] of KANBAN) {
-            const p = join(base, name, file);
-            if (existsSync(p)) {
-                curr = p;
-                break;
-            }
-        }
-        if (!curr && existsSync(join(base, file)))
-            curr = join(base, file);
-        if (!curr)
-            continue;
-        const dest = join(base, kanbanFolder(it.status));
-        mkdirSync(dest, { recursive: true });
-        const destPath = join(dest, file);
-        if (resolve(curr) !== resolve(destPath)) {
-            renameSync(curr, destPath);
+    for (const it of items)
+        if (moveKanbanItem(base, it.id, it.data, it.status))
             moved++;
+    return moved;
+}
+/**
+ * Move ONE kanban file (by its `data.file`, falling back to `id`) into the folder matching `status`
+ * (pending→todo, in_progress→in-progress, done/failed→done). Returns true if it actually moved.
+ * Called automatically by /flow:foreach on claim/complete so the board stays live without an extra step.
+ */
+export function moveKanbanItem(base, id, data, status) {
+    const file = String(data?.["file"] ?? id);
+    let curr = null;
+    for (const [name] of KANBAN) {
+        const p = join(base, name, file);
+        if (existsSync(p)) {
+            curr = p;
+            break;
         }
     }
-    return moved;
+    if (!curr && existsSync(join(base, file)))
+        curr = join(base, file);
+    if (!curr)
+        return false;
+    const dest = join(base, kanbanFolder(status));
+    mkdirSync(dest, { recursive: true });
+    const destPath = join(dest, file);
+    if (resolve(curr) === resolve(destPath))
+        return false;
+    renameSync(curr, destPath);
+    return true;
 }
 /**
  * Checkbox write-back View: re-read the markdown and toggle each checkbox to reflect the

@@ -15,7 +15,7 @@ a claim; do them in order. Steps marked **(you)** are run interactively in Claud
 
 There is no daemon and no polling. It's a **Claude Code `Stop` hook**:
 
-1. Every run writes its state to a file on disk (`.foreach/<id>/state.json`, etc.).
+1. Every run writes its state to a file on disk (`.flow/foreach/<id>/state.json`, etc.).
 2. When Claude finishes a turn, Claude Code fires the `Stop` hook — Flow wires
    `node "$CLAUDE_PLUGIN_ROOT/dist/hook/continue.js"` (see `hooks/hooks.json`).
 3. The hook scans every run's state. If one has `auto_continue` **and** residual work (items pending,
@@ -36,7 +36,7 @@ guess — check the ground truth, which is **on disk**:
 
 - **`/flow:board`** (or `node dist/inspect.js runs`) lists every run. **Zero runs after a request means
   the skill did not fire** — Claude handled it inline.
-- The state dirs (`.foreach/`, `.pipe/`, `.audit/`, …) appear only when a skill actually ran.
+- The state dirs (`.flow/foreach/`, `.flow/pipe/`, `.flow/audit/`, …) appear only when a skill actually ran.
 - **`claude --debug`** logs plugin/skill/hook activity (including Stop-hook firings).
 - Each Flow skill also **announces itself in one line** when it starts.
 

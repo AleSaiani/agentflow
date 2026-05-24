@@ -17,6 +17,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 
@@ -43,7 +44,7 @@ import {
   saveAtomic,
   statePath,
 } from "../common.js";
-import { loadSource, writeChecklistView, writeFolderView } from "../source.js";
+import { loadSource, moveKanbanItem, writeChecklistView, writeFolderView } from "../source.js";
 
 const CMD = "foreach";
 
@@ -115,6 +116,32 @@ function resolveItems(values: Record<string, unknown>): Item[] {
     if (r["task"]) item.task = r["task"] as Item["task"];
     return item;
   });
+}
+
+/**
+ * Resolve the kanban folder base if this run is folder-backed (via `--folder` or a folder
+ * SourceSpec). Stored in config so claim/complete/fail can auto-move files without a `view` step.
+ */
+function folderBaseFromValues(values: Record<string, unknown>): string | null {
+  const folder = values["folder"] as string | undefined;
+  if (folder) return resolve(folder);
+  const sourceJson = values["source"] as string | undefined;
+  if (sourceJson) {
+    try {
+      const spec = JSON.parse(sourceJson);
+      if (spec && spec.source === "folder" && typeof spec.path === "string") return resolve(spec.path);
+    } catch {
+      /* resolveItems re-parses and surfaces the real error */
+    }
+  }
+  return null;
+}
+
+/** Folder-backed runs: move the item's file into the folder matching its current status. No-op otherwise. */
+function syncKanban(state: StateDict, item: StateDict): void {
+  const base = (state["config"] as StateDict)?.["folder"];
+  if (!base) return;
+  moveKanbanItem(String(base), String(item["id"]), item["data"], String(item["status"]));
 }
 
 function cmdInit(args: string[]): void {
@@ -193,6 +220,7 @@ function cmdInit(args: string[]): void {
       execution,
       kind,
       cache: Boolean(values["cache"]),
+      folder: folderBaseFromValues(values),
     },
     { task_prompt: effectiveTaskPrompt, items },
   );
@@ -215,6 +243,9 @@ function cmdInit(args: string[]): void {
     }
   }
   finalizeStatusIfTerminal(state);
+  // Folder-backed: project any pre-completed (cache-hit) items onto the board now.
+  if ((state["config"] as StateDict)["folder"])
+    for (const it of Object.values(state["items"]) as StateDict[]) syncKanban(state, it);
 
   const p = pathFor(runId);
   if (existsSync(p) && !values["force"]) die(`error: state already exists at ${p}; use --force to overwrite`);
@@ -257,6 +288,7 @@ function cmdClaim(args: string[]): void {
     }
   }
   if (claimed.length > 0 && state["status"] === STATUS_PENDING) markInProgress(state);
+  for (const item of claimed) syncKanban(state, item); // todo/ → in-progress/
   save(runId, state);
   print(claimed);
 }
@@ -278,6 +310,7 @@ function cmdComplete(args: string[]): void {
   item["result"] = values["result"] ? JSON.parse(values["result"] as string) : null;
   item["error"] = null;
   maybeStoreCache(state, item);
+  syncKanban(state, item); // in-progress/ → done/
   finalizeStatusIfTerminal(state);
   save(runId, state);
   print({ id: itemId, status: STATUS_DONE, run_status: state["status"] });
@@ -304,6 +337,7 @@ function cmdFail(args: string[]): void {
     item["completed_at"] = now();
   }
   item["error"] = values["error"];
+  syncKanban(state, item); // failed → done/ (terminal); retry → back to todo/
   finalizeStatusIfTerminal(state);
   save(runId, state);
   print({ id: itemId, status: item["status"], attempts: item["attempts"], run_status: state["status"] });
@@ -427,6 +461,7 @@ function cmdCompleteBatch(args: string[]): void {
       }
       item["error"] = err;
     }
+    syncKanban(state, item); // project each item's new status onto the board
   }
   finalizeStatusIfTerminal(state);
   save(runId, state);

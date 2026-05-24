@@ -65,18 +65,19 @@ first. If no source and no operation can be inferred → ask one short clarifyin
 
 ## Folder-kanban flow (`--folder`)
 
-With `--folder`, status is tracked in `state.json` (authoritative) — **the engine does not move files
-on its own.** You don't need to read the engine source; the flow is:
+With `--folder`, `state.json` is authoritative **and the engine moves the files for you,
+automatically** — you don't run `view` and you don't read the engine source. The file base is stored
+in `config.folder` at `init`; every state transition projects onto the board in the same call:
 
-- `claim` marks an item `in_progress`; `complete`/`complete-batch` marks it `done` (or `failed`).
-- To project that onto the folders, run the **view** write-back — it moves each task file into
-  `todo/` / `in-progress/` / `done/` to match its status (creating the subfolders as needed):
-  ```bash
-  node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" view <run-id> --folder <dir>
-  ```
-- Run `view` **at the end** (everything lands in `done/`), and optionally **after each claim wave** to
-  show items passing through `in-progress/`. Each item's `data.file` is its filename; `data.path` is
-  the absolute path to read while processing.
+- `claim` → moves the item's file `todo/ → in-progress/`.
+- `complete` / `complete-batch` → moves it `in-progress/ → done/` (a terminal `fail` also lands in
+  `done/`; a retried item goes back to `todo/`).
+- The subfolders are created on demand; a flat folder (no subfolders) is treated as all-pending, and
+  files migrate into `todo/`/`in-progress/`/`done/` as they're worked.
+
+Each item's `data.file` is its filename; `data.path` is the absolute path to read while processing.
+`view <run-id> --folder <dir>` still exists as a **manual resync** (e.g. after editing state by hand),
+but you should not need it during a normal run.
 
 ## Step 0 — Load defaults
 
@@ -179,7 +180,7 @@ For each iteration (safety cap: max 100):
 
 3. **Split into chunks**: divide the array into at most `concurrency` chunks, each with up to `chunk_size` items. If claim returned fewer items than expected (end of queue), make smaller chunks — one chunk per Agent.
 
-4. **Prepare chunk files**: write each chunk (array of items) to `.foreach/<run-id>/wave-<W>-chunk-<N>.json` via `Write`. Subagents read this as compact input; the orchestrator keeps it as reference if a subagent fails to write.
+4. **Prepare chunk files**: write each chunk (array of items) to `.flow/foreach/<run-id>/wave-<W>-chunk-<N>.json` via `Write`. Subagents read this as compact input; the orchestrator keeps it as reference if a subagent fails to write.
 
 5. **Parallel fan-out**: launch one Agent **per chunk**, **all in the same message** (single message, multiple `Agent` tool uses). For each Agent:
    - `subagent_type`: from config (default `general-purpose`)
@@ -187,11 +188,11 @@ For each iteration (safety cap: max 100):
    - `description`: short, format `enum:<run-id>:chunk-<N>`
    - `prompt`: **self-contained** (the subagent does not see this conversation). Include:
      - the **enriched** task-prompt from preflight (see Step 1.5)
-     - chunk file path: `.foreach/<run-id>/wave-<W>-chunk-<N>.json` (list of `{id, data}`)
-     - output file path: `.foreach/<run-id>/results-chunk-<N>.json`
+     - chunk file path: `.flow/foreach/<run-id>/wave-<W>-chunk-<N>.json` (list of `{id, data}`)
+     - output file path: `.flow/foreach/<run-id>/results-chunk-<N>.json`
      - **strict I/O rules**:
        - "Run the analysis silently. DO NOT comment while working. DO NOT emit draft output."
-       - "When done, write the result to `.foreach/<run-id>/results-chunk-<N>.json` via the `Write` tool: a JSON array `[{"id": "...", "ok": true|false, "result": <any>, "error": <string|null>}, ...]` covering ALL items in the chunk."
+       - "When done, write the result to `.flow/foreach/<run-id>/results-chunk-<N>.json` via the `Write` tool: a JSON array `[{"id": "...", "ok": true|false, "result": <any>, "error": <string|null>}, ...]` covering ALL items in the chunk."
        - "The array MUST be the ONLY thing in the file. No prose, no markdown fence."
        - "Your final response to the orchestrator must be: a single line `OK <N>` where N is the count of items processed. Nothing else."
 
@@ -209,7 +210,7 @@ For each iteration (safety cap: max 100):
 
    **6b. State commit**:
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" complete-batch <run-id> --results .foreach/<run-id>/results-chunk-<N>.json
+   node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" complete-batch <run-id> --results .flow/foreach/<run-id>/results-chunk-<N>.json
    ```
    `complete-batch` reads the array and commits in one shot (atomic save). Items with `ok: false` are placed in retry/failed automatically following `max_retries`.
 
@@ -232,7 +233,7 @@ Print: totals per status, and — if any `failed` — a compact list with error 
 ## Cross-turn auto-continue
 
 A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) exists that:
-- at the end of each turn, scans `.foreach/`,
+- at the end of each turn, scans `.flow/foreach/`,
 - if it finds a run with `auto_continue=true` and residual work,
 - forces Claude to continue in the next turn with the instruction "resume /flow:foreach <run-id>".
 

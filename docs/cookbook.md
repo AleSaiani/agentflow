@@ -48,14 +48,12 @@ resumes. **Result** — with the checkbox view, finished tasks flip to `[x]` in 
 
 ```text
 /flow:foreach --folder tasks --prompt "Do the task described in this file"
-# then, to reflect progress on disk:
-/flow:foreach view <run-id> --folder tasks
 ```
 
-One file = one item; status comes from the folder (`todo/` / `in-progress/` / `done/`). The **view**
-moves each file into the folder matching its status — a kanban you watch in your file tree. A flat
-folder (no subfolders) is treated as all-pending. Same engine as the checklist; just a different
-**Source**.
+One file = one item; status comes from the folder (`todo/` / `in-progress/` / `done/`). As each item
+is claimed and completed, the engine **moves its file across the folders automatically** — a kanban
+you watch live in your file tree, no extra command. A flat folder (no subfolders) is treated as
+all-pending. Same engine as the checklist; just a different **Source**.
 
 ### 2. Summarize many results into one report
 
@@ -66,7 +64,7 @@ folder (no subfolders) is treated as all-pending. Same engine as the checklist; 
 ```
 
 One agent reads all inputs (files, inline data, or another run's output) and writes a single digest.
-The artifact lands at `.reduce/<run-id>/` and is returned to you.
+The artifact lands at `.flow/reduce/<run-id>/` and is returned to you.
 
 ### 3. Turn an outline into a structured list
 
@@ -231,7 +229,7 @@ mechanics are identical; only who does the work changes.
 ### 13. Cheap re-runs with caching
 
 Add `--cache` to `foreach` (the `audit` recipe does). Items carry a `data.content_hash`; on re-run,
-unchanged items hit the cache (`.cache/`) and skip dispatch entirely. Change one file → only that item
+unchanged items hit the cache (`.flow/cache/`) and skip dispatch entirely. Change one file → only that item
 re-runs.
 
 ### 14. Watch cost and progress

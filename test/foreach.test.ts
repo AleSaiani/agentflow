@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -89,6 +89,34 @@ test("foreach CLI: complete-batch + fail/retry + reset", () => {
   const reset = run(dir, ["reset", "r2", "--failed-to-pending"]);
   assert.equal(reset.reset, 1);
   assert.equal(run(dir, ["status", "r2"]).pending, 1);
+});
+
+test("foreach CLI: --folder auto-moves files todo→in-progress→done on claim/complete", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const board = join(dir, "tasks");
+  mkdirSync(join(board, "todo"), { recursive: true });
+  writeFileSync(join(board, "todo", "a.md"), "do a", "utf8");
+  writeFileSync(join(board, "todo", "b.md"), "do b", "utf8");
+
+  const init = run(dir, ["init", "rf", "--folder", board]);
+  assert.equal(init.total, 2);
+  // both files still in todo/ right after init
+  assert.ok(existsSync(join(board, "todo", "a.md")));
+
+  // claim one → its file moves todo/ → in-progress/, no view step
+  const claimed = run(dir, ["claim", "rf", "--count", "1"]);
+  const id = claimed[0].id; // sorted → "a.md"
+  assert.ok(existsSync(join(board, "in-progress", id)), "claimed file should be in in-progress/");
+  assert.ok(!existsSync(join(board, "todo", id)));
+
+  // complete it → moves in-progress/ → done/
+  run(dir, ["complete", "rf", id]);
+  assert.ok(existsSync(join(board, "done", id)), "completed file should be in done/");
+  assert.ok(!existsSync(join(board, "in-progress", id)));
+
+  // the untouched item stays in todo/
+  const other = id === "a.md" ? "b.md" : "a.md";
+  assert.ok(existsSync(join(board, "todo", other)));
 });
 
 test("foreach CLI: validate-only does not read items or write state", () => {

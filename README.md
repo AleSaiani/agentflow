@@ -189,7 +189,7 @@ claude --plugin-dir .
 
 ## How it works
 
-Each run is a `state.json` under `.<cmd>/<run-id>/` at the workspace root; the orchestrator (Claude)
+Each run is a `state.json` under `.flow/<cmd>/<run-id>/` at the workspace root; the orchestrator (Claude)
 is the only writer. A `Stop` hook scans every run and, if one has `auto_continue` and residual work
 (under its cap), blocks the turn and tells Claude how to resume — purely from disk, so runs survive
 compaction. `/flow:pipe` reads its children's state to decide when to advance and never mutates them;

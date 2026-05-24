@@ -75,11 +75,11 @@ If the user typed `/flow:reduce` explicitly → skip the guardrail.
 
 ## Step 2 — Init state
 
-Write the inputs descriptor to `.reduce/<run-id>/inputs-spec.json` (the parsed list). Then:
+Write the inputs descriptor to `.flow/reduce/<run-id>/inputs-spec.json` (the parsed list). Then:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" init <run-id> \
-  --inputs .reduce/<run-id>/inputs-spec.json \
+  --inputs .flow/reduce/<run-id>/inputs-spec.json \
   --task-prompt "<task-prompt>" \
   --model <model> --output-format <markdown|json> \
   --max-auto-continues <N> \
@@ -93,7 +93,7 @@ If the run-id exists **without `--force`**: ask the user `resume` (re-dispatch t
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" materialize <run-id> \
-  --out .reduce/<run-id>/inputs.json
+  --out .flow/reduce/<run-id>/inputs.json
 ```
 
 This walks every input descriptor and produces a single JSON the agent will read. Run-typed inputs only include items with `status == done` (others appear with `result: null`).
@@ -112,8 +112,8 @@ Launch ONE Agent (no fan-out). The prompt is **self-contained**:
 - `description`: `reduce:<run-id>`
 - `prompt`:
   - the user's task-prompt verbatim
-  - inputs file path: `.reduce/<run-id>/inputs.json` (read this with the `Read` tool)
-  - output file path: `.reduce/<run-id>/digest.<md|json>` (extension matches `output_format`)
+  - inputs file path: `.flow/reduce/<run-id>/inputs.json` (read this with the `Read` tool)
+  - output file path: `.flow/reduce/<run-id>/digest.<md|json>` (extension matches `output_format`)
   - **strict I/O rules**:
     - "Read the inputs file. Synthesize the requested digest. Do NOT comment while working."
     - "Write the digest to the output path via the `Write` tool. The file MUST be ONLY the digest — no preamble, no markdown fence around the whole thing (markdown content inside is fine for `format: markdown`)."
@@ -135,7 +135,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" budget-add <run-id> \
 If the agent returned `OK` and the output file exists:
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/reduce.js" complete <run-id> \
-  --output-path .reduce/<run-id>/digest.<md|json>
+  --output-path .flow/reduce/<run-id>/digest.<md|json>
 ```
 
 Otherwise:
@@ -151,7 +151,7 @@ Print a one-liner: `run-id`, `status`, `output_pointer`, byte size of the digest
 
 ## Cross-turn auto-continue
 
-A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.reduce/` (alongside other primitives). For /flow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /flow:reduce run-id:
+A **Stop hook** (`${CLAUDE_PLUGIN_ROOT}/dist/hook/continue.js`) scans `.flow/reduce/` (alongside other primitives). For /flow:reduce, "residual work" = `status in {"pending", "in_progress"}` AND `auto_continues < max_auto_continues`. If you are re-activated by the hook with a /flow:reduce run-id:
 - DO NOT re-init.
 - Read the state. If `status == in_progress` and the output file is absent → re-dispatch (Step 5).
 - If the output file IS present → call `complete` (Step 6).

@@ -47,5 +47,5 @@ stop_on_failure: true               # if any stage fails, the audit aborts
   layout. Adjust depth or switch to `jsonpath` if your project is flatter or carries
   component metadata in a field.
 
-- This recipe does NOT modify any files. Outputs land under `.audit/<run-id>/`
-  (the pipe run's directory) and the per-file review state under `.foreach/<run-id>-s1-foreach/`.
+- This recipe does NOT modify any files. Outputs land under `.flow/audit/<run-id>/`
+  (the pipe run's directory) and the per-file review state under `.flow/foreach/<run-id>-s1-foreach/`.

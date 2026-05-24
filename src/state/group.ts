@@ -5,8 +5,8 @@
  * jsonpath) and an LLM-classify method (dispatch ONE agent that returns the
  * {item_id -> group_id} mapping). Single-writer: the orchestrator owns state writes.
  *
- * Output `.group/<run-id>/groups.json` is items.json-compatible: a JSON array of group
- * items `{id, data:{group_id, items, size}}` — feed directly to /enumerate. Faithful port
+ * Output `.flow/group/<run-id>/groups.json` is items.json-compatible: a JSON array of group
+ * items `{id, data:{group_id, items, size}}` — feed directly to /flow:foreach. Faithful port
  * of `group_state.py`.
  */
 

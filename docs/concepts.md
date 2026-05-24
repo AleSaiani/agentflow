@@ -5,8 +5,8 @@ it run before you read about it.
 
 ## Runs are state on disk
 
-Every invocation of a primitive creates a **run**: a `state.json` under `.<cmd>/<run-id>/` at the
-workspace root (`.enumerate/`, `.group/`, `.iterate/`, `.pipe/`, `.reduce/`). The state is the single
+Every invocation of a primitive creates a **run**: a `state.json` under `.flow/<cmd>/<run-id>/` at the
+workspace root (`.flow/enumerate/`, `.flow/group/`, `.flow/iterate/`, `.flow/pipe/`, `.flow/reduce/`). The state is the single
 source of truth — it holds the items, their statuses, results, config, and a budget log.
 
 **The orchestrator (Claude) is the only writer.** Subagents process work and write *result files*;

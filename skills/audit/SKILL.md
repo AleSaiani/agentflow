@@ -43,7 +43,7 @@ Echo the resolved config + run-id in one line. If target has > 200 files, ask fo
 
 ## Step 1 — Working dirs
 
-Create `.audit/<run-id>/` (recipe scratch) and `.pipe/<run-id>/` (pipeline state).
+Create `.flow/audit/<run-id>/` (recipe scratch) and `.flow/pipe/<run-id>/` (pipeline state).
 
 ## Step 2 — Export the discover env vars
 
@@ -123,8 +123,8 @@ When `drive` returns `done`:
 ## Important rules
 
 - **Idempotence**: re-running with the same `--run-id` (or the same `--target` if run-id is auto-derived) resumes. With the manifest hash in run-id derivation: a file content change → new run-id → fresh run. Pure resume of a half-completed run uses the SAME run-id.
-- **No file modification**: this recipe is read-only on the target. Outputs land under `.audit/<run-id>/`, `.pipe/<run-id>/`, `.foreach/<run-id>-s1-foreach/`, `.group/<run-id>-s3-partition/`, `.reduce/<run-id>-s5-digest/`.
-- **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.cache/foreach-code-review/`.
+- **No file modification**: this recipe is read-only on the target. Outputs land under `.flow/audit/<run-id>/`, `.flow/pipe/<run-id>/`, `.flow/foreach/<run-id>-s1-foreach/`, `.flow/group/<run-id>-s3-partition/`, `.flow/reduce/<run-id>-s5-digest/`.
+- **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.flow/cache/foreach-code-review/`.
 - **Validate then drive**: trust the dry-run validation `/flow:pipe init` performs. Catches recipe typos before any agent dispatch.
 
 ## Quick example
@@ -140,6 +140,6 @@ Expected on the bundled fake-repo (8 files, 4 components, 6 with intentional bug
 - stage partition runs /flow:group path-prefix depth=1 → 4 groups (auth, billing, api, data)
 - stage build-digest-inputs materializes the reduce inputs
 - stage digest dispatches /flow:reduce (opus, markdown) → executive report
-- Final digest at `.reduce/<run-id>-s5-digest/digest.md`
+- Final digest at `.flow/reduce/<run-id>-s5-digest/digest.md`
 
 Re-running the same command without changing fake-repo: the same run-id is regenerated, all 8 review items become cache hits → no agent dispatch for review → only the digest runs again (still costs ~$0.10 for the opus call). If you change one file, only that file dispatches a new review agent.

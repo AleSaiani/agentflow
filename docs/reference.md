@@ -2,7 +2,7 @@
 
 Everything Flow can do, and how. You normally invoke a **skill** (`/flow:<name>`) and Claude drives
 the underlying CLI for you; the CLI is documented here too for power users and for understanding what
-the skill does. All state lives in `state.json` under `.<cmd>/<run-id>/` at the workspace root.
+the skill does. All state lives in `state.json` under `.flow/<cmd>/<run-id>/` at the workspace root.
 
 - [Quick map](#quick-map)
 - [The primitives](#the-primitives) — enumerate · foreach · reduce · group · loops · pipe
@@ -223,7 +223,7 @@ Authoritative state always stays in `state.json`; the View is a projection.
 - **Budget.** Record usage with `budget-add <id> --tokens N --model <m>`; inspect with
   `/flow:inspect budget <id>` (aggregates across children).
 - **Cache.** `foreach --cache` skips items whose `data.content_hash` matched a prior result
-  (`.cache/`), making re-runs cheap.
+  (`.flow/cache/`), making re-runs cheap.
 - **Models.** `--model inherit|haiku|sonnet|opus` (and per-item overrides). Optional — work can run
   in the main thread (`--execution main-thread`) with no subagent at all.
 - **Determinism boundary.** The LLM produces structured data; branching (`when`, loop predicates) is

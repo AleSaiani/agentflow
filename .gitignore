@@ -8,15 +8,9 @@ node_modules/
 coverage/
 
 # Runtime state produced by the primitives when run inside a workspace.
+# Everything lives under a single .flow/ dir (.flow/<cmd>/<run-id>/, .flow/cache, .flow/knowledge).
 # Never commit run state — it is per-invocation, per-machine.
-.enumerate/
-.group/
-.iterate/
-.pipe/
-.reduce/
-.audit/
-.knowledge/
-.cache/
+.flow/
 
 # Claude Code local (machine-specific) settings. STATUS.md stays tracked.
 .claude/settings.local.json
