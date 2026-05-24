@@ -10,6 +10,9 @@ argument-hint: --times N --stage "<bash command>"
 
 # /flow:repeat — fixed-count loop
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 Engine: `iterate` (runs show as `cmd: iterate` in `/flow:inspect`). A repeat is an iterate with a
 never-satisfied predicate, so it terminates only at `--times`.
 

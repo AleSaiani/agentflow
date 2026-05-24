@@ -12,6 +12,9 @@ argument-hint: "<describe the workflow>" [--name NAME]
 
 # /flow:compose — author a workflow-file
 
+> **Make it visible:** tell the user in one line when you start authoring (and the target file path),
+> so it's clear this skill is running.
+
 You design a `WorkflowSpec` JSON that wires the primitives, save it to `workflows/<name>.json`,
 validate it, and hand it to `/flow:run`. Compiles 1:1 into a `/flow:pipe` — no new engine.
 

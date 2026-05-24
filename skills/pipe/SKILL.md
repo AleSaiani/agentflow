@@ -18,6 +18,9 @@ argument-hint: (--stages <json> | --workflow <json>) [--context-policy summary|n
 
 # /flow:pipe
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/pipe/` (this folder: SKILL.md + defaults.md)
 > - `${CLAUDE_PLUGIN_ROOT}/dist/` (`common.js`, `state/pipe.js`, plus all child primitives' state.py)

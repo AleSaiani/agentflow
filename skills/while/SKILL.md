@@ -10,6 +10,9 @@ argument-hint: --stage "<bash>" --stop "<bash predicate>" --mode while [--max-it
 
 # /flow:while — while…do loop (check-first)
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 Engine: `iterate` with `--check-first`. `while` mode: the predicate exits **0 while still true** →
 keep running; non-zero → stop. Because the check runs first, the stage may execute zero times.
 

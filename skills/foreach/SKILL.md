@@ -22,6 +22,9 @@ argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <sp
 
 # /flow:foreach
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/foreach/` (this folder: SKILL.md + defaults.md + task-kinds.md)
 > - `${CLAUDE_PLUGIN_ROOT}/dist/` (`common.js`, `state/foreach.js`) — shared framework across primitives

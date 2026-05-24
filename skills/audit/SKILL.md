@@ -18,6 +18,9 @@ argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|son
 
 # /flow:audit
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 You are the orchestrator of a `/flow:audit` recipe. Your job is to **construct a 6-stage pipeline.json**, hand it to `/flow:pipe`, and let the framework drive execution. The recipe itself adds no new primitives.
 
 ## Step 0 — Resolve config + compute manifest hash for the run-id

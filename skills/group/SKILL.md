@@ -17,6 +17,9 @@ argument-hint: --method path-prefix|regex|jsonpath|llm-classify --input-source <
 
 # /flow:group
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 > **Portable bundle**. To use this skill in another project, copy:
 > - `${CLAUDE_PLUGIN_ROOT}/skills/group/` (this folder: SKILL.md + defaults.md)
 > - `${CLAUDE_PLUGIN_ROOT}/dist/` (`common.js`, `state/group.js`) — shared framework

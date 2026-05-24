@@ -28,6 +28,23 @@ There is no daemon and no polling. It's a **Claude Code `Stop` hook**:
 Because step 3 reads only the disk, it works **across turns and across context compaction** — the
 conversation history is irrelevant to resuming. That's the property Level 2 and Level 5 below confirm.
 
+## Is the skill actually running? (observability)
+
+Autonomous triggering from natural language is **best-effort**: for small or familiar asks Claude
+often just does the work inline (and for ≤2 items that's the intended count-gate behavior). So don't
+guess — check the ground truth, which is **on disk**:
+
+- **`/flow:board`** (or `node dist/inspect.js runs`) lists every run. **Zero runs after a request means
+  the skill did not fire** — Claude handled it inline.
+- The state dirs (`.foreach/`, `.pipe/`, `.audit/`, …) appear only when a skill actually ran.
+- **`claude --debug`** logs plugin/skill/hook activity (including Stop-hook firings).
+- Each Flow skill also **announces itself in one line** when it starts.
+
+**To exercise a skill deterministically, invoke it explicitly** (`/flow:foreach …`): that bypasses the
+model's judgment and the count gate. Use explicit invocation to test the *mechanism*; use natural
+language separately to test whether *triggering* fires on its own — and confirm either way with
+`/flow:board`.
+
 ## Install
 
 From the plugin directory (no GitHub needed — `dist/` is committed):
@@ -59,13 +76,16 @@ Confirms Node, paths, and the engine work before spending any model calls. From 
 
 Expect `{"action":"done", …}`. If this fails, fix the environment before going on.
 
-## Level 1 — skill loads + natural-language trigger **(you)**
+## Level 1 — skill loads + invocation **(you)**
 
-- Type `/flow:board` → expect the dashboard (probably "Nothing active. Clean slate.").
-- Then, in plain language (do **not** type flags): *"Work through every unchecked task in
-  `examples/TODO.md`."* Expect Claude to recognize this as a `foreach` over the checklist. There are
-  3 tasks, so it may ask whether to use the durable mechanism or just do them inline (the count gate)
-  — either answer is fine; pick "durable" to exercise the machinery.
+- `/flow:board` → the dashboard ("Nothing active. Clean slate.").
+- **Deterministic first** — invoke explicitly so it definitely runs:
+  `/flow:foreach --checkbox examples/TODO.md --prompt "summarize the file this task names"`.
+  Then `/flow:board` → you should now see a `foreach` run. This proves the skill + state work.
+- **Then test triggering** — in plain language: *"Work through every unchecked task in
+  `examples/TODO.md`."* Run `/flow:board` again: a new run = it auto-fired; still nothing = Claude did
+  it inline (expected for a 3-item list — the count gate prefers inline below ~3). Both are valid; the
+  point is you can now *tell* which happened.
 
 ## Level 2 — automatic cross-turn resume (the key test) **(you)**
 

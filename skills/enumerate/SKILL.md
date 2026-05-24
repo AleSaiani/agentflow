@@ -16,6 +16,9 @@ argument-hint: --prompt "<instructions>" [--input <path>] [--model haiku|sonnet|
 
 # /flow:enumerate — unfold (1 → N)
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 Produce a JSON array of items from a spec. You are the single writer of run state; the generator
 agent only writes the items file.
 

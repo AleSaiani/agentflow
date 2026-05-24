@@ -10,6 +10,9 @@ argument-hint: <workflow.json> [--run-id NAME] [--dry-run]
 
 # /flow:run — execute a workflow-file
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 A thin wrapper over `/flow:pipe`: it inits from a workflow-file and drives. Pick a stable `<run-id>`
 (default: derive from the workflow name) so re-runs resume.
 

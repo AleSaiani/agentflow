@@ -10,6 +10,9 @@ argument-hint: --stage "<bash>" --stop "<bash predicate>" [--max-iterations N]
 
 # /flow:until — do…until loop
 
+> **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
+> run is happening; `/flow:board` then lists every run on disk — the audit trail.
+
 Engine: `iterate`. `until` mode: the stop predicate exits **0 when satisfied** → stop.
 
 ## Init
