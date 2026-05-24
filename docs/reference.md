@@ -22,6 +22,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `group` | partition | split items into K groups by key |
 | `repeat` / `until` / `while` | loop | run a stage by count / do…until / while…do |
 | `pipe` | compose | run an ordered pipeline of stages |
+| `queue` | shared queue | many workers drain one queue safely (atomic-rename claim, no locks) |
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |
@@ -139,6 +140,20 @@ loops come from an `iterate` stage. Reads children's state to advance; never mut
 
 `drive` auto-handles bash, json, and deterministic `group` stages; it stops with
 `{"action":"needs_agent", …}` when an `enumerate`/`foreach`/`reduce`/`llm-classify` dispatch is required.
+
+### `queue` — shared work queue (many workers, no locks)
+
+Items are files moving through `pending/ → claimed/ → done|failed/` under `.agentflow/queue/<id>/`. A
+claim is an **atomic rename**, so N workers (terminals) drain one queue concurrently and never get the
+same item twice — the dynamic, pull complement to `foreach --shard` (static split). Supports dynamic
+`add`, a `--stop-file`/budget pause, and `reclaim` of a dead worker's stale claims.
+
+**Invoke:** `/agentflow:queue (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) --prompt "<op>" [--stop-file <path>] [--max-usd N]`
+
+**CLI** (`dist/state/queue.js`):
+- `init <id> (--items <path> | --checkbox <path> | --folder <dir> | --source <json>) [--prompt "…"] [--stop-file <path>] [--max-usd N] [--max-retries N] [--force]`
+- `claim <id> [--worker <name>]` (atomic; `{item:null}` when empty/paused) · `complete <id> <item-id> [--result <json>]` · `fail <id> <item-id> [--error "…"] [--retry]`
+- `add <id> (--items <path> | --source <json>)` (enqueue more) · `reclaim <id> [--older-than <sec>]` (recover stale claims) · `status <id>` · `list <id> [--status pending|claimed|done|failed]` · `runs`
 
 ---
 

@@ -258,6 +258,24 @@ state files, no locking, no double-processing (works with a `--folder` source to
 moves only its own files). `touch PAUSE` and every worker stops claiming at its next checkpoint and
 won't auto-resume; delete `PAUSE` and nudge each session to continue. `/agentflow:board` shows all shards.
 
+### 12d. A shared queue drained by many workers (dynamic, no locks)
+
+> "I don't want to pre-split — just let several terminals pull from one queue, and I'll keep adding
+> work to it." 
+
+```text
+# create the queue once, then run this in each terminal (same id):
+/agentflow:queue --items work.json --prompt "Do the task in data"
+# add more work any time, from anywhere:
+/agentflow:queue add work-queue --items more.json
+```
+
+Unlike `--shard` (a static, up-front split), a **queue** is pulled dynamically: each `claim` is an
+**atomic file rename**, so any number of workers drain the *same* queue with zero chance of grabbing
+the same item twice — no locks. Items can arrive over time (`add`), a `--stop-file` pauses every
+worker, and `queue reclaim <id> --older-than 600` returns a crashed worker's in-flight items to the
+pool. Use `--shard` when you have a fixed list to divide; use `queue` when work is shared or streaming.
+
 ---
 
 ## Level 4 — operating at scale

@@ -168,6 +168,7 @@ const OVERRIDE_ENV: Record<string, string> = {
   group: "GROUP_STATE_DIR",
   iterate: "ITERATE_STATE_DIR",
   pipe: "PIPE_STATE_DIR",
+  queue: "QUEUE_STATE_DIR",
   reduce: "REDUCE_STATE_DIR",
 };
 

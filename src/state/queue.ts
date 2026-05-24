@@ -1,0 +1,351 @@
+/**
+ * State manager for /queue — a lock-free shared work queue that MANY worker instances can drain
+ * concurrently and safely, without locks.
+ *
+ * The trick: each item is a file under the run dir, and a worker claims it with an **atomic rename**
+ * (`pending/<id> → claimed/<id>`). On a filesystem, rename is atomic, so if two workers race for the
+ * same file exactly one wins and the other gets ENOENT (and simply tries the next item). No locks, no
+ * shared-state contention — the opposite of foreach's single-writer `state.json` (use foreach for a
+ * single orchestrator; use queue to fan ONE queue across N terminals/processes).
+ *
+ * Layout: `.agentflow/queue/<id>/{state.json, pending/, claimed/, done/, failed/}`. Items move between
+ * the dirs; `state.json` only holds config. Supports dynamic `add`, `--stop-file`/budget pause, and a
+ * `reclaim` sweep that returns a dead worker's stale claims to `pending/`.
+ */
+
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { hostname } from "node:os";
+import { parseArgs } from "node:util";
+import { pathToFileURL } from "node:url";
+
+import {
+  Primitive,
+  type Item,
+  type ResidualWork,
+  type StateDict,
+  die,
+  isPaused,
+  loadState,
+  makeBaseState,
+  markDone,
+  now,
+  parseBudgetCaps,
+  print,
+  saveAtomic,
+  statePath,
+} from "../common.js";
+import { loadSource } from "../source.js";
+
+const CMD = "queue";
+const DIRS = ["pending", "claimed", "done", "failed"] as const;
+
+function pathFor(runId: string): string {
+  return statePath(CMD, runId);
+}
+function runDir(runId: string): string {
+  return dirname(pathFor(runId));
+}
+function sub(runId: string, name: string): string {
+  return join(runDir(runId), name);
+}
+function load(runId: string): StateDict {
+  return loadState(pathFor(runId));
+}
+function save(runId: string, state: StateDict): void {
+  state["updated_at"] = now();
+  saveAtomic(pathFor(runId), state);
+}
+
+/** Filesystem-safe filename for an item id (real id is also stored inside the file). */
+function sanitize(id: string): string {
+  return (id.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120) || "item") + ".json";
+}
+
+function countDir(runId: string, name: string): number {
+  const d = sub(runId, name);
+  if (!existsSync(d)) return 0;
+  return readdirSync(d).filter((f) => f.endsWith(".json")).length;
+}
+
+/** Write one item into pending/ (skips if a file with that id already exists anywhere in the queue). */
+function enqueue(runId: string, it: Item): boolean {
+  const fname = sanitize(it.id);
+  for (const d of DIRS) if (existsSync(join(sub(runId, d), fname))) return false;
+  const payload = { id: it.id, data: it.data ?? {}, task: it.task ?? null, attempts: 0, enqueued_at: now() };
+  writeFileSync(join(sub(runId, "pending"), fname), JSON.stringify(payload, null, 2), "utf8");
+  return true;
+}
+
+function cmdInit(args: string[]): void {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    strict: true,
+    options: {
+      items: { type: "string" },
+      checkbox: { type: "string" },
+      folder: { type: "string" },
+      source: { type: "string" },
+      prompt: { type: "string" },
+      "stop-file": { type: "string" },
+      "max-usd": { type: "string" },
+      "max-tokens": { type: "string" },
+      "max-agents": { type: "string" },
+      "max-retries": { type: "string", default: "1" },
+      "auto-continue": { type: "boolean" },
+      "no-auto-continue": { type: "boolean" },
+      "max-auto-continues": { type: "string", default: "50" },
+      force: { type: "boolean", default: false },
+      "validate-only": { type: "boolean", default: false },
+    },
+  });
+  const runId = positionals[0];
+  if (!runId) die("error: init requires a run_id");
+
+  if (values["validate-only"]) return print({ valid: true });
+
+  const provided = [values["items"], values["checkbox"], values["folder"], values["source"]].filter(Boolean).length;
+  if (provided !== 1) die("error: provide exactly one of --items, --checkbox, --folder, --source");
+  let items: Item[];
+  if (values["checkbox"]) items = loadSource({ source: "checkbox", path: values["checkbox"] as string });
+  else if (values["folder"]) items = loadSource({ source: "folder", path: values["folder"] as string });
+  else if (values["source"]) items = loadSource(JSON.parse(values["source"] as string));
+  else {
+    const raw = JSON.parse(readFileSync(values["items"] as string, "utf8"));
+    if (!Array.isArray(raw)) die("error: items file must contain a JSON array");
+    items = raw.map((r: Record<string, unknown>, i: number): Item => ({
+      id: String(r["id"] ?? i),
+      data: r["data"] ?? Object.fromEntries(Object.entries(r).filter(([k]) => k !== "id")),
+      status: "pending",
+      ...(r["task"] ? { task: r["task"] as Item["task"] } : {}),
+    }));
+  }
+
+  const p = pathFor(runId);
+  if (existsSync(p) && !values["force"]) die(`error: queue already exists at ${p}; use --force to overwrite`);
+  for (const d of DIRS) mkdirSync(sub(runId, d), { recursive: true });
+
+  const state = makeBaseState(
+    CMD,
+    runId,
+    {
+      task_prompt: (values["prompt"] as string) ?? "",
+      max_retries: parseInt(values["max-retries"] as string, 10),
+      auto_continue: values["no-auto-continue"] ? false : true,
+      max_auto_continues: parseInt(values["max-auto-continues"] as string, 10),
+      stop_file: values["stop-file"] ? resolve(values["stop-file"] as string) : null,
+      budget_caps: parseBudgetCaps(values),
+    },
+    { total_enqueued: 0 },
+  );
+  save(runId, state);
+
+  let added = 0;
+  for (const it of items) if (enqueue(runId, it)) added++;
+  state["total_enqueued"] = added;
+  save(runId, state);
+  print({ run_id: runId, enqueued: added, path: p });
+}
+
+function cmdAdd(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { items: { type: "string" }, source: { type: "string" } } });
+  const runId = positionals[0];
+  if (!runId) die("error: add requires a run_id");
+  const state = load(runId);
+  let items: Item[];
+  if (values["source"]) items = loadSource(JSON.parse(values["source"] as string));
+  else if (values["items"]) {
+    const raw = JSON.parse(readFileSync(values["items"] as string, "utf8"));
+    if (!Array.isArray(raw)) die("error: items file must contain a JSON array");
+    items = raw.map((r: Record<string, unknown>, i: number): Item => ({ id: String(r["id"] ?? `${now()}-${i}`), data: r["data"] ?? r, status: "pending" }));
+  } else {
+    die("error: add requires --items or --source");
+  }
+  let added = 0;
+  for (const it of items) if (enqueue(runId, it)) added++;
+  state["total_enqueued"] = (state["total_enqueued"] ?? 0) + added;
+  if (state["status"] === "done") state["status"] = "in_progress"; // reopened by new work
+  save(runId, state);
+  print({ run_id: runId, added });
+}
+
+/** Atomically claim the next pending item (rename pending→claimed). Returns {item:null} when empty/paused. */
+function cmdClaim(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { worker: { type: "string" } } });
+  const runId = positionals[0];
+  if (!runId) die("error: claim requires a run_id");
+  const state = load(runId);
+  const worker = (values["worker"] as string) || `${hostname()}-${process.pid}`;
+  if (isPaused(state)[0]) return print({ item: null, paused: true, reason: isPaused(state)[1] });
+
+  const pendingDir = sub(runId, "pending");
+  const claimedDir = sub(runId, "claimed");
+  for (const fname of readdirSync(pendingDir).filter((f) => f.endsWith(".json")).sort()) {
+    const from = join(pendingDir, fname);
+    const to = join(claimedDir, fname);
+    try {
+      renameSync(from, to); // ATOMIC: only one racing worker wins; the loser throws ENOENT below
+    } catch {
+      continue; // another worker grabbed it first — try the next
+    }
+    const item = JSON.parse(readFileSync(to, "utf8"));
+    item["claimed_by"] = worker;
+    item["claimed_at"] = now();
+    item["attempts"] = (item["attempts"] ?? 0) + 1;
+    writeFileSync(to, JSON.stringify(item, null, 2), "utf8");
+    if (state["status"] === "pending") {
+      state["status"] = "in_progress";
+      save(runId, state);
+    }
+    return print({ item, task_prompt: state["config"]["task_prompt"] ?? "" });
+  }
+  return print({ item: null });
+}
+
+function moveClaimed(runId: string, itemId: string, dest: "done" | "failed" | "pending", patch: Record<string, unknown>): StateDict {
+  const fname = sanitize(itemId);
+  const from = join(sub(runId, "claimed"), fname);
+  if (!existsSync(from)) die(`error: item '${itemId}' is not claimed (no ${fname} in claimed/)`);
+  const item = JSON.parse(readFileSync(from, "utf8"));
+  Object.assign(item, patch);
+  const to = join(sub(runId, dest), fname);
+  writeFileSync(from, JSON.stringify(item, null, 2), "utf8");
+  renameSync(from, to);
+  return item;
+}
+
+function cmdComplete(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { result: { type: "string", default: "" } } });
+  const [runId, itemId] = positionals;
+  if (!runId || !itemId) die("error: complete requires run_id and item_id");
+  const state = load(runId);
+  moveClaimed(runId, itemId, "done", { result: values["result"] ? JSON.parse(values["result"] as string) : null, completed_at: now(), error: null });
+  finalizeIfDrained(runId, state);
+  save(runId, state);
+  print({ id: itemId, status: "done", remaining: countDir(runId, "pending") + countDir(runId, "claimed") });
+}
+
+function cmdFail(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { error: { type: "string", default: "" }, retry: { type: "boolean", default: false } } });
+  const [runId, itemId] = positionals;
+  if (!runId || !itemId) die("error: fail requires run_id and item_id");
+  const state = load(runId);
+  const fname = sanitize(itemId);
+  const cur = JSON.parse(readFileSync(join(sub(runId, "claimed"), fname), "utf8"));
+  const maxRetries = state["config"]["max_retries"] ?? 1;
+  const retry = values["retry"] && (cur["attempts"] ?? 1) <= maxRetries;
+  moveClaimed(runId, itemId, retry ? "pending" : "failed", { error: values["error"], ...(retry ? { claimed_by: null, claimed_at: null } : { completed_at: now() }) });
+  finalizeIfDrained(runId, state);
+  save(runId, state);
+  print({ id: itemId, status: retry ? "pending" : "failed", retried: retry });
+}
+
+/** Return claimed items whose claim is older than `--older-than` seconds to pending/ (dead-worker recovery). */
+function cmdReclaim(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { "older-than": { type: "string", default: "900" } } });
+  const runId = positionals[0];
+  if (!runId) die("error: reclaim requires a run_id");
+  const olderThan = parseInt(values["older-than"] as string, 10) * 1000;
+  const claimedDir = sub(runId, "claimed");
+  let reclaimed = 0;
+  for (const fname of existsSync(claimedDir) ? readdirSync(claimedDir).filter((f) => f.endsWith(".json")) : []) {
+    const full = join(claimedDir, fname);
+    if (Date.now() - statSync(full).mtimeMs < olderThan) continue;
+    const item = JSON.parse(readFileSync(full, "utf8"));
+    item["claimed_by"] = null;
+    item["claimed_at"] = null;
+    writeFileSync(full, JSON.stringify(item, null, 2), "utf8");
+    renameSync(full, join(sub(runId, "pending"), fname));
+    reclaimed++;
+  }
+  print({ run_id: runId, reclaimed });
+}
+
+function counts(runId: string): Record<string, number> {
+  return { pending: countDir(runId, "pending"), claimed: countDir(runId, "claimed"), done: countDir(runId, "done"), failed: countDir(runId, "failed") };
+}
+
+function finalizeIfDrained(runId: string, state: StateDict): void {
+  const c = counts(runId);
+  if (c["pending"] === 0 && c["claimed"] === 0 && state["status"] !== "done") markDone(state, runDir(runId));
+}
+
+function cmdStatus(args: string[]): void {
+  const { positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: {} });
+  const runId = positionals[0];
+  if (!runId) die("error: status requires a run_id");
+  const state = load(runId);
+  const [paused, reason] = isPaused(state);
+  print({ run_id: runId, run_status: state["status"], paused, paused_reason: reason, ...counts(runId), config: state["config"] });
+}
+
+function cmdList(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { status: { type: "string", default: "pending" } } });
+  const runId = positionals[0];
+  if (!runId) die("error: list requires a run_id");
+  const which = values["status"] as string;
+  if (!DIRS.includes(which as (typeof DIRS)[number])) die(`error: --status must be one of ${DIRS.join(",")}`);
+  const d = sub(runId, which);
+  const out = (existsSync(d) ? readdirSync(d).filter((f) => f.endsWith(".json")).sort() : []).map((f) => JSON.parse(readFileSync(join(d, f), "utf8")));
+  print(out);
+}
+
+// ---------- primitive registration ----------
+
+function isDone(state: StateDict): boolean {
+  return state["status"] === "done";
+}
+function hasResidualWork(state: StateDict): ResidualWork | null {
+  const runId = state["run_id"];
+  const c = counts(runId);
+  if (c["pending"] === 0 && c["claimed"] === 0) return null;
+  return [c["pending"] ?? 0, c["claimed"] ?? 0];
+}
+function resumeMsg(runId: string, work: ResidualWork): string {
+  const [pending, claimed] = work as [number, number];
+  return (
+    `/agentflow:queue run '${runId}' still has work: ${pending} pending, ${claimed} claimed. Resume the ` +
+    `drain loop: \`claim ${runId}\` the next item, process it, then \`complete ${runId} <id>\` (or \`fail … --retry\`); ` +
+    `repeat until claim returns {item:null}. If items are stuck claimed from a dead worker, run ` +
+    `\`reclaim ${runId} --older-than <sec>\` first.`
+  );
+}
+
+const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPointer: (s) => (s["result_pointer"] ?? null) as string | null });
+
+function main(argv: string[]): void {
+  const [sub, ...rest] = argv;
+  switch (sub) {
+    case "init":
+      return cmdInit(rest);
+    case "add":
+      return cmdAdd(rest);
+    case "claim":
+      return cmdClaim(rest);
+    case "complete":
+      return cmdComplete(rest);
+    case "fail":
+      return cmdFail(rest);
+    case "reclaim":
+      return cmdReclaim(rest);
+    case "status":
+      return cmdStatus(rest);
+    case "list":
+      return cmdList(rest);
+    case "runs":
+      return PRIM.cliRuns();
+    case "budget-add":
+      return PRIM.cliBudgetAdd(rest[0] ?? "", {});
+    case "increment-continues":
+      return PRIM.cliIncrementContinues(rest[0] ?? "");
+    default:
+      die(`error: unknown subcommand '${sub ?? ""}'`);
+  }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main(process.argv.slice(2));
+}
+
+export { PRIM };

@@ -18,6 +18,7 @@ import "./state/foreach.js";
 import "./state/group.js";
 import "./state/iterate.js";
 import "./state/reduce.js";
+import "./state/queue.js";
 import "./state/pipe.js";
 function round4(n) {
     return Math.round((n ?? 0) * 1e4) / 1e4;
