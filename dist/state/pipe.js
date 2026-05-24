@@ -19,7 +19,7 @@
  * {{stages.<name>.run_id}}, {{run.id}}, {{run.dir}}, with |json / |shell / |raw filters.
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -71,6 +71,13 @@ function resolveTemplate(value, state) {
             if (parts.length === 2 && parts[1] === "dir")
                 return applyFilter(join(stateDir(CMD), state["run_id"] ?? ""), filterName);
             return whole;
+        }
+        if (parts[0] === "workflow" && parts.length === 2 && parts[1] === "dir") {
+            // The directory the workflow-file lives in — lets a workflow reference its own scripts
+            // relatively (`{{workflow.dir}}/discover.mjs`), so the folder is self-contained and movable.
+            if (!state["workflow_dir"])
+                return whole; // run inited from raw --stages: no workflow dir
+            return applyFilter(state["workflow_dir"], filterName);
         }
         if (parts[0] === "stages" && parts.length >= 3) {
             const name = parts[1];
@@ -231,12 +238,14 @@ function cmdInit(args) {
     // compiles into the pipe's stages[]. Its optional config provides defaults for the run.
     let stagesRaw;
     let workflowConfig = {};
+    let workflowDir = null;
     if (workflowPath) {
         const wf = JSON.parse(readFileSync(workflowPath, "utf8"));
         if (typeof wf !== "object" || wf === null || !Array.isArray(wf.stages))
             die("error: workflow file must be an object with a 'stages' array");
         stagesRaw = wf.stages;
         workflowConfig = wf.config ?? {};
+        workflowDir = dirname(resolve(workflowPath)); // for {{workflow.dir}} — self-contained workflows
     }
     else {
         stagesRaw = JSON.parse(readFileSync(stagesPath, "utf8"));
@@ -266,7 +275,7 @@ function cmdInit(args) {
         max_auto_continues: pick("max_auto_continues", parseInt(values["max-auto-continues"], 10)),
         max_stages: maxStages,
         stop_on_failure: pick("stop_on_failure", stopOnFailure),
-    }, { stages, stage_index: 0, stop_reason: null });
+    }, { stages, stage_index: 0, stop_reason: null, workflow_dir: workflowDir });
     const p = pathFor(runId);
     if (existsSync(p) && !values["force"])
         die(`error: state already exists at ${p}; use --force to overwrite`);

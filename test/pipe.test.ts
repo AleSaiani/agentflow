@@ -105,13 +105,26 @@ test("pipe: the shipped audit workflow-file validates and inits (dogfood)", () =
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const repo = resolve(".");
   const env = { PIPE_STATE_DIR: dir, CLAUDE_PLUGIN_ROOT: repo };
-  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit.json")]);
+  const init = run(env, ["init", "audit-x", "--workflow", join(repo, "workflows", "audit", "workflow.json")]);
   assert.equal(init.stages, 6);
   const status = run(env, ["status", "audit-x"]);
   assert.deepEqual(
     status.stages.map((s: any) => `${s.name}:${s.type}`),
     ["discover:bash", "review:primitive", "build-group-input:json", "partition:primitive", "build-digest-inputs:json", "digest:primitive"],
   );
+});
+
+test("pipe: {{workflow.dir}} resolves to the workflow file's folder (self-contained scripts)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const repo = resolve(".");
+  const env = { PIPE_STATE_DIR: dir };
+  const wf = join(repo, "workflows", "audit", "workflow.json");
+  run(env, ["init", "wfdir", "--workflow", wf]);
+  const plan = run(env, ["plan", "wfdir"]);
+  const discover = plan.plan.find((s: any) => s.name === "discover");
+  // {{workflow.dir}} must be resolved to the audit folder's discover.mjs, not left literal
+  assert.ok(!discover.command.includes("{{workflow.dir}}"), "workflow.dir should be resolved");
+  assert.match(discover.command.replace(/\\/g, "/"), /workflows\/audit\/discover\.mjs/);
 });
 
 test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {

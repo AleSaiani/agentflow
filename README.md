@@ -137,7 +137,7 @@ engine underneath.)
   **markdown checklist**; a View can reflect state back onto the checklist (`[ ]` ↔ `[x]`).
 - **Conditional steps** — a pipe stage's `when` guard (a bash predicate) decides run-vs-skip.
 - **Workflow-files** — a declarative JSON `WorkflowSpec` compiles 1:1 into the pipe's stages, so you
-  version and reuse pipelines (see [`workflows/audit.json`](workflows/audit.json)).
+  version and reuse pipelines (see [`workflows/audit/workflow.json`](workflows/audit/workflow.json)).
 
 ## Install
 

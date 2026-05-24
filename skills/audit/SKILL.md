@@ -25,7 +25,7 @@ You are the orchestrator of a `/flow:audit` recipe. Your job is to **construct a
 
 ## Step 0 — Resolve config + compute manifest hash for the run-id
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/flow:audit/defaults.md`. Apply override priority CLI > defaults.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/audit/defaults.md`. Apply override priority CLI > defaults.
 
 Required: `--target <path>`. If missing → ask via `AskUserQuestion` or abort with a clear message.
 
@@ -47,11 +47,12 @@ Create `.flow/audit/<run-id>/` (recipe scratch) and `.flow/pipe/<run-id>/` (pipe
 
 ## Step 2 — Export the discover env vars
 
-The 6-stage structure is shipped as a **declarative workflow-file** at
-`${CLAUDE_PLUGIN_ROOT}/workflows/flow:audit.json` (this is the canonical, reusable
-artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the bundled
-`discover.mjs`, which reads the target/glob from the environment and emits a
-/flow:foreach-compatible items array with a per-file `content_hash` (for the review `--cache`).
+The 6-stage structure is shipped as a **self-contained declarative workflow-file** at
+`${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json` (this is the canonical, reusable
+artifact — you do NOT hand-build a stages.json). Its `discover` stage runs the sibling
+`discover.mjs` via `{{workflow.dir}}` (so the whole `workflows/audit/` folder is movable);
+the script reads the target/glob from the environment and emits a /flow:foreach-compatible
+items array with a per-file `content_hash` (for the review `--cache`).
 
 Export these before init (resolve `${CLAUDE_PLUGIN_ROOT}` to its real path here):
 
@@ -59,11 +60,11 @@ Export these before init (resolve `${CLAUDE_PLUGIN_ROOT}` to its real path here)
 export AUDIT_TARGET="<resolved-target-path>"
 export AUDIT_GLOB="<file_glob>"          # e.g. "**/*.cs"; default "**/*"
 export AUDIT_EXCLUDE="<file_exclude>"    # comma-separated globs; may be empty
-export AUDIT_DISCOVER="${CLAUDE_PLUGIN_ROOT}/workflows/discover.mjs"
 ```
 
-To tune the review/digest models or group depth, copy the workflow file into your project's
-`workflows/` and edit the `--model` / `--method-config` values; pass that copy to `--workflow`.
+(No `AUDIT_DISCOVER` needed — the workflow finds its own script via `{{workflow.dir}}`.) To tune
+the review/digest models or group depth, copy the whole `workflows/audit/` folder into your project's
+`workflows/` and edit the `--model` / `--method-config` values; pass that copy's `workflow.json` to `--workflow`.
 
 ## Step 3 — (the pipeline is the workflow-file)
 
@@ -77,7 +78,7 @@ resolved by /flow:pipe at tick time. The stages are: `discover` (bash) → `revi
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" init <run-id> \
-  --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/flow:audit.json" \
+  --workflow "${CLAUDE_PLUGIN_ROOT}/workflows/audit/workflow.json" \
   [--no-stop-on-failure if user passed --keep-going] \
   [--force if --run-id was explicitly provided and overrides existing]
 ```
@@ -109,7 +110,9 @@ Output is JSON:
 
 1. Init the reduce child + record + materialize (the reduce SKILL covers Steps 2-4).
 2. Dispatch ONE digest agent (no fan-out for /flow:reduce).
-3. After Agent returns: `state/reduce.js budget-add` for the tokens, then `state/reduce.js complete <child-id> --output-path <digest.md>`.
+3. After Agent returns: `state/reduce.js budget-add` for the tokens, then `state/reduce.js complete
+   <child-id> --output-path ./<run-id>-audit.md` — write the digest to a **visible file in the
+   workspace root** (e.g. `audit-3f2a-audit.md`), not buried under `.flow/`.
 4. Call `drive` once more → returns `done`.
 
 ## Step 6 — Final report
@@ -123,7 +126,10 @@ When `drive` returns `done`:
 ## Important rules
 
 - **Idempotence**: re-running with the same `--run-id` (or the same `--target` if run-id is auto-derived) resumes. With the manifest hash in run-id derivation: a file content change → new run-id → fresh run. Pure resume of a half-completed run uses the SAME run-id.
-- **No file modification**: this recipe is read-only on the target. Outputs land under `.flow/audit/<run-id>/`, `.flow/pipe/<run-id>/`, `.flow/foreach/<run-id>-s1-foreach/`, `.flow/group/<run-id>-s3-partition/`, `.flow/reduce/<run-id>-s5-digest/`.
+- **No file modification**: this recipe is read-only on the target. The **digest lands as a visible
+  `./<run-id>-audit.md`** in the workspace; internal state lives under `.flow/audit/<run-id>/`,
+  `.flow/pipe/<run-id>/`, `.flow/foreach/<run-id>-s1-foreach/`, `.flow/group/<run-id>-s3-partition/`,
+  `.flow/reduce/<run-id>-s5-digest/`.
 - **Incremental re-runs**: with `--cache` on the review stage, files whose `content_hash` matches a prior cached result are skipped (no agent dispatch). Hits saved under `.flow/cache/foreach-code-review/`.
 - **Validate then drive**: trust the dry-run validation `/flow:pipe init` performs. Catches recipe typos before any agent dispatch.
 
@@ -140,6 +146,6 @@ Expected on the bundled fake-repo (8 files, 4 components, 6 with intentional bug
 - stage partition runs /flow:group path-prefix depth=1 → 4 groups (auth, billing, api, data)
 - stage build-digest-inputs materializes the reduce inputs
 - stage digest dispatches /flow:reduce (opus, markdown) → executive report
-- Final digest at `.flow/reduce/<run-id>-s5-digest/digest.md`
+- Final digest written to a visible `./<run-id>-audit.md` in the workspace
 
 Re-running the same command without changing fake-repo: the same run-id is regenerated, all 8 review items become cache hits → no agent dispatch for review → only the digest runs again (still costs ~$0.10 for the opus call). If you change one file, only that file dispatches a new review agent.

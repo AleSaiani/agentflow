@@ -154,7 +154,7 @@ or `llm-classify` when the key needs judgment (one agent returns the mapping; th
 /flow:audit --target examples/fake-repo
 ```
 
-A layer-3 recipe: a shipped workflow-file ([`workflows/audit.json`](../workflows/audit.json)) wires
+A layer-3 recipe: a shipped workflow-file ([`workflows/audit/workflow.json`](../workflows/audit/workflow.json)) wires
 discover (bash) → review (`foreach`, cached) → partition (`group`) → digest (`reduce`). `pipe drive`
 auto-runs the deterministic stages and stops only for the two LLM stages.
 
@@ -185,14 +185,16 @@ it's cheap.
 /flow:compose "fetch open issues → triage each by severity → summarize the triage" --name triage
 ```
 
-`compose` designs the `WorkflowSpec`, writes `workflows/triage.json`, then validates + previews:
+`compose` confirms the name (proposing one, or take your own), designs the `WorkflowSpec`, and writes
+a **self-contained folder** `workflows/triage/` (the `workflow.json` plus any scripts it needs,
+referenced via `{{workflow.dir}}` so the folder is movable), then validates + previews:
 
 ```text
-/flow:run workflows/triage.json --dry-run    # shows the resolved stage plan, runs nothing
-/flow:run workflows/triage.json              # init + drive to completion
+/flow:run workflows/triage/workflow.json --dry-run    # shows the resolved stage plan, runs nothing
+/flow:run workflows/triage/workflow.json              # init + drive to completion
 ```
 
-The file is yours to version, edit (swap models, depth, prompts), and re-run.
+The folder is yours to version, move, edit (swap models, depth, prompts), and re-run.
 
 ### 11. Conditional steps — do only if
 
@@ -272,4 +274,4 @@ session: `… foreach reset <run-id> --in-progress-to-pending`, then send any me
 
 - [reference.md](reference.md) — every skill, flag, and subcommand.
 - [concepts.md](concepts.md) — the model: state on disk, the Stop hook, the determinism boundary.
-- [`workflows/audit.json`](../workflows/audit.json) — a complete, real workflow-file to learn from.
+- [`workflows/audit/workflow.json`](../workflows/audit/workflow.json) — a complete, real workflow-file to learn from.

@@ -3,7 +3,7 @@ name: run
 description: |
   Run a declarative workflow-file end to end: init a `/flow:pipe` from a JSON `WorkflowSpec`, then drive it to completion — auto-running every bash/json/deterministic stage and dispatching agents only where genuinely needed. Use `--dry-run` to preview the resolved plan without executing anything. The one-command way to execute a reusable, versioned workflow.
 
-  USE when the user points at a workflow JSON ("run this workflow", "execute audit.json", "run my pipeline") or wants to run a saved `WorkflowSpec`.
+  USE when the user points at a workflow JSON ("run this workflow", "run workflows/audit/workflow.json", "run my pipeline") or wants to run a saved `WorkflowSpec`. Workflows are normally self-contained folders (`workflows/<name>/workflow.json` + sibling scripts), but a bare `.json` path also works.
 allowed-tools: Bash, Read, Write, Agent
 argument-hint: <workflow.json> [--run-id NAME] [--dry-run]
 ---
@@ -13,7 +13,9 @@ argument-hint: <workflow.json> [--run-id NAME] [--dry-run]
 > **Make it visible:** the moment you start, say so in one line (skill + run-id) so it's clear a Flow
 > run is happening; `/flow:board` then lists every run on disk — the audit trail.
 
-A thin wrapper over `/flow:pipe`: it inits from a workflow-file and drives. Pick a stable `<run-id>`
+A thin wrapper over `/flow:pipe`: it inits from a workflow-file and drives. The workflow-file is
+typically `workflows/<name>/workflow.json` — a self-contained folder whose `bash` stages call sibling
+scripts via `{{workflow.dir}}`, so it runs unchanged wherever the folder is. Pick a stable `<run-id>`
 (default: derive from the workflow name) so re-runs resume.
 
 ## 1. Init the pipe from the workflow
