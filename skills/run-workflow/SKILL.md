@@ -49,6 +49,9 @@ Loop on the JSON result:
 - `action: "needs_agent"` → init the child, `start-primitive-child`, run the dispatch per the child's
   SKILL.md (`/agentflow:foreach`, `/agentflow:reduce`, `/agentflow:enumerate`, or `/agentflow:group --method llm-classify`),
   then call `drive` again.
+- `action: "needs_approval"` → a human-approval gate. **Stop and ask the user** with `AskUserQuestion`
+  (use the returned `prompt`). If approved: `node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" approve <run-id>`
+  then `drive` again. If rejected: `… pipe.js fail <run-id> --error "rejected at <stage>"`.
 - `action: "done"` → surface `result_pointer`.
 - `action: "failed"` → surface the error.
 

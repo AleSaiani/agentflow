@@ -225,6 +225,33 @@ test("pipe: a `step` child stage is a registered primitive (drive→needs_agent,
   assert.equal(adv.pipe_status, "done");
 });
 
+test("pipe: a human-approval gate pauses drive until approved", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const wf = join(dir, "approve.json");
+  writeFileSync(
+    wf,
+    JSON.stringify({
+      stages: [
+        { name: "build", type: "bash", spec: { command: 'echo built > "$PIPE_OUTPUT_PATH"' } },
+        { name: "deploy", type: "bash", approve: true, approve_prompt: "Deploy to prod?", spec: { command: 'echo deployed > "$PIPE_OUTPUT_PATH"' } },
+      ],
+    }),
+    "utf8",
+  );
+  run(env, ["init", "ap", "--workflow", wf]);
+  // drive runs `build`, then stops at the gate
+  const paused = run(env, ["drive", "ap"]);
+  assert.equal(paused.action, "needs_approval");
+  assert.equal(paused.stage, "deploy");
+  assert.equal(paused.prompt, "Deploy to prod?");
+  // still paused if driven again (no auto-bypass)
+  assert.equal(run(env, ["drive", "ap"]).action, "needs_approval");
+  // approve → drive completes
+  run(env, ["approve", "ap"]);
+  assert.equal(run(env, ["drive", "ap"]).action, "done");
+});
+
 test("pipe: config.on_failure runs a cleanup/alert command when the pipe fails", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };

@@ -230,6 +230,13 @@ function compileStage(s) {
     const timeout = bulletGet(bullets, "timeout");
     if (timeout !== undefined)
         stage["timeout"] = timeout;
+    // Human-approval gate.
+    const approve = bulletGet(bullets, "approve");
+    if (approve !== undefined)
+        stage["approve"] = approve;
+    const approvePrompt = bulletGet(bullets, "approve-prompt") ?? bulletGet(bullets, "approve_prompt");
+    if (approvePrompt !== undefined)
+        stage["approve_prompt"] = String(approvePrompt);
     if (s.type === "bash") {
         stage["type"] = "bash";
         const cmd = fences["sh"] ?? fences["bash"] ?? fences["shell"] ?? fences[""];
@@ -258,7 +265,7 @@ function compileStage(s) {
         stage["type"] = "primitive";
         const initArgs = [];
         for (const [k, v] of bullets) {
-            if (["when", "output-schema", "output_schema", "next", "route", "retries", "timeout"].includes(k))
+            if (["when", "output-schema", "output_schema", "next", "route", "retries", "timeout", "approve", "approve-prompt", "approve_prompt"].includes(k))
                 continue;
             const flag = `--${k}`;
             if (v === true) {

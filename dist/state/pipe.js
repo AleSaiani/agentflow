@@ -198,6 +198,9 @@ function validateStages(stagesRaw) {
                 : Number.isFinite(raw["timeout_ms"])
                     ? Math.max(0, Math.trunc(raw["timeout_ms"]))
                     : 0,
+            approve: Boolean(raw["approve"]), // human-approval gate: pause before this stage runs
+            approved: null,
+            approve_prompt: raw["approve_prompt"] ?? null,
             status: STATUS_PENDING,
             child_cmd: null,
             child_run_id: null,
@@ -466,6 +469,17 @@ function cmdTick(args) {
             }
             save(runId, state); // record the guard passed
         }
+        // Human-approval gate: pause before running this stage until explicitly approved.
+        if (cur["approve"] && cur["approved"] !== true) {
+            print({
+                action: "needs_approval",
+                stage_index: cur["index"],
+                stage: cur["name"],
+                prompt: cur["approve_prompt"] ?? `Approve stage '${cur["name"] ?? cur["index"]}' before it runs?`,
+                approve_cmd: `approve ${state["run_id"]}`,
+            });
+            return;
+        }
         if (cur["type"] === "bash") {
             const rawOut = cur["spec"]["output_path"] || stageDefaultOutput(runId, cur["index"]);
             print({
@@ -730,6 +744,22 @@ function cmdAdvance(args) {
     }
     print({ advanced: true, next_stage: state["stage_index"] });
 }
+/** Approve the current human-approval gate so the next tick/drive runs it. */
+function cmdApprove(args) {
+    const { positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: {} });
+    const runId = positionals[0];
+    if (!runId)
+        die("error: approve requires a run_id");
+    const state = load(runId);
+    const cur = currentStage(state);
+    if (cur === null)
+        die("error: no current stage to approve");
+    if (!cur["approve"])
+        die(`error: stage '${cur["name"] ?? cur["index"]}' is not an approval gate`);
+    cur["approved"] = true;
+    save(runId, state);
+    print({ run_id: runId, approved: cur["name"] ?? cur["index"], next: "call `drive` to run it" });
+}
 function cmdFail(args) {
     const { values, positionals } = parseArgs({
         args, allowPositionals: true, strict: true, options: { error: { type: "string", default: "" } },
@@ -971,6 +1001,9 @@ function hasResidualWork(state) {
         return ["finalize"];
     const cur = stages[idx];
     const curStatus = cur["status"];
+    // Paused at a human-approval gate — the Stop hook must NOT auto-resume; the user approves, then nudges.
+    if (curStatus === STATUS_PENDING && cur["approve"] && cur["approved"] !== true)
+        return null;
     if (curStatus === STATUS_PENDING)
         return ["start_stage", idx, cur["type"]];
     if (curStatus === STATUS_IN_PROGRESS && cur["type"] === "primitive") {
@@ -1028,6 +1061,8 @@ function main(argv) {
             return cmdStartPrimitiveChild(rest);
         case "advance":
             return cmdAdvance(rest);
+        case "approve":
+            return cmdApprove(rest);
         case "fail":
             return cmdFail(rest);
         case "status":

@@ -115,6 +115,11 @@ extra attempts) and `- timeout: <seconds>` (each attempt is killed past the limi
 pipe fails (env `PIPE_FAIL_REASON`, `PIPE_RUN_ID`) — e.g. `node "${CLAUDE_PLUGIN_ROOT}/dist/notify.js"
 --message "audit failed: $PIPE_FAIL_REASON"`. Best-effort; it never changes the failure outcome.
 
+**Human approval.** Put `- approve: true` (+ optional `- approve-prompt: "Deploy to prod?"`) on a stage
+before an irreversible action. `run-workflow`/`drive` pauses there with `action: needs_approval` (the
+Stop hook won't auto-bypass it); the orchestrator asks the user via `AskUserQuestion`, then runs
+`pipe approve <run-id>` and re-drives (or `fail` if rejected).
+
 **Branching (fork).** A stage's `- next:` routes the flow: a stage name jumps there; a `- route:` array
 of `{ when: <bash predicate>, goto: <stage> }` rules takes the first whose `when` exits 0 (a rule with
 no `when` is the default/else). Forward jumps skip the not-taken branch's stages. For loops/back-edges,

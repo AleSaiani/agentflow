@@ -222,6 +222,11 @@ function compileStage(s: RawStage): Record<string, unknown> {
   if (retries !== undefined) stage["retries"] = retries;
   const timeout = bulletGet(bullets, "timeout");
   if (timeout !== undefined) stage["timeout"] = timeout;
+  // Human-approval gate.
+  const approve = bulletGet(bullets, "approve");
+  if (approve !== undefined) stage["approve"] = approve;
+  const approvePrompt = bulletGet(bullets, "approve-prompt") ?? bulletGet(bullets, "approve_prompt");
+  if (approvePrompt !== undefined) stage["approve_prompt"] = String(approvePrompt);
 
   if (s.type === "bash") {
     stage["type"] = "bash";
@@ -244,7 +249,7 @@ function compileStage(s: RawStage): Record<string, unknown> {
     stage["type"] = "primitive";
     const initArgs: string[] = [];
     for (const [k, v] of bullets) {
-      if (["when", "output-schema", "output_schema", "next", "route", "retries", "timeout"].includes(k)) continue;
+      if (["when", "output-schema", "output_schema", "next", "route", "retries", "timeout", "approve", "approve-prompt", "approve_prompt"].includes(k)) continue;
       const flag = `--${k}`;
       if (v === true) {
         initArgs.push(flag);
