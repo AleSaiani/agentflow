@@ -122,8 +122,9 @@ claude --plugin-dir .
 /flow:board
 ```
 
-See **[docs/getting-started.md](docs/getting-started.md)** for a guided first run and
-**[docs/concepts.md](docs/concepts.md)** for the mental model.
+**📚 Full docs in [`docs/`](docs/):** [Getting started](docs/getting-started.md) ·
+[Concepts](docs/concepts.md) · [Cookbook](docs/cookbook.md) (real scenarios, simple → complex) ·
+[Reference](docs/reference.md) (every skill, flag, and subcommand).
 
 ## How it works
 

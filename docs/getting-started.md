@@ -84,4 +84,9 @@ node dist/inspect.js budget <run-id>             # cost, aggregated across child
 node dist/state/foreach.js reset <run-id> --in-progress-to-pending   # unstick a run
 ```
 
-Next: read **[concepts.md](concepts.md)** for the mental model behind all of this.
+## Next
+
+- **[cookbook.md](cookbook.md)** — real scenarios from one command to a full workflow (the fastest
+  way to see what's possible).
+- **[concepts.md](concepts.md)** — the mental model behind all of this.
+- **[reference.md](reference.md)** — every skill, flag, and CLI subcommand.
