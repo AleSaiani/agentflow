@@ -8,7 +8,7 @@ params:
   deploy_cmd: { default: "echo '(replace deploy_cmd)'", description: "Deploy command" }
 config:
   stop_on_failure: true
-  on_failure: node "${CLAUDE_PLUGIN_ROOT}/dist/notify.js" --message "release-gate failed: $PIPE_FAIL_REASON"
+  on_failure: 'node "${CLAUDE_PLUGIN_ROOT}/dist/notify.js" --message "release-gate failed: $PIPE_FAIL_REASON"'
 ---
 
 ## 1. test · bash

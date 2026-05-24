@@ -11,7 +11,7 @@ description: |
   DON'T use this to inspect a specific run in depth (use `/agentflow:inspect show <id>` or `tree <id>`), or
   to modify state (board is read-only). Explicit: `/agentflow:board` or `/agentflow:board --json`.
 allowed-tools: Bash, Read
-argument-hint: [--json] [--no-failed]
+argument-hint: '[--json] [--no-failed]'
 disable-model-invocation: false
 ---
 

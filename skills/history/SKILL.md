@@ -9,7 +9,7 @@ description: |
   "did the X run earlier", "list past runs". For a live dashboard of what's *active* use `/agentflow:board`;
   for one run's details use `/agentflow:inspect show <id>`.
 allowed-tools: Bash, Read
-argument-hint: [--limit N] [--cmd enumerate|foreach|group|iterate|reduce|pipe] [--json]
+argument-hint: '[--limit N] [--cmd enumerate|foreach|group|iterate|reduce|pipe] [--json]'
 disable-model-invocation: false
 ---
 

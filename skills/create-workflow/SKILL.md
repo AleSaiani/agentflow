@@ -7,7 +7,7 @@ description: |
 
   DO NOT use for a one-off single step — call the primitive directly. `create-workflow` is for durable, reusable multi-stage flows.
 allowed-tools: Bash, Read, Write
-argument-hint: "<describe the workflow>" [--name NAME]
+argument-hint: '"<describe the workflow>" [--name NAME]'
 ---
 
 # /agentflow:create-workflow — author a workflow-file

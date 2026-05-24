@@ -112,6 +112,8 @@ function parseScalar(raw: string): unknown {
       return unquote(s);
     }
   }
+  // YAML single-quoted scalar ('' is a literal '): lets frontmatter values with `:`/quotes stay valid YAML.
+  if (/^'.*'$/.test(s)) return s.slice(1, -1).replace(/''/g, "'");
   return s;
 }
 
