@@ -17,11 +17,14 @@ keep running; non-zero → stop. Because the check runs first, the stage may exe
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/iterate.js" init <run-id> \
-  --stage '{"type":"bash","command":"<body>"}' \
-  --stop  '{"type":"bash","command":"<predicate>","mode":"while"}' \
-  --check-first \
+  --stage "<body command>" \
+  --stop  "<predicate command>" \
+  --mode while --check-first \
   [--max-iterations <N>] [--no-convergence-check]
 ```
+
+`--stage` and `--stop` take plain bash commands. The predicate exits **0 while still true** →
+keep running; non-zero → stop.
 
 ## Drive (one iteration per turn)
 

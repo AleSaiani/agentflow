@@ -38,6 +38,21 @@ function killPath(runId) {
 function iterDir(runId) {
     return join(stateDir(CMD), runId);
 }
+/** Accept a step as a plain bash command string OR a JSON object `{type, command, mode?}`. */
+function coerceStep(raw) {
+    const t = raw.trim();
+    if (t.startsWith("{")) {
+        try {
+            const obj = JSON.parse(t);
+            if (obj && typeof obj === "object" && !Array.isArray(obj))
+                return obj;
+        }
+        catch {
+            /* not JSON — fall through to the plain-string form */
+        }
+    }
+    return { type: "bash", command: raw };
+}
 function cmdInit(args) {
     const { values, positionals } = parseArgs({
         args,
@@ -46,6 +61,7 @@ function cmdInit(args) {
         options: {
             stage: { type: "string" },
             stop: { type: "string" },
+            mode: { type: "string", default: "until" },
             times: { type: "string" },
             "check-first": { type: "boolean", default: false },
             "max-iterations": { type: "string", default: "10" },
@@ -66,16 +82,25 @@ function cmdInit(args) {
     if (!values["stage"])
         die("error: init requires --stage");
     const times = values["times"] !== undefined ? parseInt(values["times"], 10) : null;
-    const stage = JSON.parse(values["stage"]);
-    // `stop` is optional with --times: a fixed-count repeat uses a never-satisfied predicate so
-    // the loop terminates only at max_iterations (= times).
+    // --stage / --stop accept a plain bash command string OR a JSON object. A string --stop takes
+    // its mode from --mode (default "until"); a JSON --stop carries its own.
+    const stage = coerceStep(values["stage"]);
+    const mode = values["mode"];
+    if (!["until", "while"].includes(mode))
+        die("error: --mode must be 'until' or 'while'");
     let stop;
-    if (values["stop"])
-        stop = JSON.parse(values["stop"]);
-    else if (times !== null)
+    if (values["stop"]) {
+        stop = coerceStep(values["stop"]);
+        if (!stop["mode"])
+            stop["mode"] = mode;
+    }
+    else if (times !== null) {
+        // a fixed-count repeat uses a never-satisfied predicate so it terminates only at max_iterations
         stop = { type: "bash", command: "false", mode: "until" };
-    else
+    }
+    else {
         die("error: init requires --stop (or --times for a fixed-count repeat)");
+    }
     if (stage.type !== "bash")
         die("error: v1 only supports stage type 'bash'");
     if (!("command" in stage))

@@ -73,6 +73,19 @@ test("iterate: until-loop stops when predicate satisfied", () => {
   assert.equal(status.iteration_count, 3);
 });
 
+test("iterate: accepts plain-string --stage/--stop (no JSON needed)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "iter-"));
+  const env = { ITERATE_STATE_DIR: dir };
+  // plain strings; --mode defaults to until → stop when the predicate exits 0
+  run(ITERATE, env, ["init", "s1", "--stage", "echo iter $ITER_INDEX", "--stop", '[ "$ITER_INDEX" -ge 1 ]']);
+  for (let i = 0; i < 5; i++) {
+    if (run(ITERATE, env, ["run-iteration", "s1"]).action === "stop") break;
+  }
+  const status = run(ITERATE, env, ["status", "s1"]);
+  assert.equal(status.stop_reason, "predicate_satisfied");
+  assert.equal(status.iteration_count, 2); // index 0 (continue) then index 1 (stop)
+});
+
 test("iterate: max-iterations hard cap", () => {
   const dir = mkdtempSync(join(tmpdir(), "iter-"));
   const env = { ITERATE_STATE_DIR: dir };

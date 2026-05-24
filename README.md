@@ -15,34 +15,35 @@
 
 ---
 
-**Flow** gives an LLM the control-flow you'd reach for in code — `for each`, `reduce`, `group by`,
-`while`, and pipelines — as **durable, resumable operations**. State lives on disk, a Stop hook
-carries loops across turns and context compaction, and a declarative workflow-file wires the
-primitives into reusable pipelines.
+**Flow** turns repetitive, large, or multi-step LLM work into **durable, resumable operations** — the
+`for each`, `reduce`, `group by`, and `while` you'd reach for in code, except each step is an LLM doing
+the work. In a plain chat that work is fragile: you lose track halfway, there's no parallelism, and a
+long session gets compacted and forgets where it was. Flow fixes that — **every run is a state file on
+disk**, a Stop hook **resumes it across turns**, and the pieces **compose into reusable workflows**.
 
-Think of it as a **structured, durable "Ralph loop"**: not a blind while-loop over a task list, but
-an engine where the *worker* is an LLM and the *control flow* is deterministic code. The rule that
-keeps "deterministic" honest: **the LLM produces structured data; branching is always evaluated by
-code — never on free text.**
+## A first taste
 
-## See it work — no LLM, ~10 seconds
+You have a book outline and want to draft all twelve chapters:
 
-A fully deterministic pipeline (emit items → build a descriptor → partition by path). `drive`
-auto-runs every stage to completion with **zero agent dispatches**:
+```text
+# 1 — unfold: turn the outline into a list of chapter items (saved to disk)
+/flow:enumerate --prompt "Turn this outline into chapters: id, title, one-line brief" --input outline.md
 
-```console
-$ node dist/state/pipe.js init demo --workflow examples/workflows/demo.json
-{"run_id":"demo","stages":3,...}
-
-$ node dist/state/pipe.js drive demo
-{"action":"done","steps_taken":5,...}
-
-$ node dist/inspect.js show demo --cmd group   # the partition child
-# → groups: lib (1 item), src (2 items)
+# 2 — map: draft each chapter in parallel, one subagent per chapter
+/flow:foreach --items chapters.json --prompt "Draft this chapter from data.brief (~800 words)"
 ```
 
-That's the engine. Swap the deterministic stages for `/flow:foreach` (per-file LLM review) and
-`/flow:reduce` (digest) and you have the `audit` recipe — same machinery, agents only where needed.
+**Why it works:** `enumerate` writes the chapter list to a state file you can inspect and tweak before
+committing compute. `foreach` then processes each item in its own subagent and checkpoints every
+result — so if you close the laptop and reopen tomorrow, the Stop hook finds the unfinished run and
+picks up exactly where it left off, even if the conversation was compacted in between. Add a
+`/flow:reduce` step to stitch the chapters into one document and that's a three-line pipeline.
+
+> The *control flow* is deterministic; only the work *inside* each step is the LLM — that's the rule
+> that keeps "deterministic" honest (**the LLM produces structured data; branching is always code over
+> that data, never a judgment on free text**). Curious to watch the bare engine drive a pipeline to
+> completion with no LLM at all? The 10-second runnable demo is in
+> [docs/getting-started.md](docs/getting-started.md).
 
 ## Highlights
 
@@ -101,18 +102,18 @@ claude --plugin-dir .
 ## Cookbook
 
 ```text
-# Review every C# file under a folder, then produce an executive digest (a shipped recipe):
-/flow:audit --target src --file-glob "**/*.cs"
-
-# Process a markdown checklist in parallel (each line becomes an item):
-/flow:foreach --checkbox TODO.md
+# Process a markdown checklist in parallel (each unchecked line becomes an item):
+/flow:foreach --checkbox TODO.md --prompt "Complete this task"
 
 # Generate a list, then act on it (unfold → map):
-/flow:enumerate --prompt "Break this outline into chapters"   # → items.json
-/flow:foreach --items <items.json> --prompt "Draft each chapter"
+/flow:enumerate --prompt "Break this outline into chapters" --input outline.md   # → items.json
+/flow:foreach --items items.json --prompt "Draft each chapter"
 
-# Loop until the build passes (do…until); or while a queue stays non-empty (while…do):
-/flow:until    # stage "npm run build", stop "exit 0"
+# Loop until the build passes (plain bash commands, no JSON):
+/flow:until --stage "npm run build" --stop "npm run build"
+
+# A shipped recipe — review every file under a folder, then digest:
+/flow:audit --target src --file-glob "**/*.cs"
 
 # Author a reusable workflow, then run it:
 /flow:compose "discover files → review each → digest"

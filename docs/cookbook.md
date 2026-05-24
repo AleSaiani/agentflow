@@ -53,20 +53,20 @@ to `foreach`. (If the list already exists — a glob, a file — skip this and p
 > "Keep fixing the build until it's green (max 8 tries)."
 
 ```text
-/flow:until --stage '{"type":"bash","command":"npm run build 2>&1 | tee $ITER_OUTPUT_PATH"}' \
-            --stop  '{"type":"bash","command":"npm run build","mode":"until"}' \
-            --max-iterations 8
+/flow:until --stage "npm run build" --stop "npm run build" --max-iterations 8
 ```
 
-`do…until`: run the body, then check. One iteration per turn — the Stop hook fires the next. Stops on
-`predicate_satisfied`, `max_iterations`, `convergence` (output stopped changing), or a `kill`.
+`--stage` and `--stop` are plain bash commands (pass JSON only for extra fields). `do…until` runs the
+body, then checks the predicate — exit 0 = satisfied = stop. One iteration per turn; the Stop hook
+fires the next. Stops on `predicate_satisfied`, `max_iterations`, `convergence` (output stopped
+changing), or a `kill`.
 
 ### 5. Repeat a fixed number of times
 
 > "Run the flaky test 10 times and collect the failures."
 
 ```text
-/flow:repeat --stage '{"type":"bash","command":"pytest tests/flaky_test.py"}' --times 10
+/flow:repeat --stage "pytest tests/flaky_test.py" --times 10
 ```
 
 A bounded count loop — no predicate, just N runs.

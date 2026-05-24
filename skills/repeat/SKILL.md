@@ -17,9 +17,11 @@ never-satisfied predicate, so it terminates only at `--times`.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/iterate.js" init <run-id> \
-  --stage '{"type":"bash","command":"<command to run each time>"}' \
+  --stage "<command to run each time>" \
   --times <N>
 ```
+
+(`--stage` takes a plain bash command; pass a JSON object only if you need extra fields.)
 
 ## Drive (one iteration per turn)
 

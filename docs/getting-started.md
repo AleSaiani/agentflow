@@ -24,8 +24,11 @@ semantics on every OS).
 
 ## 2. See the engine work — no LLM, ~10 seconds
 
-Run the bundled deterministic demo. Every stage is bash/json/deterministic-group, so `drive`
-takes it all the way to `done` with **no agent dispatches**:
+You normally use the `/flow:*` skills and let Claude drive things. Under the hood those skills run an
+**engine CLI** (`node "$CLAUDE_PLUGIN_ROOT/dist/state/<cmd>.js" …`). Running it directly on a bundled
+demo is the fastest way to *see the state machine work* — and because this demo's stages are all
+bash/json/deterministic-group, `drive` takes it all the way to `done` with **no LLM calls at all**.
+It's the plumbing made visible; you won't type these commands in normal use.
 
 ```shell
 node dist/state/pipe.js init demo --workflow examples/workflows/demo.json

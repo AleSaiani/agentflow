@@ -16,10 +16,13 @@ Engine: `iterate`. `until` mode: the stop predicate exits **0 when satisfied** â
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/state/iterate.js" init <run-id> \
-  --stage '{"type":"bash","command":"<body>"}' \
-  --stop  '{"type":"bash","command":"<predicate>","mode":"until"}' \
+  --stage "<body command>" \
+  --stop  "<predicate command>" \
   [--max-iterations <N>] [--no-convergence-check]
 ```
+
+`--stage` and `--stop` take plain bash commands (`--mode` defaults to `until` here). The predicate
+exits **0 when satisfied** â†’ stop.
 
 ## Drive (one iteration per turn)
 

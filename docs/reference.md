@@ -105,12 +105,14 @@ the next across turns. Each iteration captures stdout; env: `ITER_INDEX`, `ITER_
 
 | Skill | Semantics | Init |
 |---|---|---|
-| `repeat` | fixed count (`for`) | `--stage '{…}' --times N` |
-| `until` | do…until (run, then check) | `--stage '{…}' --stop '{…,"mode":"until"}'` |
-| `while` | while…do (check first) | `--stage '{…}' --stop '{…,"mode":"while"}' --check-first` |
+| `repeat` | fixed count (`for`) | `--stage "<cmd>" --times N` |
+| `until` | do…until (run, then check) | `--stage "<cmd>" --stop "<predicate>"` |
+| `while` | while…do (check first) | `--stage "<cmd>" --stop "<predicate>" --mode while --check-first` |
+
+`--stage` and `--stop` accept a **plain bash command string** or a JSON `{type, command, mode?}`.
 
 **CLI** (`dist/state/iterate.js`):
-- `init <id> --stage '{"type":"bash","command":"…"}' (--stop '{"type":"bash","command":"…","mode":"until|while"}' | --times N) [--check-first] [--max-iterations N] [--no-convergence-check] [--model …] [--force] [--validate-only]`
+- `init <id> --stage "<cmd>" (--stop "<predicate>" [--mode until|while] | --times N) [--check-first] [--max-iterations N] [--no-convergence-check] [--model …] [--force] [--validate-only]`
 - `run-iteration <id>` → `{action:"continue"|"stop", reason, …}` · `kill <id>` · `fail <id>` · `status <id>` · `runs` · `budget-add` · `increment-continues`
 
 Stop reasons: `predicate_satisfied | max_iterations | convergence | stage_failed | killed`.
