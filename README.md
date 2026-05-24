@@ -21,23 +21,47 @@ the work. In a plain chat that work is fragile: you lose track halfway, there's 
 long session gets compacted and forgets where it was. Flow fixes that — **every run is a state file on
 disk**, a Stop hook **resumes it across turns**, and the pieces **compose into reusable workflows**.
 
+> **You don't type commands.** You describe the goal in plain language; Claude picks the right Flow
+> skill and runs it. The `/flow:…` lines in these docs show *what Claude runs*, for transparency — you
+> won't normally write the flags yourself.
+
 ## A first taste
 
-You have a book outline and want to draft all twelve chapters:
+You say:
+
+> *"Here's my book outline `outline.md` — break it into chapters and draft each one."*
+
+Claude runs two steps (shown so you can see what happens):
 
 ```text
-# 1 — unfold: turn the outline into a list of chapter items (saved to disk)
-/flow:enumerate --prompt "Turn this outline into chapters: id, title, one-line brief" --input outline.md
-
-# 2 — map: draft each chapter in parallel, one subagent per chapter
-/flow:foreach --items chapters.json --prompt "Draft this chapter from data.brief (~800 words)"
+/flow:enumerate --prompt "outline → chapters: id, title, one-line brief" --input outline.md   # → chapters.json
+/flow:foreach   --items chapters.json --prompt "draft this chapter from data.brief (~800 words)"
 ```
 
-**Why it works:** `enumerate` writes the chapter list to a state file you can inspect and tweak before
-committing compute. `foreach` then processes each item in its own subagent and checkpoints every
-result — so if you close the laptop and reopen tomorrow, the Stop hook finds the unfinished run and
+Your input, `outline.md`:
+
+```markdown
+# Part I — Foundations
+- What problem this solves
+- Prior art
+# Part II — The approach
+- Core idea
+- Worked example
+```
+
+…becomes `chapters.json` (which you can inspect and tweak before any drafting happens):
+
+```json
+[ {"id": "what-problem-this-solves", "data": {"title": "What problem this solves", "brief": "…"}},
+  {"id": "prior-art",                "data": {"title": "Prior art", "brief": "…"}}, … ]
+```
+
+…and `foreach` then drafts each chapter in its own subagent, checkpointing every one.
+
+**Why it works:** the chapter list is a state file on disk; `foreach` processes each item and checkpoints
+its result — so if you close the laptop and reopen tomorrow, the Stop hook finds the unfinished run and
 picks up exactly where it left off, even if the conversation was compacted in between. Add a
-`/flow:reduce` step to stitch the chapters into one document and that's a three-line pipeline.
+`/flow:reduce` step to stitch the chapters into one document and that's a three-step pipeline.
 
 > The *control flow* is deterministic; only the work *inside* each step is the LLM — that's the rule
 > that keeps "deterministic" honest (**the LLM produces structured data; branching is always code over

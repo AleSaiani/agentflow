@@ -1,9 +1,13 @@
 # Cookbook
 
-Real scenarios, from a single command to a full multi-stage workflow. Each shows **what you'd say to
-Claude**, **what Flow does**, and **what you get**. Most of the time you just describe the goal in
-natural language and Claude triggers the right skill; the explicit `/flow:…` form is shown so you can
-see (and pin down) what runs.
+Real scenarios, from a single command to a full multi-stage workflow.
+
+**How to read these.** You **don't type the flags** — you describe the goal in plain language and
+Claude picks the right Flow skill and runs it. Each scenario is laid out as:
+
+- **You say** — what you actually type to Claude (natural language);
+- **Claude runs** — the command it translates that into (shown for transparency);
+- the **input** file(s) and the **result** you get.
 
 Mental model in one line: **`enumerate` makes a list → `foreach` works each item → `reduce` digests
 the results**, with `group` to partition, `repeat`/`until`/`while` to loop, and `pipe`/`compose`/`run`
@@ -15,16 +19,28 @@ to wire it all into a reusable workflow. State is on disk, so any of these survi
 
 ### 1. Work through a checklist in parallel
 
-> "Here's `TODO.md` — do every unchecked item."
+**You say:** *"Here's `TODO.md` — do every unchecked task."*
 
+**Input** — `TODO.md`:
+```markdown
+- [ ] Add a rate limiter to the API {model:opus}
+- [ ] Write tests for the billing module
+- [x] Update the changelog
+```
+
+**Claude runs:**
 ```text
 /flow:foreach --checkbox TODO.md --prompt "Complete this task; report what you changed"
 ```
 
-Flow parses each `- [ ]` line into an item (inline `{model:opus}` annotations become per-item
-overrides), processes them in parallel chunks across subagents, and persists progress. Reopen the
-session mid-run and it resumes. Reflect results back onto the file with the checkbox **view** so done
-items flip to `[x]`.
+Each `- [ ]` line becomes an item (the `[x]` line starts done; inline `{model:opus}` is a per-item
+override). Claude works them in parallel subagents and checkpoints progress — reopen mid-run and it
+resumes. **Result** — with the checkbox view, finished tasks flip to `[x]` in the file:
+```markdown
+- [x] Add a rate limiter to the API {model:opus}
+- [x] Write tests for the billing module
+- [x] Update the changelog
+```
 
 ### 1b. Track a folder of task files (file kanban)
 
@@ -132,16 +148,35 @@ or `llm-classify` when the key needs judgment (one agent returns the mapping; th
 
 ### 9. The `audit` recipe (discover → review → group → digest)
 
-> "Audit `examples/fake-repo` for bugs."
+**You say:** *"Audit `examples/fake-repo` for bugs."*
 
+**Claude runs:**
 ```text
 /flow:audit --target examples/fake-repo
 ```
 
 A layer-3 recipe: a shipped workflow-file ([`workflows/audit.json`](../workflows/audit.json)) wires
 discover (bash) → review (`foreach`, cached) → partition (`group`) → digest (`reduce`). `pipe drive`
-auto-runs the deterministic stages and stops only for the two LLM stages. Re-run after changing one
-file: only that file's review re-dispatches (cache hits skip the rest).
+auto-runs the deterministic stages and stops only for the two LLM stages.
+
+**Result** — a markdown digest (excerpt):
+```markdown
+# Code audit — examples/fake-repo (8 files, 4 components)
+
+## Severity rollup
+🔴 2 critical · 🟠 3 major · 🟡 4 minor
+
+## Hotspots
+1. auth/TokenIssuer.cs — token signed with a hardcoded secret (critical)
+2. billing/RefundProcessor.cs — refund amount not validated against the charge (critical)
+
+## Recurring patterns
+- Missing null-checks on external input (5 files)
+- Catch-all `catch (Exception)` swallowing errors (3 files)
+```
+
+Re-run after changing one file: only that file's review re-dispatches — cache hits skip the rest, so
+it's cheap.
 
 ### 10. Author and run your own workflow
 
