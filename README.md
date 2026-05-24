@@ -2,81 +2,76 @@
 
 # Agent Flow
 
-**Deterministic, composable iteration & workflows for Claude Code — durable across turns.**
+**Describe a workflow in plain language — Agent Flow builds it, runs it, and keeps it running across turns.**
 
 [![version](https://img.shields.io/badge/version-1.0.0--beta.1-blue)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
 [![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](https://nodejs.org)
 
-`agentflow` · a Claude Code plugin · invoke as `/agentflow:enumerate` · `/agentflow:pipe` · `/agentflow:audit`
+`agentflow` · a Claude Code plugin · `/agentflow:create-workflow` · `/agentflow:run-workflow`
 
 </div>
 
 ---
 
-**Agent Flow** turns repetitive, large, or multi-step LLM work into **durable, resumable operations** — the
-`for each`, `reduce`, `group by`, and `while` you'd reach for in code, except each step is an LLM doing
-the work. In a plain chat that work is fragile: you lose track halfway, there's no parallelism, and a
-long session gets compacted and forgets where it was. Agent Flow fixes that — **every run is a state file on
-disk**, a Stop hook **resumes it across turns**, and the pieces **compose into reusable workflows**.
+## What it is
 
-> **You don't type the flags — you describe the goal.** Two ways:
-> - let Claude pick the skill from your request (best-effort), or
-> - **for certainty, invoke the skill by name and describe the rest in plain words** —
->   `/agentflow:foreach summarize every file in src/`. The `/agentflow:` prefix guarantees the skill runs; the
->   skill translates your words into the exact command.
->
-> The `/agentflow:…` lines in these docs show *what Claude runs*, for transparency.
+You tell Claude what you want done across many things — *"review every file in `src/`, group the
+findings, write me one digest"* — and **Agent Flow turns it into a durable, resumable workflow**. Each
+step is an LLM doing the work, but the **control flow is deterministic** and **every run is a state
+file on disk** — so a long job survives parallelism, interruptions, and even context compaction.
 
-## A first taste
+> **You don't type the flags.** You describe the goal; the skill writes the exact commands. The
+> `/agentflow:…` lines below show *what runs under the hood*, for transparency.
+
+## The main way: describe → build → run
 
 You say:
 
-> *"Here's my book outline `outline.md` — break it into chapters and draft each one."*
-
-Claude runs two steps (shown so you can see what happens):
+> *"Review every `.cs` file under `src/`, group the findings by area, and give me one digest."*
 
 ```text
-/agentflow:enumerate --prompt "outline → chapters: id, title, one-line brief" --input outline.md   # → chapters.json
-/agentflow:foreach   --items chapters.json --prompt "draft this chapter from data.brief (~800 words)"
+/agentflow:create-workflow "review every .cs file in src → group findings by area → one digest"
 ```
 
-Your input, `outline.md`:
+Agent Flow designs the workflow, confirms a name with you, and writes a **self-contained, movable
+folder** — the steps plus any helper script it needs, referenced relatively:
 
-```markdown
-# Part I — Foundations
-- What problem this solves
-- Prior art
-# Part II — The approach
-- Core idea
-- Worked example
+```text
+workflows/code-review/
+  workflow.json     ← the steps, wired together
+  discover.mjs      ← a helper script (called via {{workflow.dir}}, so the folder is portable)
 ```
 
-…becomes `chapters.json` (which you can inspect and tweak before any drafting happens):
+Then run it — now, or any time, on any machine:
 
-```json
-[ {"id": "what-problem-this-solves", "data": {"title": "What problem this solves", "brief": "…"}},
-  {"id": "prior-art",                "data": {"title": "Prior art", "brief": "…"}}, … ]
+```text
+/agentflow:run-workflow workflows/code-review/workflow.json     # add --dry-run to preview first
 ```
 
-…and `foreach` then drafts each chapter in its own subagent, checkpointing every one.
+It drives itself: deterministic steps run automatically, LLM steps dispatch agents, and the whole
+thing **resumes across turns** if interrupted. The digest lands as a plain file in your workspace,
+not buried in a hidden folder.
 
-**Why it works:** the chapter list is a state file on disk; `foreach` processes each item and checkpoints
-its result — so if you close the laptop and reopen tomorrow, the Stop hook finds the unfinished run and
-picks up exactly where it left off, even if the conversation was compacted in between. Add a
-`/agentflow:reduce` step to stitch the chapters into one document and that's a three-step pipeline.
+## Or: run a shipped recipe
 
-> The *control flow* is deterministic; only the work *inside* each step is the LLM — that's the rule
-> that keeps "deterministic" honest (**the LLM produces structured data; branching is always code over
-> that data, never a judgment on free text**). Curious to watch the bare engine drive a pipeline to
-> completion with no LLM at all? The 10-second runnable demo is in
-> [docs/getting-started.md](docs/getting-started.md).
+`audit` is a ready-made workflow — discover files → review each → group by area → executive digest:
 
-## Track work as a file kanban
+```text
+/agentflow:audit --target src --file-glob "**/*.cs"
+```
 
-Point `/agentflow:foreach` at a folder of task files and it works each one, **moving the file across
-`todo/ → in-progress/ → done/`** as it goes — a board you can watch in your own file tree:
+## Or: reach for a single primitive
+
+When you just want **one operation over a list**, call the primitive directly — no workflow needed:
+
+```text
+/agentflow:foreach --folder tasks --prompt "Do the task described in this file"
+```
+
+Point `foreach` at a folder of task files and it works each one, **moving the file across
+`todo/ → in-progress/ → done/`** automatically — a board you watch in your own file tree:
 
 ```text
    before                 …mid-run                 done
@@ -89,11 +84,7 @@ Point `/agentflow:foreach` at a folder of task files and it works each one, **mo
                               refactor-auth.md
 ```
 
-```text
-/agentflow:foreach --folder tasks --prompt "Do the task described in this file"
-```
-
-Check the state at any point — `/agentflow:board` shows what's in flight, with progress and cost:
+Check progress any time — `/agentflow:board` shows what's in flight, with cost:
 
 ```text
 === Workspace board (1 active, 0 done, 0 failed) ===
@@ -101,43 +92,25 @@ ACTIVE (1):
   [foreach   ] tasks-run    2/3 done    updated 2026-05-24T10:42:07Z
 ```
 
-(Sources are pluggable: a folder, a markdown checklist, a JSON list, or another run's output — same
-engine underneath.)
+## Under the hood — the primitives
 
-## Highlights
-
-- **A programmatic vocabulary** — `enumerate` (unfold 1→N), `foreach` (map N→N), `reduce` (fold N→1),
-  `group` (partition), `repeat` / `until` / `while` (loop) — each a persisted, resumable run.
-- **Durable across turns** — a Stop hook auto-resumes in-flight runs; state survives compaction
-  because it lives in `state.json`, not the conversation.
-- **Composable** — `/agentflow:pipe` chains stages with declarative wiring and per-stage **conditional
-  guards** (`when`); `/agentflow:create-workflow` authors reusable workflow-files, `/agentflow:run-workflow` executes them.
-- **Human-readable sources** — drive a run from a markdown checklist (`- [ ] task {model:opus}`).
-- **Operation = a prompt** — the per-item op is instructions; model and subagent are optional, and
-  work can run inline in the main thread instead of fanning out.
-- **Zero runtime dependencies** — Node builtins only; ships compiled, runs anywhere Node ≥ 22 runs.
-
-## Primitives
+`create-workflow` wires these together for you, but you can call any of them directly. They're the
+functional vocabulary (`map` / `fold` / `group by` / `loop`), each a **persisted, resumable run**:
 
 | Command | Like | What it does |
 |---|---|---|
-| `/agentflow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec (outline → chapters); produces an items.json |
-| `/agentflow:foreach` | `map` (N→N) | Apply a **prompt** to each item of a list — inline or in parallel; model/subagent optional; per-item overrides + content-hash cache |
-| `/agentflow:reduce` | `fold` (N→1) | Collapse N inputs into 1 digest (markdown or JSON) |
+| `/agentflow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec (outline → chapters) |
+| `/agentflow:foreach` | `map` (N→N) | Apply a **prompt** to each item — inline or in parallel; `--serial`/`--carry`, `--shard`, per-item overrides, content-hash cache |
+| `/agentflow:reduce` | `fold` (N→1) | Collapse N inputs into one digest (markdown or JSON) |
 | `/agentflow:group` | `group by` | Partition N items into K groups — path-prefix / regex / jsonpath, or LLM-classify |
-| `/agentflow:repeat` · `until` · `while` | `for` · `do…until` · `while…do` | Loop a stage a fixed count, until a predicate, or while one holds (one engine) |
-| `/agentflow:pipe` | pipeline | Compose stages; declarative wiring + `when` guards; `plan` for a dry-run |
-| `/agentflow:run-workflow` · `compose` | — | Run a workflow-file end to end (`--dry-run` to preview) · author one from the primitives |
-| `/agentflow:inspect` · `board` · `history` | — | Read-only: inspect a run · session dashboard · chronological run log |
-| `/agentflow:audit` | recipe | discover → review → partition → executive digest, as a declarative workflow-file |
+| `/agentflow:repeat` · `until` · `while` | `for` · `do…until` · `while…do` | Loop a stage by count, until a predicate, or while one holds |
+| `/agentflow:pipe` | pipeline | Compose stages with declarative wiring + per-stage `when` guards |
+| `/agentflow:create-workflow` · `run-workflow` | author · execute | Build a reusable workflow-folder · run one end to end (`--dry-run` to preview) |
+| `/agentflow:inspect` · `board` · `history` | observe | Inspect a run · session dashboard · chronological run log |
+| `/agentflow:audit` | recipe | A shipped workflow: discover → review → group → digest |
 
-## The workflow layer
-
-- **Source / View** — items come from an inline list, a JSON file, another run's output, or a
-  **markdown checklist**; a View can reflect state back onto the checklist (`[ ]` ↔ `[x]`).
-- **Conditional steps** — a pipe stage's `when` guard (a bash predicate) decides run-vs-skip.
-- **Workflow-files** — a declarative JSON `WorkflowSpec` compiles 1:1 into the pipe's stages, so you
-  version and reuse pipelines (see [`workflows/audit/workflow.json`](workflows/audit/workflow.json)).
+Sources are pluggable: a folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON list, or
+another run's output — same engine underneath.
 
 ## Install
 
@@ -155,68 +128,30 @@ npm install && npm run build
 claude --plugin-dir .
 ```
 
-> Requires Node ≥ 22 and `git bash` on `PATH` (pipe/iterate run shell stages under bash for POSIX
-> semantics on every OS).
+> Requires Node ≥ 22 and `git bash` on `PATH` (shell stages run under bash for POSIX semantics on every OS).
 
-## Cookbook
-
-```text
-# Process a markdown checklist in parallel (each unchecked line becomes an item):
-/agentflow:foreach --checkbox TODO.md --prompt "Complete this task"
-
-# Generate a list, then act on it (unfold → map):
-/agentflow:enumerate --prompt "Break this outline into chapters" --input outline.md   # → items.json
-/agentflow:foreach --items items.json --prompt "Draft each chapter"
-
-# Loop until the build passes (plain bash commands, no JSON):
-/agentflow:until --stage "npm run build" --stop "npm run build"
-
-# A shipped recipe — review every file under a folder, then digest:
-/agentflow:audit --target src --file-glob "**/*.cs"
-
-# Author a reusable workflow, then run it:
-/agentflow:create-workflow "discover files → review each → digest"
-/agentflow:run-workflow workflows/<name>.json    # add --dry-run to preview the plan first
-
-# See what's in flight after reopening the workspace:
-/agentflow:board
-```
+## Docs
 
 **📚 Full docs in [`docs/`](docs/):** [Getting started](docs/getting-started.md) ·
 [Concepts](docs/concepts.md) · [Cookbook](docs/cookbook.md) (real scenarios, simple → complex) ·
 [Reference](docs/reference.md) (every skill, flag, and subcommand) ·
 [Beta testing](docs/beta-test.md) (try it live).
 
-## How it works
+## How it works (the short version)
 
-Each run is a `state.json` under `.flow/<cmd>/<run-id>/` at the workspace root; the orchestrator (Claude)
-is the only writer. A `Stop` hook scans every run and, if one has `auto_continue` and residual work
-(under its cap), blocks the turn and tells Claude how to resume — purely from disk, so runs survive
-compaction. `/agentflow:pipe` reads its children's state to decide when to advance and never mutates them;
-`pipe drive` auto-runs every bash, json, and deterministic stage, stopping only when an agent
-dispatch is genuinely needed.
-
-## Architecture
-
-TypeScript (strict, ESM/NodeNext) compiled to a committed `dist/`, run with `node`. **Zero runtime
-dependencies** — Node builtins only (`fs`, `path`, `crypto`, `child_process`, `util.parseArgs`). The
-registry in `src/common.ts` is the composition contract every primitive registers into: add one and
-the Stop hook and `/agentflow:pipe` pick it up automatically.
-
-```shell
-npm install      # dev deps only (typescript, @types/node)
-npm run build    # tsc → dist/
-npm test         # node:test (builds first)
-```
+Every run is a `state.json` under `.flow/<cmd>/<run-id>/`; Claude is the only writer. A `Stop` hook
+finds any in-flight run and resumes it across turns — purely from disk, so runs survive compaction.
+The control flow is deterministic; only the work *inside* each step is the LLM (**it produces
+structured data; branching is always code over that data, never a judgment on free text**). The
+engine is TypeScript compiled to a committed `dist/`, **zero runtime dependencies** (Node builtins
+only). See [docs/concepts.md](docs/concepts.md) for the full model.
 
 ## Status
 
 `1.0.0-beta.1`. Primitives, the workflow layer, inspect/board, and the Stop hook are implemented and
-covered by an automated suite, including a simulated cross-turn resumption loop (each turn a fresh
-process reading only disk state). The Stop hook output contract is verified against current docs; a
-**live multi-turn Claude Code session smoke test** is the recommended final check before relying on
-it in production. Roadmap and deferred items (YAML front-end, folder-kanban source, branch/back-edge
-runtime, Codex adapter) live in [CHANGELOG.md](CHANGELOG.md).
+covered by an automated suite (including a simulated cross-turn resumption loop). A **live multi-turn
+Claude Code session smoke test** is the recommended final check before relying on it in production.
+Roadmap and deferred items live in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
