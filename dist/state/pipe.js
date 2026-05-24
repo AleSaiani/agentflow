@@ -176,8 +176,12 @@ function validateStages(stagesRaw) {
                 die(`error: stage ${i}: when must be {type:"bash", command:"..."}`);
         }
         const next = raw["next"];
-        if (next !== undefined && next !== null && typeof next !== "string" && typeof next !== "number")
-            die(`error: stage ${i}: next must be a stage name (string), index (number), or null`);
+        if (next !== undefined && next !== null && typeof next !== "string" && typeof next !== "number" && !Array.isArray(next))
+            die(`error: stage ${i}: next must be a stage name (string), index (number), null, or an array of {when?, goto} branch rules`);
+        if (Array.isArray(next))
+            for (const r of next)
+                if (typeof r !== "object" || r === null || r["goto"] === undefined)
+                    die(`error: stage ${i}: each branch rule needs a 'goto'`);
         out.push({
             index: i,
             name: raw["name"] ?? null,
@@ -337,8 +341,44 @@ function currentStage(state) {
  * the schema but graph traversal (named jumps / back-edges) is a v1.1 runtime feature. This
  * single helper is the seam where that resolution will live.
  */
-function nextIndex(state, _cur) {
+/** Resolve a branch target (stage name or index) to a stage index. */
+function resolveTarget(state, target) {
+    if (typeof target === "number")
+        return target;
+    if (typeof target === "string") {
+        const idx = state["stages"].findIndex((s) => s["name"] === target);
+        if (idx < 0)
+            die(`error: branch target '${target}' is not a stage name`);
+        return idx;
+    }
     return state["stage_index"] + 1;
+}
+/**
+ * Compute the next stage index from the completed stage's `next` field — the **fork** seam:
+ * - absent/null → linear (`+1`);
+ * - a stage name / index → jump there;
+ * - an array of `{ when?: <bash predicate>, goto: <name|index> }` rules → take the first rule whose
+ *   `when` exits 0 (a rule with no `when` is the default/else). Forward jumps skip the not-taken
+ *   branch's stages (they stay pending, unvisited). For loops/back-edges use /agentflow:until.
+ */
+function nextIndex(state, cur) {
+    const linear = state["stage_index"] + 1;
+    const next = cur?.["next"];
+    if (next === undefined || next === null)
+        return linear;
+    if (Array.isArray(next)) {
+        for (const ruleRaw of next) {
+            const rule = ruleRaw;
+            if (rule["when"] === undefined || rule["when"] === null) {
+                return rule["goto"] !== undefined ? resolveTarget(state, rule["goto"]) : linear; // default/else
+            }
+            const whenObj = typeof rule["when"] === "string" ? { type: "bash", command: rule["when"] } : rule["when"];
+            if (evalWhenGuard(whenObj, state, cur["index"]) === 0)
+                return resolveTarget(state, rule["goto"]);
+        }
+        return linear;
+    }
+    return resolveTarget(state, next);
 }
 /** Run a stage's `when` guard. exit 0 → run the stage; non-zero → skip. */
 function evalWhenGuard(when, state, stageIndex) {

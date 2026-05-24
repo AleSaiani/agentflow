@@ -223,7 +223,7 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
       "name": "unique-name",                                 // required to wire references
       "type": "bash" | "json" | "primitive",
       "when": { "type": "bash", "command": "<predicate>" },  // optional guard: exit 0 runs, else skip
-      "next": "<stage-name>" | <index> | null,               // graph edge (v1: linear; schema-ready)
+      "next": "<stage>" | <index> | [{ "when": "<bash>", "goto": "<stage>" }, …] | null, // fork/route
       "output_schema": { "type": "object", "required": [] }, // optional: validate the stage's JSON output
       "spec": { /* type-specific */ }
     }

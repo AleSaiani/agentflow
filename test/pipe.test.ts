@@ -175,6 +175,37 @@ test("pipe: a stage's output_schema gates advancement (fail on mismatch)", () =>
   assert.match(String(driven.error), /output failed schema: \$\.n: required/);
 });
 
+test("pipe: conditional `next` branches (fork) route forward and skip the not-taken stage", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const mk = (cond: string) =>
+    JSON.stringify({
+      stages: [
+        { name: "a", type: "bash", next: [{ when: cond, goto: "c" }, { goto: "b" }], spec: { command: 'echo A > "$PIPE_OUTPUT_PATH"' } },
+        { name: "b", type: "bash", spec: { command: 'echo B > "$PIPE_OUTPUT_PATH"' } },
+        { name: "c", type: "bash", spec: { command: 'echo C > "$PIPE_OUTPUT_PATH"' } },
+      ],
+    });
+
+  // when=true → jump a→c, b never runs (the not-taken branch)
+  const wf1 = join(dir, "t.json");
+  writeFileSync(wf1, mk("true"), "utf8");
+  run(env, ["init", "ft", "--workflow", wf1]);
+  assert.equal(run(env, ["drive", "ft"]).action, "done");
+  const s1: Record<string, string> = {};
+  for (const s of run(env, ["status", "ft"]).stages) s1[s.name] = s.status;
+  assert.deepEqual(s1, { a: "done", b: "pending", c: "done" });
+
+  // when=false → fall through to the default branch (b), then linear to c
+  const wf2 = join(dir, "f.json");
+  writeFileSync(wf2, mk("false"), "utf8");
+  run(env, ["init", "ff", "--workflow", wf2]);
+  run(env, ["drive", "ff"]);
+  const s2: Record<string, string> = {};
+  for (const s of run(env, ["status", "ff"]).stages) s2[s.name] = s.status;
+  assert.deepEqual(s2, { a: "done", b: "done", c: "done" });
+});
+
 test("pipe: plan (dry-run) shows the resolved stage plan without executing", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };

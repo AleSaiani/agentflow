@@ -216,6 +216,13 @@ function compileStage(s) {
     const schema = bulletGet(bullets, "output-schema") ?? bulletGet(bullets, "output_schema");
     if (schema !== undefined)
         stage["output_schema"] = schema;
+    // Branching: `- next: <stage>` (simple goto) or `- route: [{when, goto}, …]` (conditional fork).
+    const route = bulletGet(bullets, "route");
+    const next = bulletGet(bullets, "next");
+    if (route !== undefined)
+        stage["next"] = route;
+    else if (next !== undefined)
+        stage["next"] = next;
     if (s.type === "bash") {
         stage["type"] = "bash";
         const cmd = fences["sh"] ?? fences["bash"] ?? fences["shell"] ?? fences[""];
@@ -244,7 +251,7 @@ function compileStage(s) {
         stage["type"] = "primitive";
         const initArgs = [];
         for (const [k, v] of bullets) {
-            if (k === "when" || k === "output-schema" || k === "output_schema")
+            if (k === "when" || k === "output-schema" || k === "output_schema" || k === "next" || k === "route")
                 continue;
             const flag = `--${k}`;
             if (v === true) {

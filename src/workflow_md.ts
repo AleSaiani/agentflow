@@ -212,6 +212,11 @@ function compileStage(s: RawStage): Record<string, unknown> {
   if (when !== undefined) stage["when"] = { type: "bash", command: String(when) };
   const schema = bulletGet(bullets, "output-schema") ?? bulletGet(bullets, "output_schema");
   if (schema !== undefined) stage["output_schema"] = schema;
+  // Branching: `- next: <stage>` (simple goto) or `- route: [{when, goto}, …]` (conditional fork).
+  const route = bulletGet(bullets, "route");
+  const next = bulletGet(bullets, "next");
+  if (route !== undefined) stage["next"] = route;
+  else if (next !== undefined) stage["next"] = next;
 
   if (s.type === "bash") {
     stage["type"] = "bash";
@@ -234,7 +239,7 @@ function compileStage(s: RawStage): Record<string, unknown> {
     stage["type"] = "primitive";
     const initArgs: string[] = [];
     for (const [k, v] of bullets) {
-      if (k === "when" || k === "output-schema" || k === "output_schema") continue;
+      if (k === "when" || k === "output-schema" || k === "output_schema" || k === "next" || k === "route") continue;
       const flag = `--${k}`;
       if (v === true) {
         initArgs.push(flag);

@@ -105,6 +105,19 @@ JSON-schema: `type`, `required`, `properties`, `items`, `enum`). The engine vali
 output before advancing; on mismatch the stage fails with a precise path (e.g. `$.severity: not in
 enum`). Use it on the step that produces the data a later guard branches on.
 
+**Branching (fork).** A stage's `- next:` routes the flow: a stage name jumps there; a `- route:` array
+of `{ when: <bash predicate>, goto: <stage> }` rules takes the first whose `when` exits 0 (a rule with
+no `when` is the default/else). Forward jumps skip the not-taken branch's stages. For loops/back-edges,
+use `/agentflow:until` (the loop engine), not a backward `goto`.
+
+```markdown
+## judge · step
+- runtime: claude-cli
+- prompt: Output JSON {"blocking": <bool>} for the diff at {{stages.diff.result_pointer}}.
+- output-schema: { type: object, required: [blocking] }
+- route: [ { "when": "[ \"$(jq -r .blocking {{stages.judge.result_pointer}})\" = true ]", "goto": "fix" }, { "goto": "ship" } ]
+```
+
 ## Process
 
 1. Clarify the goal and the steps (ask if ambiguous — what's the input, what's processed per item,
