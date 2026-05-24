@@ -134,6 +134,7 @@ Described in plain language (left) → what Agent Flow runs (right). Full versio
 | **[Concepts](docs/concepts.md)** | The mental model: runs as state on disk, the Stop hook, the determinism boundary, the workflow layer |
 | **[Cookbook](docs/cookbook.md)** | Real scenarios, one command → full workflow → operating at scale → composing operators |
 | **[Reference](docs/reference.md)** | Every command, flag, and CLI subcommand · the WORKFLOW.md schema · sources & views · conventions |
+| **[Production](docs/production.md)** | Running it for real: resilience, cost caps, approval gates, secrets/env, concurrency, audit |
 | **[Beta testing](docs/beta-test.md)** | A graded protocol to verify the promises live (cross-turn resume, compaction) |
 
 New here? Read **Getting started**, skim **Concepts**, then keep the **Cookbook** open and copy from it.

@@ -8,6 +8,7 @@ Start here.
 | **[Concepts](concepts.md)** | The mental model: runs as state on disk, the Stop hook, the determinism boundary, the workflow layer, preserve-chat. |
 | **[Cookbook](cookbook.md)** | Real scenarios — one command → compose two → full workflow → operating at scale → composing operators. The fastest way to learn what's possible. |
 | **[Reference](reference.md)** | Every command, flag, and CLI subcommand; the WORKFLOW.md schema; sources & views; conventions. |
+| **[Production](production.md)** | Running it for real: resilience (retry/timeout/on-failure), cost caps, approval gates, secrets/env, concurrency, audit. |
 | **[Beta testing](beta-test.md)** | A graded protocol to verify the promises live — including how automatic cross-turn resume works and how to confirm it. |
 
 New here? Read **Getting started**, skim **Concepts**, then keep the **Cookbook** open and copy from it.
