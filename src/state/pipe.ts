@@ -367,6 +367,7 @@ function cmdInit(args: string[]): void {
       max_stages: maxStages,
       stop_on_failure: pick("stop_on_failure", stopOnFailure),
       budget_caps: parseBudgetCaps(values),
+      on_failure: (workflowConfig["on_failure"] as string) ?? null, // bash cleanup/alert run if the pipe fails
     },
     { stages, stage_index: 0, stop_reason: null, workflow_dir: workflowDir, params },
   );
@@ -568,6 +569,18 @@ function cmdTick(args: string[]): void {
   return cmdTick(args);
 }
 
+/** Best-effort: run `config.on_failure` (a bash cleanup/alert command) when the pipe fails. Never throws. */
+function runOnFailureHook(state: StateDict, reason: string): void {
+  const cmd = (state["config"] as StateDict)?.["on_failure"];
+  if (!cmd) return;
+  try {
+    const resolved = resolveTemplate(String(cmd), state) as string;
+    runBash(resolved, findWorkspaceRoot(), { ...process.env, PIPE_RUN_ID: state["run_id"], PIPE_FAIL_REASON: reason });
+  } catch {
+    /* the alert/cleanup is best-effort; the failure outcome stands regardless */
+  }
+}
+
 /** Mark a stage failed because its output violated `output_schema`; fail the pipe unless stop_on_failure is off. */
 function failStageOnSchema(state: StateDict, cur: StateDict, kind: string, err: string): void {
   cur["status"] = STATUS_FAILED;
@@ -575,6 +588,7 @@ function failStageOnSchema(state: StateDict, cur: StateDict, kind: string, err: 
   if (state["config"]["stop_on_failure"] ?? true) {
     state["stop_reason"] = "schema_failed";
     markFailed(state, `stage ${cur["index"]} (${kind}) output failed schema: ${err}`);
+    runOnFailureHook(state, `schema:${err}`);
   } else {
     state["stage_index"] = nextIndex(state, cur);
   }
@@ -637,6 +651,7 @@ function cmdCompleteBashStage(args: string[]): void {
     if (state["config"]["stop_on_failure"] ?? true) {
       state["stop_reason"] = "stage_failed";
       markFailed(state, `stage ${cur["index"]} (bash) failed: exit=${exitCode}`);
+      runOnFailureHook(state, `stage ${cur["index"]} (bash) exit ${exitCode}`);
       save(runId, state);
       print({ recorded: true, advanced: false, pipe_status: STATUS_FAILED });
       return;
@@ -720,6 +735,7 @@ function cmdAdvance(args: string[]): void {
   if (cur["status"] === STATUS_FAILED && (state["config"]["stop_on_failure"] ?? true)) {
     state["stop_reason"] = "stage_failed";
     markFailed(state, `stage ${cur["index"]} (${cur["type"]}) failed`);
+    runOnFailureHook(state, `stage ${cur["index"]} (${cur["type"]}) failed`);
     save(runId, state);
     print({ advanced: false, pipe_status: STATUS_FAILED, stage_index: cur["index"] });
     return;
@@ -746,6 +762,7 @@ function cmdFail(args: string[]): void {
   if (!runId) die("error: fail requires a run_id");
   const state = load(runId);
   markFailed(state, values["error"] as string);
+  runOnFailureHook(state, (values["error"] as string) || "explicit fail");
   save(runId, state);
   print({ run_id: runId, status: STATUS_FAILED, error: values["error"] });
 }

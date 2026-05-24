@@ -111,6 +111,10 @@ enum`). Use it on the step that produces the data a later guard branches on.
 extra attempts) and `- timeout: <seconds>` (each attempt is killed past the limit → fails with exit
 124). Use them on stages that call flaky networks/CLIs so a transient failure doesn't sink the run.
 
+**On failure.** A workflow-level `config: { on_failure: "<bash>" }` runs a cleanup/alert command if the
+pipe fails (env `PIPE_FAIL_REASON`, `PIPE_RUN_ID`) — e.g. `node "${CLAUDE_PLUGIN_ROOT}/dist/notify.js"
+--message "audit failed: $PIPE_FAIL_REASON"`. Best-effort; it never changes the failure outcome.
+
 **Branching (fork).** A stage's `- next:` routes the flow: a stage name jumps there; a `- route:` array
 of `{ when: <bash predicate>, goto: <stage> }` rules takes the first whose `when` exits 0 (a rule with
 no `when` is the default/else). Forward jumps skip the not-taken branch's stages. For loops/back-edges,

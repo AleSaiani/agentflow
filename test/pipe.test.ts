@@ -225,6 +225,21 @@ test("pipe: a `step` child stage is a registered primitive (drive→needs_agent,
   assert.equal(adv.pipe_status, "done");
 });
 
+test("pipe: config.on_failure runs a cleanup/alert command when the pipe fails", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const flag = join(dir, "failed.txt").replace(/\\/g, "/");
+  const wf = join(dir, "of.json");
+  writeFileSync(
+    wf,
+    JSON.stringify({ config: { stop_on_failure: true, on_failure: `echo FAILED:$PIPE_FAIL_REASON > ${flag}` }, stages: [{ name: "boom", type: "bash", spec: { command: "exit 7" } }] }),
+    "utf8",
+  );
+  run(env, ["init", "of", "--workflow", wf]);
+  assert.equal(run(env, ["drive", "of"]).action, "failed");
+  assert.match(readFileSync(join(dir, "failed.txt"), "utf8"), /FAILED:stage 0 \(bash\) exit 7/);
+});
+
 test("pipe: typed params validate + coerce (enum / integer / boolean)", () => {
   const dir = mkdtempSync(join(tmpdir(), "pipe-"));
   const env = { PIPE_STATE_DIR: dir };
