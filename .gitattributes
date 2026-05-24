@@ -1,0 +1,7 @@
+# Normalize line endings to LF for all text — consistent diffs, no CRLF churn, working CI.
+* text=auto eol=lf
+
+# Binary / generated assets: leave untouched.
+*.png binary
+*.jpg binary
+*.ico binary
