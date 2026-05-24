@@ -170,7 +170,7 @@ text**). The engine is TypeScript compiled to a committed `dist/`, **zero runtim
 
 `1.0.0-beta.1`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation),
 `queue`/`mailbox`/`step`, inspect/board, and the hooks (cross-turn resume + preserve-chat) are
-implemented and covered by an automated suite (74 tests, including a simulated cross-turn loop). The
+implemented and covered by an automated suite (77 tests, including a simulated cross-turn loop). The
 recommended final check before production is a **live multi-turn Claude Code session smoke test**
 (install, real turns, a real `claude -p`/`codex` step). Roadmap and deferred items live in
 [CHANGELOG.md](CHANGELOG.md).

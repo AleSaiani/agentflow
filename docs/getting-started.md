@@ -72,7 +72,7 @@ Any markdown checklist is a valid item source. Inline `{...}` annotations become
 ```
 
 ```shell
-/agentflow:foreach --checkbox TODO.md
+/agentflow:foreach --checkbox TODO.md --prompt "Complete this task; report what you changed"
 ```
 
 Each unchecked line becomes an item processed in parallel; `[x]` lines start done. The authoritative

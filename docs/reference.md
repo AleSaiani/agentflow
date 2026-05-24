@@ -234,7 +234,7 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
 
 - **bash** → `{ "command": "<shell; writes $PIPE_OUTPUT_PATH>", "output_path"?: "…" }`
 - **json** → `{ "value": <any JSON; string leaves resolve templates>, "output_path"?: "…" }`
-- **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate", "init_args": [ … ] }`
+- **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate|step", "init_args": [ … ] }`
 
 **Params** are supplied at run time with `--param name=value` (repeatable) and referenced anywhere as
 `{{params.<name>}}` (use `|shell` when injecting into a `bash` command). A `required` param with no

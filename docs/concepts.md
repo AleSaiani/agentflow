@@ -70,15 +70,18 @@ out to subagents.
 ## The workflow layer
 
 - **Source** produces the `Item[]` a run operates on: `inline` | `file` | `run` (another run's
-  output) | `checkbox` (a markdown checklist). **View** projects authoritative state back onto a
-  human artifact (e.g. toggling checklist boxes). New sources slot in without touching the primitives.
+  output) | `checkbox` (a markdown checklist) | `folder` (a file kanban — `todo/`/`in-progress/`/`done/`).
+  **View** projects authoritative state back onto a human artifact (toggling checklist boxes, moving
+  kanban files). New sources slot in without touching the primitives.
 - **Conditional steps** — a pipe stage may carry a `when` guard: a bash predicate run before the
   stage. Exit 0 runs it; non-zero marks it `skipped`. This is "do only if".
 - **Workflow-files** — a declarative JSON `WorkflowSpec` (`{name, config, stages[]}`) compiles 1:1
   into a pipe's `stages[]`. No new engine — it's a reusable, versionable front-end for `pipe init`.
   Stages wire to each other with templates: `{{stages.<name>.result_pointer}}`, `{{run.dir}}`, etc.
-- **Graph seam** — each stage carries a `next` edge. v1 traversal is linear; conditional branches and
-  back-edges (workflow loops) are schema-ready for a later release.
+- **Branching (fork)** — a stage's `next` edge routes the flow: a stage name/index jumps there, or an
+  array of `{ when: <bash predicate>, goto: <stage> }` rules takes the first match (a rule with no
+  `when` is the default). Forward jumps skip the not-taken branch. Loops/back-edges stay the domain of
+  the loop engine (`repeat`/`until`/`while`); a full parallel fork-join DAG is a later release.
 
 ## `pipe drive`
 
