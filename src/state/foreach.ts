@@ -159,6 +159,8 @@ function cmdInit(args: string[]): void {
       "prompt-file": { type: "string" },
       serial: { type: "boolean", default: false },
       carry: { type: "boolean", default: false },
+      shard: { type: "string" },
+      "stop-file": { type: "string" },
       execution: { type: "string", default: "subagent" },
       concurrency: { type: "string", default: "4" },
       "chunk-size": { type: "string", default: "auto" },
@@ -184,12 +186,27 @@ function cmdInit(args: string[]): void {
   if (kind && kind !== "unknown" && loadTaskKindTemplate(kind, "foreach") === null)
     die(`error: no template found for kind '${kind}' in skills/foreach/task-kinds.md`);
 
+  // Sharding: --shard k/N keeps only items at positions where index % N == k. Run N terminals
+  // with k=0..N-1 (distinct run-ids) to split one list across processes — each is its own state
+  // file, so there are no concurrent writers (read-partition model, no locks).
+  const shardStr = values["shard"] as string | undefined;
+  let shard: { k: number; n: number } | null = null;
+  if (shardStr) {
+    const m = shardStr.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (!m) die(`error: --shard must be k/N (e.g. 0/2), got '${shardStr}'`);
+    const k = parseInt(m[1] as string, 10);
+    const n = parseInt(m[2] as string, 10);
+    if (n < 1 || k < 0 || k >= n) die(`error: --shard requires 1<=N and 0<=k<N, got ${k}/${n}`);
+    shard = { k, n };
+  }
+
   if (values["validate-only"]) {
-    print({ valid: true, kind, model });
+    print({ valid: true, kind, model, shard: shardStr ?? null });
     return;
   }
 
-  const sourceItems = resolveItems(values);
+  let sourceItems = resolveItems(values);
+  if (shard) sourceItems = sourceItems.filter((_, idx) => idx % shard.n === shard.k);
   const items: StateDict = {};
   for (const it of sourceItems) {
     if (items[it.id]) die(`error: duplicate item id '${it.id}'`);
@@ -240,6 +257,11 @@ function cmdInit(args: string[]): void {
       execution,
       serial,
       carry,
+      shard: shardStr ?? null,
+      // Pause gate: while this file exists, the orchestrator stops claiming and the Stop hook
+      // does not auto-resume. Remove it (and send a message) to continue. Resolved to absolute
+      // so the check is cwd-independent.
+      stop_file: values["stop-file"] ? resolve(values["stop-file"] as string) : null,
       kind,
       cache: Boolean(values["cache"]),
       folder: folderBaseFromValues(values),
@@ -272,7 +294,7 @@ function cmdInit(args: string[]): void {
   const p = pathFor(runId);
   if (existsSync(p) && !values["force"]) die(`error: state already exists at ${p}; use --force to overwrite`);
   save(runId, state);
-  print({ run_id: runId, total: Object.keys(items).length, kind, serial, carry, cache_hits: cacheHits, path: p });
+  print({ run_id: runId, total: Object.keys(items).length, kind, serial, carry, shard: shardStr ?? null, cache_hits: cacheHits, path: p });
 }
 
 function maybeStoreCache(state: StateDict, item: StateDict): void {
@@ -418,9 +440,12 @@ function cmdStatus(args: string[]): void {
     counts[item["status"]] = (counts[item["status"]] ?? 0) + 1;
   }
   const b = state["budget"] ?? {};
+  const stopFile = (state["config"] as StateDict)?.["stop_file"];
+  const paused = Boolean(stopFile && existsSync(String(stopFile)));
   print({
     run_id: runId,
     run_status: state["status"],
+    paused,
     total: Object.keys(state["items"]).length,
     ...counts,
     budget: {
@@ -593,6 +618,9 @@ function isDone(state: StateDict): boolean {
 }
 
 function hasResidualWork(state: StateDict): ResidualWork | null {
+  // Pause gate: a present stop-file suspends auto-resume (the Stop hook sees no residual work).
+  const stopFile = (state["config"] as StateDict)?.["stop_file"];
+  if (stopFile && existsSync(String(stopFile))) return null;
   const items = Object.values(state["items"] ?? {}) as StateDict[];
   const pending = items.filter((i) => i["status"] === STATUS_PENDING).length;
   const inProgress = items.filter((i) => i["status"] === STATUS_IN_PROGRESS).length;

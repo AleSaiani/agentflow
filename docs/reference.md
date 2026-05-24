@@ -60,9 +60,11 @@ The operation is, primarily, a **`--prompt`** (the instructions applied per item
 <path>` to read it from a file. `--model`, `--subagent-type` (which agent runs each item) and
 `--execution main-thread` are optional knobs. **`--serial`** processes one item at a time in list
 order (no fan-out); **`--carry`** implies serial and threads each item the previous item's output.
+**`--shard k/N`** keeps only items at `index % N == k` (run N terminals with distinct run-ids to split
+a list, no locks); **`--stop-file <path>`** pauses the run (and the Stop hook) while that file exists.
 
 **CLI** (`dist/state/foreach.js`):
-- `init <id> (--items <path> | --checkbox <path> | --folder <dir> | --source <json>) (--prompt "…" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--serial] [--carry] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
+- `init <id> (--items <path> | --checkbox <path> | --folder <dir> | --source <json>) (--prompt "…" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--serial] [--carry] [--shard k/N] [--stop-file <path>] [--cache] [--model …] [--concurrency N] [--chunk-size N|auto] [--max-retries N] [--execution main-thread|subagent] [--subagent-type …] [--force] [--validate-only]`
 - `claim <id> --count N` · `claim-serial <id>` (next item in order + `prev_result` for `--carry`) · `complete <id> <item-id> [--result <json>]` · `fail <id> <item-id> [--error "…"] [--retry]`
 - `complete-batch <id> --results <file>` (array of `{id, ok, result, error}`)
 - `status <id>` · `list <id> [--status …] [--limit N]` · `reset <id> [--failed-to-pending] [--in-progress-to-pending]`

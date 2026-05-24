@@ -241,6 +241,23 @@ feeds each item the previous item's result, so the operation accumulates (a sequ
 checkpoint per item, so they resume mid-list across turns. Long operation? Keep it in a file with
 `--prompt-file ops/translate.md` instead of a giant inline `--prompt`.
 
+### 12c. Split a queue across terminals, with a pause switch
+
+> "This list is huge — I want to chew through it from three terminals at once, and be able to pause
+> them all." 
+
+```text
+# one per terminal, each takes a disjoint third of the list:
+/flow:foreach --items work.json --shard 0/3 --run-id work-0 --stop-file PAUSE --prompt "<op>"
+/flow:foreach --items work.json --shard 1/3 --run-id work-1 --stop-file PAUSE --prompt "<op>"
+/flow:foreach --items work.json --shard 2/3 --run-id work-2 --stop-file PAUSE --prompt "<op>"
+```
+
+`--shard k/N` keeps only the items at `index % N == k`, so the three runs are disjoint — separate
+state files, no locking, no double-processing (works with a `--folder` source too, since each shard
+moves only its own files). `touch PAUSE` and every worker stops claiming at its next checkpoint and
+won't auto-resume; delete `PAUSE` and nudge each session to continue. `/flow:board` shows all shards.
+
 ---
 
 ## Level 4 — operating at scale

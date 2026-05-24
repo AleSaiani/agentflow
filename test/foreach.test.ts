@@ -163,6 +163,33 @@ test("foreach CLI: --carry implies serial; claim-serial returns the previous ite
   assert.equal(again.item.attempts, 1);
 });
 
+test("foreach CLI: --shard k/N partitions items by index; bad shard errors", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }]), "utf8");
+
+  const s0 = run(dir, ["init", "s0", "--items", items, "--shard", "0/2", "--prompt", "x"]);
+  assert.equal(s0.total, 2);
+  assert.equal(s0.shard, "0/2");
+  assert.deepEqual((run(dir, ["list", "s0"]) as any[]).map((i) => i.id), ["a", "c"]);
+
+  run(dir, ["init", "s1", "--items", items, "--shard", "1/2", "--prompt", "x"]);
+  assert.deepEqual((run(dir, ["list", "s1"]) as any[]).map((i) => i.id), ["b", "d"]);
+
+  assert.throws(() => run(dir, ["init", "bad", "--items", items, "--shard", "3/2", "--prompt", "x"]));
+});
+
+test("foreach CLI: --stop-file pauses (status.paused) while the file exists", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }]), "utf8");
+  const stop = join(dir, "STOP");
+  run(dir, ["init", "sf", "--items", items, "--stop-file", stop, "--prompt", "x"]);
+  assert.equal(run(dir, ["status", "sf"]).paused, false);
+  writeFileSync(stop, "", "utf8");
+  assert.equal(run(dir, ["status", "sf"]).paused, true);
+});
+
 test("foreach CLI: validate-only does not read items or write state", () => {
   const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
   const v = run(dir, ["init", "rX", "--items", join(dir, "nope.json"), "--validate-only"]);

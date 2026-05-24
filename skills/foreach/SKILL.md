@@ -17,7 +17,7 @@ description: |
 
   Explicit invocation (`/flow:foreach …`) skips the count check — the user already chose the mechanism.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--subagent-type <name>] [--serial] [--carry] [--concurrency N] [--cache] [--no-auto-continue]
+argument-hint: (--items <json> | --checkbox <md> | --folder <dir> | --source <spec>) (--prompt "<operation>" | --prompt-file <path>) [--kind code-review|transformation|extraction|validation|audit] [--execution main-thread|subagent] [--model haiku|sonnet|opus] [--subagent-type <name>] [--serial] [--carry] [--shard k/N] [--stop-file <path>] [--concurrency N] [--cache] [--no-auto-continue]
 ---
 
 # /flow:foreach
@@ -64,6 +64,12 @@ runs each item; per-item override via `{subagent:…}` in a checklist), `--execu
   `chunk 1`). Use when items must not run concurrently (shared resource, rate limit, ordering matters).
 - `--carry` — implies `--serial` **and** feeds each item the **previous item's output** (a sequential
   scan / accumulation). Each step depends on the one before it.
+- `--shard k/N` — keep only the items at positions `index % N == k`. Run **N terminals** with
+  `k = 0..N-1` and **distinct run-ids** to split one list across processes — each shard is its own
+  state file, so there are no concurrent writers (read-partition, no locks).
+- `--stop-file <path>` — a **pause gate**: while this file exists, the dispatch loop stops claiming
+  new items and the Stop hook does **not** auto-resume the run. Delete the file (and send a message)
+  to continue. Lets you halt/resume external workers by touching a file.
 
 **Invoked with natural language?** (e.g. `/flow:foreach review every .cs file in src/ for bugs`) —
 translate the user's words into a source + `--prompt`, don't ask them for flags. If they name files you
@@ -145,7 +151,8 @@ Confirm to the user in a single line: `run-id`, `kind`, `effective model`, `conc
      (--prompt "<operation, verbatim>" | --prompt-file <path>) \
      [--kind <code-review|transformation|extraction|validation|audit>] \
      [--execution main-thread|subagent] [--model <inherit|haiku|sonnet|opus>] [--subagent-type <name>] \
-     [--serial] [--carry] [--concurrency <N>] [--chunk-size <N|auto>] [--max-retries <N>] [--cache] \
+     [--serial] [--carry] [--shard <k/N>] [--stop-file <path>] \
+     [--concurrency <N>] [--chunk-size <N|auto>] [--max-retries <N>] [--cache] \
      [--max-auto-continues <N>] [--auto-continue|--no-auto-continue] [--force]
    ```
    The state helper applies `--kind` (prepends the matching `task-kinds.md` template to `--prompt` and
@@ -184,6 +191,8 @@ For each iteration (safety cap: max 100):
    node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" status <run-id>
    ```
    If `pending == 0 && in_progress == 0`: exit the loop, go to Step 5.
+   If `paused == true` (a `--stop-file` is present): **stop claiming**, report the run is paused, and
+   exit — the Stop hook will not auto-resume until the file is removed. (Same check applies in Step 4b.)
 
 2. **Claim wave**: claim `concurrency * chunk_size` items:
    ```bash
@@ -257,6 +266,24 @@ Agents). Each iteration handles a single item, in list order, and is resumable a
 
 Because items are committed one by one, the Stop hook resumes mid-list cleanly and `claim-serial`
 re-hands an interrupted `in_progress` item without double-counting attempts.
+
+## Sharding across terminals (`--shard k/N`)
+
+To split one big list across **N parallel terminals/sessions**, init **N separate runs** with distinct
+run-ids, each taking one shard of the items (positions where `index % N == k`):
+
+```bash
+# terminal 1
+/flow:foreach --items work.json --shard 0/3 --run-id work-0 --prompt "<op>"
+# terminal 2
+/flow:foreach --items work.json --shard 1/3 --run-id work-1 --prompt "<op>"
+# terminal 3
+/flow:foreach --items work.json --shard 2/3 --run-id work-2 --prompt "<op>"
+```
+
+Each run is its own `state.json`, so there are no concurrent writers (read-partition, no locks). The
+shards are disjoint, so even a `--folder` source is safe (each terminal only moves its own files).
+Pair with `--stop-file` to pause every worker by touching one file. `/flow:board` shows all shards.
 
 ## Step 5 — Final report
 
