@@ -1,19 +1,25 @@
 version: 2
 updates:
-  # Dev dependencies (TypeScript, @types/node). The plugin has zero runtime deps.
+  # Dev dependencies. The plugin ships zero runtime deps and a committed dist/, so:
+  #  - typescript is ignored: a tsc bump can change compiled output, so update it manually + rebuild dist.
+  #  - @types/node majors are ignored to stay aligned with the Node 22 runtime (engines: >=22).
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "typescript"
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
-  # Keep GitHub Actions in the CI workflow up to date.
+  # Keep GitHub Actions in the CI/Release workflows current (no dist impact).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(ci)"
