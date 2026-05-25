@@ -10,9 +10,11 @@ description: |
 
   DON'T use to do work (the other skills do that) or for non-Agent Flow state (it only knows `.agentflow/enumerate/`,
   `.agentflow/foreach/`, `.agentflow/group/`, `.agentflow/iterate/`, `.agentflow/reduce/`, `.agentflow/pipe/`).
-  Explicit: `/agentflow:inspect runs | show <id> | tree <id> | budget <id> | timeline <id>`.
+  Also turns a finished run's outputs into reusable data WITHOUT re-running it ("turn that review into a
+  checklist", "give me all results as JSON"): `results <id> --json | --checklist`.
+  Explicit: `/agentflow:inspect runs | show <id> | results <id> | tree <id> | budget <id> | timeline <id>`.
 allowed-tools: Bash, Read
-argument-hint: runs | show <run-id> | tree <run-id> | budget <run-id> | timeline <run-id>
+argument-hint: runs | show <run-id> | results <run-id> [--checklist|--json] | tree <run-id> | budget <run-id> | timeline <run-id>
 disable-model-invocation: false
 ---
 
@@ -25,6 +27,7 @@ You are operating the read-only inspector. There is no state to manage and nothi
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" runs [--cmd foreach|group|iterate|reduce|pipe] [--json]
 node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" show <run-id> [--cmd <name>] [--pretty]
+node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" results <run-id> [--cmd <name>] [--json | --checklist] [--field a.b] [--status <s>] [--limit N]
 node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" tree <run-id> [--cmd <name>] [--max-depth N]
 node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" budget <run-id> [--json]
 node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" timeline <run-id> [--limit N]
@@ -41,6 +44,25 @@ Auto-detect which primitive owns the run-id and print a JSON summary with primit
 - /agentflow:group adds items_total, groups_count, method
 
 Use `--cmd` to disambiguate when two primitives have a run with the same id.
+
+### `results <run-id>` — reuse a finished run WITHOUT re-running it
+Every result is persisted in the run's `state.json`, so you can transform an expensive run's output
+deterministically (code over the saved items — nothing is dropped, count == total). Auto-detects the
+primitive (use `--cmd` to disambiguate, e.g. `--cmd foreach`).
+- `--json` — every output at full fidelity: `foreach` → one row per item `{id, status, result}`;
+  `step`/`reduce`/`pipe` → the produced output (inline or read from its result_pointer file).
+- `--checklist` — a markdown `- [ ]` line per item (one per item, so a 2,000-item run yields 2,000
+  lines, none lost). Append a result field as the task text with `--field <key>` (or `--field a.b` for a
+  nested field); if the item's result is a plain string it is appended automatically.
+- `--status <s>` filters foreach items (e.g. `failed`); `--limit N` caps rows (use `1` to peek at the shape first).
+
+**Turn a review run into an actionable checklist** (no re-run):
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" results <run-id> --cmd foreach --json --limit 1     # see the result shape → pick --field
+node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" results <run-id> --cmd foreach --checklist --field summary > CHECKLIST.md
+```
+Then action it with `/agentflow:checklist CHECKLIST.md`. (Writing the output file via a redirect is
+fine — `results` only READS run state.)
 
 ### `tree <pipe-run-id>`
 For a /agentflow:pipe run, recursively walk the stage tree and show each child run's status, agent count, and USD estimate. Indented ASCII tree. Useful to see at a glance "stage 1 done, stage 2 in_progress, stage 3 pending".
