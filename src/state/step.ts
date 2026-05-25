@@ -11,9 +11,9 @@
  * For the two CLI runtimes, `step run <id>` spawns the binary, captures stdout, extracts the result,
  * and marks the run done/failed — no orchestrator agent needed (like a bash stage, but an LLM).
  *
- * Binaries are overridable for testing/portability via $STEP_CLAUDE_BIN / $STEP_CODEX_BIN. Inspired by
- * the sessionless CLI providers in a local workspace (claude-cli-stream / codex-cli-stream); validate the
- * exact flags against your installed `claude`/`codex` before relying on the CLI runtimes in production.
+ * Binaries are overridable for testing/portability via $STEP_CLAUDE_BIN / $STEP_CODEX_BIN. Modeled on
+ * sessionless CLI provider patterns (a streaming claude-cli / codex-cli); validate the exact flags
+ * against your installed `claude`/`codex` before relying on the CLI runtimes in production.
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

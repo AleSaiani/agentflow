@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a problem with Agent Flow
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in as much as you can.
+        For **security** issues, do not use this form — see [SECURITY.md](../../SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: Steps to reproduce · expected behavior · actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: agentflow-version
+    attributes:
+      label: Agent Flow version
+      placeholder: e.g. 1.0.0-beta.2
+    validations:
+      required: true
+  - type: input
+    id: claude-code-version
+    attributes:
+      label: Claude Code version
+      placeholder: output of `claude --version`
+    validations:
+      required: false
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      placeholder: output of `node --version` (must be >= 22)
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / state
+      description: Paste any error output or the relevant run's state.json. Redact anything sensitive.
+      render: shell
+    validations:
+      required: false

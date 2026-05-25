@@ -7,7 +7,7 @@ auto-continue: true
 
 ## List
 
-Find every `.md` file under `./docs\` (excluding this file itself).
+Find every `.md` file under `./docs/` (excluding this file itself).
 Output: a JSON array of `{id: <path>, data: {path: <path>}}`. No prose, no fence.
 
 ## Task

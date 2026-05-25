@@ -12,7 +12,10 @@ coverage/
 # Never commit run state — it is per-invocation, per-machine.
 .agentflow/
 
-# Claude Code local (machine-specific) settings. STATUS.md stays tracked.
+# Claude Code local working docs & machine-specific settings — never published.
+# STATUS.md/HISTORY.md are internal session bridges (local paths, roadmap) — kept out of the public repo.
+.claude/STATUS.md
+.claude/HISTORY.md
 .claude/settings.local.json
 .claude/*.local.json
 
