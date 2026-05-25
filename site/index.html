@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Flow — durable, deterministic LLM agent workflows for Claude Code</title>
+<meta name="description" content="Describe a workflow in plain English; Agent Flow builds it, runs it, and keeps it running across turns. Durable, deterministic agent workflows inside Claude Code — zero runtime dependencies.">
+<meta property="og:title" content="Agent Flow">
+<meta property="og:description" content="Durable, deterministic LLM agent workflows — described in plain English, run inside Claude Code, with zero runtime dependencies.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0a0f10">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0f10'/%3E%3Ctext x='6' y='23' font-family='monospace' font-size='18' fill='%232dd4bf'%3E%E2%96%B8%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0f10; --bg2:#0c1314; --surface:#101a1c; --surface2:#0e1618;
+    --line:#1c2a2d; --line2:#243437;
+    --text:#e9f1f1; --muted:#90a3a6; --faint:#5d7074;
+    --teal:#2dd4bf; --mint:#7df0dd; --amber:#f4b860; --coral:#ff7d6b; --green:#56d364;
+    --r:14px; --maxw:1140px;
+    --shadow:0 24px 60px -20px rgba(0,0,0,.7);
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* layered atmosphere */
+  body::before{ /* technical grid */
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:64px 64px; opacity:.18;
+    mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 75%);
+  }
+  body::after{ /* grain */
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .glow{position:fixed;z-index:-1;border-radius:50%;filter:blur(120px);pointer-events:none}
+  .glow.a{top:-180px;left:50%;transform:translateX(-50%);width:760px;height:520px;background:radial-gradient(circle,rgba(45,212,191,.16),transparent 70%)}
+  .glow.b{top:680px;right:-160px;width:520px;height:520px;background:radial-gradient(circle,rgba(244,184,96,.08),transparent 70%)}
+
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--teal)}
+
+  /* nav */
+  header{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:rgba(10,15,16,.72);border-bottom:1px solid var(--line)}
+  nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:"Syne",sans-serif;font-weight:800;font-size:1.18rem;letter-spacing:-.01em}
+  .brand .cur{color:var(--teal);font-family:"IBM Plex Mono",monospace}
+  .navlinks{display:flex;align-items:center;gap:28px}
+  .navlinks a{color:var(--muted);font-size:.92rem;transition:color .2s}
+  .navlinks a:hover{color:var(--text)}
+  .navlinks .gh{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--line2);border-radius:9px;color:var(--text)}
+  .navlinks .gh:hover{border-color:var(--teal);background:rgba(45,212,191,.06)}
+  @media(max-width:760px){.navlinks a:not(.gh){display:none}}
+
+  /* hero */
+  .hero{padding:92px 0 64px;position:relative}
+  .badges{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:26px}
+  .badge{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--muted);border:1px solid var(--line2);border-radius:999px;padding:5px 12px;background:var(--surface)}
+  .badge b{color:var(--mint);font-weight:500}
+  h1{font-family:"Syne",sans-serif;font-weight:800;font-size:clamp(2.4rem,6vw,4.3rem);line-height:1.04;letter-spacing:-.025em;margin-bottom:22px;max-width:14ch}
+  h1 .hl{color:var(--teal)}
+  .lede{font-size:clamp(1.05rem,2vw,1.28rem);color:var(--muted);max-width:60ch;margin-bottom:14px}
+  .lede strong{color:var(--text);font-weight:500}
+  .cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .btn{display:inline-flex;align-items:center;gap:10px;padding:13px 22px;border-radius:11px;font-weight:600;font-size:.96rem;transition:transform .15s,box-shadow .2s,background .2s;cursor:pointer;border:1px solid transparent}
+  .btn-primary{background:var(--teal);color:#05201c;box-shadow:0 0 0 1px var(--teal),0 12px 30px -10px rgba(45,212,191,.5)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 0 1px var(--mint),0 18px 40px -12px rgba(45,212,191,.6)}
+  .btn-ghost{border-color:var(--line2);color:var(--text);background:var(--surface)}
+  .btn-ghost:hover{border-color:var(--teal);transform:translateY(-2px)}
+
+  .herogrid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+  @media(max-width:920px){.herogrid{grid-template-columns:1fr;gap:40px}}
+
+  /* terminal */
+  .term{border:1px solid var(--line2);border-radius:var(--r);background:linear-gradient(180deg,var(--surface),var(--surface2));box-shadow:var(--shadow);overflow:hidden}
+  .term-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.015)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+  .term-title{margin-left:8px;font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--faint)}
+  .term-body{padding:18px 18px 22px;font-family:"IBM Plex Mono",monospace;font-size:.83rem;line-height:1.85;min-height:286px}
+  .ln{display:block;white-space:pre-wrap;opacity:0;transform:translateY(4px);animation:rise .4s ease forwards}
+  .ln .you{color:var(--amber)}
+  .ln .af{color:var(--teal)}
+  .ln .dim{color:var(--faint)}
+  .ln .ok{color:var(--green)}
+  .ln .warn{color:var(--coral)}
+  .ln .bar{color:var(--teal)}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  /* sections */
+  section{padding:74px 0;position:relative}
+  .sec-head{max-width:62ch;margin-bottom:46px}
+  .sec-head h2{font-family:"Syne",sans-serif;font-weight:700;font-size:clamp(1.7rem,3.4vw,2.5rem);letter-spacing:-.02em;line-height:1.1;margin:12px 0 14px}
+  .sec-head p{color:var(--muted);font-size:1.05rem}
+
+  /* problem / fix split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:760px){.split{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);border-radius:var(--r);padding:28px;background:var(--surface)}
+  .panel.bad{border-color:rgba(255,125,107,.25)}
+  .panel.good{border-color:rgba(45,212,191,.28);background:linear-gradient(180deg,rgba(45,212,191,.05),var(--surface))}
+  .panel h3{font-family:"Syne",sans-serif;font-size:1.18rem;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+  .panel.bad h3 .tag{color:var(--coral)}.panel.good h3 .tag{color:var(--teal)}
+  .panel p{color:var(--muted);font-size:.98rem}
+
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:920px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:var(--r);padding:24px;background:var(--surface);transition:border-color .25s,transform .25s,background .25s}
+  .card:hover{border-color:var(--line2);transform:translateY(-3px);background:var(--surface2)}
+  .card .ix{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--teal);margin-bottom:14px;display:block}
+  .card h3{font-family:"Syne",sans-serif;font-weight:600;font-size:1.12rem;margin-bottom:8px}
+  .card p{color:var(--muted);font-size:.92rem}
+  .card code{font-family:"IBM Plex Mono",monospace;color:var(--mint);font-size:.86em}
+  .card.wide{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:24px;background:linear-gradient(110deg,rgba(45,212,191,.07),var(--surface))}
+  .card.wide h3{font-size:1.3rem}
+  @media(max-width:600px){.card.wide{flex-direction:column;align-items:flex-start}}
+
+  /* why */
+  .why{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:820px){.why{grid-template-columns:1fr}}
+  .why .card .vs{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--faint);text-transform:uppercase;letter-spacing:.12em}
+  .why .card .vs b{color:var(--text)}
+
+  /* examples */
+  .ex{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+  .ex-row{display:grid;grid-template-columns:1fr 1.15fr;gap:0;border-top:1px solid var(--line)}
+  .ex-row:first-child{border-top:none}
+  .ex-row>div{padding:16px 20px}
+  .ex-row .say{color:var(--text);font-size:.95rem}
+  .ex-row .run{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--mint);border-left:1px solid var(--line);background:var(--surface2);overflow-x:auto}
+  @media(max-width:680px){.ex-row{grid-template-columns:1fr}.ex-row .run{border-left:none;border-top:1px solid var(--line)}}
+
+  /* install */
+  .install{border:1px solid var(--line2);border-radius:var(--r);background:linear-gradient(180deg,var(--surface),var(--surface2));box-shadow:var(--shadow);overflow:hidden}
+  .install .ibar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--faint)}
+  .codeblock{position:relative;padding:22px 20px;font-family:"IBM Plex Mono",monospace;font-size:.9rem;line-height:2}
+  .codeblock .cmt{color:var(--faint)}
+  .codeblock .pr{color:var(--teal)}
+  .copy{position:absolute;top:14px;right:14px;font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--muted);border:1px solid var(--line2);border-radius:8px;padding:6px 12px;cursor:pointer;background:var(--bg);transition:all .2s}
+  .copy:hover{color:var(--teal);border-color:var(--teal)}
+  .req{margin-top:18px;color:var(--faint);font-size:.86rem;font-family:"IBM Plex Mono",monospace}
+  .req b{color:var(--muted);font-weight:500}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:48px 0;margin-top:40px}
+  .foot{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:center}
+  .foot .links{display:flex;flex-wrap:wrap;gap:24px}
+  .foot a{color:var(--muted);font-size:.9rem}
+  .foot a:hover{color:var(--teal)}
+  .foot .lic{color:var(--faint);font-family:"IBM Plex Mono",monospace;font-size:.8rem}
+
+  /* scroll reveal */
+  .reveal{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important;animation-delay:0ms!important;transition:none!important}
+    .ln{opacity:1;transform:none}
+    .reveal{opacity:1;transform:none}
+    html{scroll-behavior:auto}
+  }
+  :focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="glow a"></div>
+<div class="glow b"></div>
+
+<header>
+  <nav class="wrap" aria-label="Primary">
+    <a class="brand" href="#top"><span class="cur" aria-hidden="true">▸</span> Agent&nbsp;Flow</a>
+    <div class="navlinks">
+      <a href="#features">Features</a>
+      <a href="#why">Why</a>
+      <a href="#examples">Examples</a>
+      <a href="#install">Install</a>
+      <a class="gh" href="https://github.com/AleSaiani/agentflow" target="_blank" rel="noopener" aria-label="Agent Flow on GitHub">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap herogrid">
+      <div>
+        <div class="badges">
+          <span class="badge"><b>0</b> runtime deps</span>
+          <span class="badge"><b>86</b> tests</span>
+          <span class="badge">Apache&#8209;2.0</span>
+          <span class="badge">Node&nbsp;<b>≥22</b></span>
+          <span class="badge">Claude&nbsp;Code <b>plugin</b></span>
+        </div>
+        <h1>Agent workflows that <span class="hl">survive the context window.</span></h1>
+        <p class="lede"><strong>Durable, deterministic LLM agent workflows</strong> — described in plain English, run inside Claude Code, with zero runtime dependencies.</p>
+        <p class="lede">A long, fan-out agent job dies on context compaction or when you close the session. Agent Flow makes every run a <span class="mono" style="color:var(--mint)">state.json</span> on disk that a Stop hook resumes across turns — so nothing is lost or redone.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#install">Install the plugin</a>
+          <a class="btn btn-ghost" href="https://github.com/AleSaiani/agentflow" target="_blank" rel="noopener">View on GitHub →</a>
+        </div>
+      </div>
+
+      <div class="term" role="img" aria-label="A Claude Code session: a workflow is created, runs, gets interrupted by context compaction, and resumes from disk to completion.">
+        <div class="term-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="term-title">claude-code — agentflow</span>
+        </div>
+        <div class="term-body" id="term" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLEM / FIX -->
+  <section id="problem">
+    <div class="wrap">
+      <div class="split reveal">
+        <div class="panel bad">
+          <h3><span class="tag mono">// before</span></h3>
+          <p>You kick off a 200-file review, a multi-chapter draft, a queue drained from three terminals. Then compaction hits at item 142 — the in-flight sub-agents take their state with them. No checkpoint, no resume. Hours gone.</p>
+        </div>
+        <div class="panel good">
+          <h3><span class="tag mono">// with agent flow</span></h3>
+          <p>Each step is an LLM doing the work, but the control flow is <strong style="color:var(--text)">deterministic</strong> and every run is a <span class="mono" style="color:var(--mint)">state.json</span> on disk. A Stop hook auto-continues it across turns — surviving parallelism, interruption, and compaction. Resume at item 143.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="kicker">What you get</span>
+        <h2>A real vocabulary for orchestrating agents — on durable state.</h2>
+        <p>You describe the goal in plain English; the engine writes the exact commands. Below is what runs under the hood.</p>
+      </div>
+      <div class="grid">
+        <div class="card reveal"><span class="ix">01</span><h3>Durable &amp; resumable</h3><p>Every run is a <code>state.json</code> with atomic writes; a Stop hook continues in-flight runs across turns and survives compaction. A second hook snapshots the chat too.</p></div>
+        <div class="card reveal"><span class="ix">02</span><h3>A programmatic vocabulary</h3><p><code>enumerate</code> · <code>foreach</code> · <code>reduce</code> · <code>group</code> · <code>repeat/until/while</code> · <code>step</code> — composed by <code>pipe</code>.</p></div>
+        <div class="card reveal"><span class="ix">03</span><h3>Workflows as readable markdown</h3><p>Author a <code>WORKFLOW.md</code>, parameterize with <code>--param</code>, branch with conditional <code>fork</code>, validate a step's output against a schema, nest sub-workflows.</p></div>
+        <div class="card reveal"><span class="ix">04</span><h3>Any runtime for a step</h3><p>Run a prompt inline, in a subagent, or sessionlessly via <code>claude -p</code> / <code>codex exec</code> — the basis for cross-model conversations.</p></div>
+        <div class="card reveal"><span class="ix">05</span><h3>Scale safely</h3><p>Split a list across terminals with <code>--shard</code>, or drain one lock-free <code>queue</code> from many workers (atomic-rename claim, no double-processing); coordinate via a <code>mailbox</code>.</p></div>
+        <div class="card reveal"><span class="ix">06</span><h3>Stay in control</h3><p>Cost caps (<code>--max-usd</code>) pause a run; a <code>--stop-file</code> pauses on demand; <code>pipe progress</code> shows where you are; <code>board</code>/<code>inspect</code> show cost &amp; what's in flight.</p></div>
+        <div class="card reveal"><span class="ix">07</span><h3>Reuse without re-running</h3><p><code>inspect results &lt;run&gt;</code> dumps a finished run's outputs (<code>--json</code> / <code>--checklist</code>) so you transform an expensive run deterministically — no re-review.</p></div>
+        <div class="card wide reveal">
+          <div><h3>Zero runtime dependencies</h3><p style="margin-top:6px">TypeScript compiled to a committed <code>dist/</code>; Node builtins only. Apache-2.0.</p></div>
+          <span class="mono" style="color:var(--teal);font-size:.8rem;white-space:nowrap">fs · path · crypto · child_process</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY -->
+  <section id="why">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="kicker">Why Agent Flow</span>
+        <h2>It earns its keep when work fans out, loops, or runs long enough to risk interruption.</h2>
+        <p>If your task is a single prompt, you don't need it — just ask Claude. Here's the honest comparison.</p>
+      </div>
+      <div class="why">
+        <div class="card reveal"><span class="vs">instead of <b>plain sub-agents</b></span><p style="margin-top:12px">The same agents, but with durable state — they resume across turns and survive compaction, composed with a real vocabulary instead of ad-hoc prompting.</p></div>
+        <div class="card reveal"><span class="vs">instead of <b>LangGraph / LangChain</b></span><p style="margin-top:12px">No Python service, no runtime deps, no separate process — workflows live in your Claude Code session as readable, diffable markdown.</p></div>
+        <div class="card reveal"><span class="vs">instead of <b>Airflow / Prefect / Temporal</b></span><p style="margin-top:12px">No server, no scheduler, no infra — durability is a <code style="color:var(--mint)">state.json</code> on disk, not a database.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXAMPLES -->
+  <section id="examples">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="kicker">In practice</span>
+        <h2>You say it in plain language → Agent Flow runs it.</h2>
+      </div>
+      <div class="ex reveal">
+        <div class="ex-row"><div class="say">“Audit <code class="mono">src</code> for bugs and give me a report.”</div><div class="run">/agentflow:audit --target src --file-glob "**/*.cs"</div></div>
+        <div class="ex-row"><div class="say">“Draft every chapter of this outline.”</div><div class="run">enumerate outline → foreach draft → reduce stitch</div></div>
+        <div class="ex-row"><div class="say">“Keep fixing the build until it passes.”</div><div class="run">/agentflow:until --stage "npm run build" --stop "npm run build"</div></div>
+        <div class="ex-row"><div class="say">“Chew through this list from 3 terminals.”</div><div class="run">/agentflow:queue --items work.json --prompt "…"  (×3)</div></div>
+        <div class="ex-row"><div class="say">“Review the diff; only deploy if it's safe.”</div><div class="run">step emits {blocking} → fork routes to ship | fix</div></div>
+        <div class="ex-row"><div class="say">“Turn that finished review into a to-do list — don't re-run it.”</div><div class="run">inspect results &lt;run&gt; --checklist &gt; CHECKLIST.md</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section id="install">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="kicker">Get started</span>
+        <h2>Two lines inside Claude Code.</h2>
+      </div>
+      <div class="install reveal">
+        <div class="ibar"><span>claude code — install</span><span>agentflow@agentflow</span></div>
+        <div class="codeblock">
+          <button class="copy" type="button" data-copy="/plugin marketplace add AleSaiani/agentflow&#10;/plugin install agentflow@agentflow">copy</button>
+<span class="cmt"># inside Claude Code</span>
+<span class="pr">/plugin</span> marketplace add AleSaiani/agentflow
+<span class="pr">/plugin</span> install agentflow@agentflow
+        </div>
+      </div>
+      <p class="req">Requires <b>Node ≥ 22</b> and <b>Git Bash</b> (shell stages run under bash for POSIX semantics on every OS).</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top"><span class="cur" aria-hidden="true">▸</span> Agent&nbsp;Flow</a>
+    <div class="links">
+      <a href="https://github.com/AleSaiani/agentflow" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/AleSaiani/agentflow/tree/main/docs" target="_blank" rel="noopener">Docs</a>
+      <a href="https://github.com/AleSaiani/agentflow/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="https://github.com/AleSaiani/agentflow/releases" target="_blank" rel="noopener">Releases</a>
+    </div>
+    <span class="lic">Apache-2.0 © 2026 Alessandro Saiani</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- terminal type-in (line by line) ----
+  var lines = [
+    {h:'<span class="you">You ▸</span> /agentflow:create-workflow "review every .cs in src → group by area → one digest"'},
+    {h:'<span class="af">Agent Flow ▸</span> designed <span class="dim">code-review</span> (discover → review·foreach → group → digest·reduce). Run it?'},
+    {h:'<span class="you">You ▸</span> /agentflow:run-workflow workflows/code-review/WORKFLOW.md'},
+    {h:'<span class="af">Agent Flow ▸</span> stage 2/4 · review  <span class="bar">███████░░░</span>  142/200 · 3 agents · $0.38'},
+    {h:'           <span class="warn">— context compaction —</span>'},
+    {h:'           <span class="dim">▸ resumed from disk at item 143/200 …</span>'},
+    {h:'           <span class="ok">✓ done · digest → ./code-review-digest.md</span>'}
+  ];
+  var term = document.getElementById("term");
+  if(term){
+    if(reduce){
+      lines.forEach(function(l){ var s=document.createElement("span"); s.className="ln"; s.style.animation="none"; s.style.opacity=1; s.innerHTML=l.h; term.appendChild(s); });
+    } else {
+      var i=0;
+      (function add(){
+        if(i>=lines.length) return;
+        var s=document.createElement("span"); s.className="ln"; s.innerHTML=lines[i].h; term.appendChild(s);
+        i++; setTimeout(add, 620);
+      })();
+    }
+  }
+
+  // ---- scroll reveal ----
+  if(!reduce && "IntersectionObserver" in window){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
+    },{threshold:.14});
+    document.querySelectorAll(".reveal").forEach(function(el){ io.observe(el); });
+  } else {
+    document.querySelectorAll(".reveal").forEach(function(el){ el.classList.add("in"); });
+  }
+
+  // ---- copy buttons ----
+  document.querySelectorAll(".copy").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var text=(btn.getAttribute("data-copy")||"").replace(/&#10;/g,"\n");
+      navigator.clipboard && navigator.clipboard.writeText(text).then(function(){
+        var old=btn.textContent; btn.textContent="copied ✓";
+        setTimeout(function(){ btn.textContent=old; },1600);
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>
