@@ -1,0 +1,32 @@
+# CD: on a version tag (vX.Y.Z), run tests then publish a GitHub Release.
+# Agent Flow installs via the Claude Code plugin marketplace, not npm — so there is no package to
+# publish; the deliverable is the tagged GitHub Release. Uses the preinstalled `gh` CLI (zero deps).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'        # e.g. v1.0.0-beta.2
+
+permissions:
+  contents: write       # required to create the Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Test (gate — no release if red)
+        run: npm test
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          pre=""
+          [[ "$tag" == *-* ]] && pre="--prerelease"   # tags containing '-' (beta/rc) → pre-release
+          gh release create "$tag" --title "$tag" --generate-notes $pre

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.2] - 2026-05-25
+
 ### Added
 - **`/agentflow:do`** — describe a one-off **deterministic** operation; it designs an inline pipe
   (code-first, LLM step only where judgment is needed), names + runs it (no saved file), then offers to
