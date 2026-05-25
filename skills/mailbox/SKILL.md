@@ -1,5 +1,6 @@
 ---
 name: mailbox
+user-invocable: false
 description: |
   Directed outbox/inbox messaging between concurrent Agent Flow instances or sessions. One instance
   sends to a named box, another receives from it; `recv` claims the oldest message with an atomic

@@ -1,5 +1,6 @@
 ---
 name: while
+user-invocable: false
 description: |
   Loop a stage WHILE a predicate holds, checking the condition BEFORE each run — `while (cond) { body }`. If the condition is already false up front, the body never runs. Full loop safety: hard cap, convergence detection, kill switch.
 

@@ -1,5 +1,6 @@
 ---
 name: repeat
+user-invocable: false
 description: |
   Run a stage a FIXED number of times — a bounded count loop (`for i in 1..N`). One iteration per turn; the Stop hook resumes the next across turns. For a loop with a semantic stop condition, use `/agentflow:until` (do…until) or `/agentflow:while` (while…do) instead.
 

@@ -1,5 +1,6 @@
 ---
 name: until
+user-invocable: false
 description: |
   Loop a stage and stop once a predicate is satisfied — `do … until (cond)`: the body runs FIRST, then the condition is checked. The loop always runs at least once. Full loop safety: hard cap on iterations, convergence detection (stops if output stops changing), and a clean kill switch.
 

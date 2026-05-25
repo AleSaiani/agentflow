@@ -1,5 +1,6 @@
 ---
 name: history
+user-invocable: false
 description: |
   Chronological history of Agent Flow runs in this workspace — every run across all primitives, most recent
   first, with status, agent count, and cost. The "what have I run, and when" log. Read-only, never

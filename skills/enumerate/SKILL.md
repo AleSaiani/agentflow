@@ -1,5 +1,6 @@
 ---
 name: enumerate
+user-invocable: false
 description: |
   Generate a list of items from a higher-level spec — the **unfold** (1→N) primitive. Turn an outline into chapters, a feature into tasks, a goal into a checklist. Output is an items.json array that `/agentflow:foreach` (map) or `/agentflow:group` (partition) consume. The complement of `/agentflow:reduce` (N→1).
 

@@ -1,5 +1,6 @@
 ---
 name: notify
+user-invocable: false
 description: |
   Send a notification — a webhook POST (Slack/Discord-compatible) and/or a best-effort OS desktop
   notification — so the user is pinged when a long-running flow finishes or hits a milestone, even if

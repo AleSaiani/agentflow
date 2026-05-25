@@ -78,40 +78,28 @@ thing **resumes across turns** if interrupted. The digest lands as a plain file 
 
 ## Commands
 
-`create-workflow` wires the primitives for you, but each is callable directly.
+You only type a handful — describe what you want and Agent Flow wires the rest. The low-level primitives
+are **building blocks** the engine composes for you, kept out of the `/` menu so it stays focused.
 
-**Author & run workflows**
+**Front door** — what you actually type (the `/agentflow:` menu)
 
 | Command | What it does |
 |---|---|
-| `/agentflow:do` | Describe a one-off deterministic operation → it designs + runs an inline pipeline, then offers to promote it to a saved workflow |
+| `/agentflow:do` | Describe a one-off deterministic operation → designs + runs an inline pipeline, then offers to promote it to a saved workflow |
 | `/agentflow:how` | Help desk: "how do I … with Agent Flow?" → the right command + a copy-paste recipe (read-only) |
 | `/agentflow:create-workflow` | Author a reusable `WORKFLOW.md` (validates + previews) |
 | `/agentflow:run-workflow` | Run a workflow end to end (`--dry-run`, `--param k=v`); echoes a progress block each turn |
 | `/agentflow:checklist` | Run a repeatable `- [ ]` to-do list — tick items, write back, resume only the open ones |
-| `/agentflow:workflows` | List the workflows authored in this workspace |
 | `/agentflow:audit` | Shipped recipe: discover → review each → group → executive digest |
+| `/agentflow:workflows` · `board` · `inspect` | Observe: authored-workflow catalog · live dashboard · a run's detail/tree/budget — plus `inspect results <run>` (reuse a finished run without re-running) and `pipe progress <run>` (where you are) |
 
-**Iteration primitives** (the FP vocabulary, each a persisted, resumable run)
+**Building blocks** — the engine composes these for you; they're hidden from the `/` menu (`user-invocable: false`) but still scriptable via their CLIs.
 
-| Command | Like | What it does |
-|---|---|---|
-| `/agentflow:enumerate` | `unfold` (1→N) | Generate a list of items from a spec |
-| `/agentflow:foreach` | `map` (N→N) | A prompt per item — parallel or `--serial`/`--carry`, `--shard`, folder-kanban, cache |
-| `/agentflow:reduce` | `fold` (N→1) | Collapse N inputs into one digest (md/json) |
-| `/agentflow:group` | `group by` | Partition into K groups — path-prefix / regex / jsonpath / LLM-classify |
-| `/agentflow:repeat` · `until` · `while` | loop | Run a stage by count / do…until / while…do |
-| `/agentflow:step` | one unit | Run ONE prompt once — inline / subagent / `claude -p` / `codex exec` |
-| `/agentflow:pipe` | compose | Ordered stages + `when` guards + conditional `fork` routing + `output_schema` |
-
-**Scale, coordinate & observe**
-
-| Command | What it does |
-|---|---|
-| `/agentflow:queue` | A lock-free shared work queue — many workers drain it safely (atomic-rename claim) |
-| `/agentflow:mailbox` | Directed messages between instances (outbox/inbox, atomic FIFO recv) |
-| `/agentflow:board` · `inspect` · `history` | Read-only: live dashboard · one run's detail/tree/budget · run log · **`inspect results <run>`** dumps a finished run's outputs (`--json`/`--checklist`) for reuse without re-running · **`pipe progress <run>`** shows where you are |
-| `/agentflow:notify` | Ping a webhook (Slack/Discord) and/or desktop when a long run finishes |
+The FP vocabulary — `enumerate` (unfold 1→N) · `foreach` (map N→N) · `reduce` (fold N→1) · `group`
+(partition) · `repeat`/`until`/`while` (loop) · `step` (one unit) · `pipe` (compose) — plus `queue`
+(lock-free shared queue across terminals/`--shard`), `mailbox` (directed cross-instance messages),
+`notify` (webhook/desktop), `history`. `do` and `run-workflow` wire these automatically; to drive one
+yourself, run its CLI, e.g. `node "${CLAUDE_PLUGIN_ROOT}/dist/state/foreach.js" …`.
 
 Sources are pluggable everywhere: a folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON
 list, or another run's output — same engine underneath.

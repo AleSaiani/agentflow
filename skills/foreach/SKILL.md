@@ -1,5 +1,6 @@
 ---
 name: foreach
+user-invocable: false
 description: |
   Apply ONE operation to EVERY item of a list — the **map** (N→N). The operation is a prompt; items
   come from a JSON list, a markdown checklist, or another run's output. Runs in parallel subagents or

@@ -1,5 +1,6 @@
 ---
 name: step
+user-invocable: false
 description: |
   Run ONE prompt once and capture its structured output — the single LLM/work unit between
   /agentflow:reduce (one agent over N inputs) and /agentflow:foreach (one agent per item). Pick where it

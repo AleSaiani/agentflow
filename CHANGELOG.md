@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `workflows/security-pack/` — a meta-workflow nesting security-domain + security-repo into one index
     (a worked example of workflow composition).
 
+### Changed
+- **Slimmer `/` menu**: the low-level building-block skills (`enumerate`, `foreach`, `reduce`, `group`,
+  `repeat`/`until`/`while`, `step`, `pipe`, `queue`, `mailbox`, `notify`, `history`) are now
+  `user-invocable: false` — hidden from the slash-command menu but still composed by the engine and
+  auto-invocable by the model (descriptions stay in context). The front door is the ~9 entry commands
+  (`do`, `how`, `create-workflow`, `run-workflow`, `checklist`, `audit`, `workflows`, `board`, `inspect`).
+  README "Commands" reorganized into front-door vs building-blocks.
+
 ## [1.0.0-beta.2] - 2026-05-24
 
 Production-hardening + capability expansion over beta.1.

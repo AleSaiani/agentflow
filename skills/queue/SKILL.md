@@ -1,5 +1,6 @@
 ---
 name: queue
+user-invocable: false
 description: |
   A lock-free shared work queue that MANY workers (terminals/sessions) can drain at the same time
   without double-processing. Each item is a file claimed by an atomic rename, so concurrent claims are

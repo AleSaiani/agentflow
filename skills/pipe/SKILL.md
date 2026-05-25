@@ -1,5 +1,6 @@
 ---
 name: pipe
+user-invocable: false
 description: |
   Run an ordered pipeline of stages — each a bash command, a json write, or another primitive
   (/agentflow:enumerate, /agentflow:foreach, /agentflow:group, /agentflow:reduce, or a loop). The composer: it holds no

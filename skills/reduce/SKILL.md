@@ -1,5 +1,6 @@
 ---
 name: reduce
+user-invocable: false
 description: |
   Collapse N results into 1 digest (markdown or JSON) via a single agent — the **fold** (N→1).
 

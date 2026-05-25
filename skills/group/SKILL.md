@@ -1,5 +1,6 @@
 ---
 name: group
+user-invocable: false
 description: |
   Partition N items into K groups by key — the partition step. Output is items.json-compatible: feed
   it straight to /agentflow:foreach to process per group. Methods: path-prefix / regex / jsonpath
