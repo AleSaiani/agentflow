@@ -449,9 +449,68 @@ function cmdWorkflows(args: string[]): void {
   process.stdout.write(lines.join("\n") + "\n");
 }
 
+function getPath(obj: unknown, path: string): unknown {
+  let cur: unknown = obj;
+  for (const k of path.split(".")) {
+    if (cur == null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[k];
+  }
+  return cur;
+}
+
+/**
+ * Dump the RESULTS of a completed run for downstream, deterministic reuse — so you operate on outputs
+ * WITHOUT re-running. `foreach` → one row per item (id+status+result); `step`/`reduce`/`pipe`/`group`/
+ * `iterate` → the produced output (inline or read from its result_pointer file). Modes: `--json` (full,
+ * lossless), `--checklist` (a markdown `- [ ]` line per item — one per item so nothing is dropped),
+ * `--field a.b` pulls a nested result field as the task text, `--status <s>` filters foreach items.
+ */
+function cmdResults(args: string[]): void {
+  const { values, positionals } = parseArgs({
+    args, allowPositionals: true, strict: true,
+    options: { cmd: { type: "string" }, json: { type: "boolean", default: false }, checklist: { type: "boolean", default: false }, field: { type: "string" }, status: { type: "string" }, limit: { type: "string", default: "0" } },
+  });
+  const runId = positionals[0];
+  if (!runId) die("error: results requires a run_id");
+  const [cmd, state] = resolveOrExit(runId, values["cmd"] as string | undefined);
+  let rows: StateDict[];
+  if (cmd === "foreach") {
+    let items = Object.values(state["items"] ?? {}) as StateDict[];
+    if (values["status"]) items = items.filter((i) => i["status"] === values["status"]);
+    rows = items.map((i) => ({ id: i["id"], status: i["status"], result: i["result"] ?? null }));
+  } else {
+    let result: unknown = state["output"] ?? null;
+    const ptr = state["result_pointer"];
+    if (result == null && typeof ptr === "string" && existsSync(ptr)) {
+      try {
+        result = readFileSync(ptr, "utf8");
+      } catch {
+        /* leave null */
+      }
+    }
+    rows = [{ id: runId, status: state["status"], result }];
+  }
+  const limit = parseInt(values["limit"] as string, 10);
+  if (limit > 0) rows = rows.slice(0, limit);
+
+  if (values["checklist"]) {
+    const field = values["field"] as string | undefined;
+    const lines = rows.map((r) => {
+      const picked = field ? getPath(r["result"], field) : typeof r["result"] === "string" ? r["result"] : null;
+      const txt = picked != null && picked !== "" ? ` — ${String(picked).replace(/\s+/g, " ").slice(0, 160)}` : "";
+      return `- [ ] ${r["id"]}${txt}`;
+    });
+    process.stdout.write(lines.join("\n") + "\n");
+    return;
+  }
+  if (values["json"]) return print(rows);
+  process.stdout.write(`[${cmd}] ${runId} — ${rows.length} result(s)\n`);
+  for (const r of rows) process.stdout.write(`  ${String(r["id"]).slice(0, 64).padEnd(64)} ${r["status"] ?? ""}\n`);
+}
+
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
-  if (isHelp(sub)) return printUsage("inspect", ["runs", "workflows", "history", "show", "tree", "budget", "timeline", "board"]);
+  if (isHelp(sub)) return printUsage("inspect", ["runs", "workflows", "history", "show", "results", "tree", "budget", "timeline", "board"]);
   switch (sub) {
     case "runs":
       return cmdRuns(rest);
@@ -461,6 +520,8 @@ function main(argv: string[]): void {
       return cmdHistory(rest);
     case "show":
       return cmdShow(rest);
+    case "results":
+      return cmdResults(rest);
     case "tree":
       return cmdTree(rest);
     case "budget":
@@ -470,7 +531,7 @@ function main(argv: string[]): void {
     case "board":
       return cmdBoard(rest);
     default:
-      die(`error: unknown subcommand '${sub ?? ""}' (runs|workflows|history|show|tree|budget|timeline|board)`);
+      die(`error: unknown subcommand '${sub ?? ""}' (runs|workflows|history|show|results|tree|budget|timeline|board)`);
   }
 }
 

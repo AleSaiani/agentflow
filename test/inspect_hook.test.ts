@@ -101,3 +101,25 @@ test("inspect runs/board surface the active run", () => {
   assert.equal(history[0].run_id, "rb");
   assert.ok(history[0].updated_at);
 });
+
+test("inspect results: dumps a finished foreach run's items (lossless) as json + checklist", () => {
+  const { env } = freshEnv();
+  const items = join(env["FOREACH_STATE_DIR"]!, "..", "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }, { id: "c" }]), "utf8");
+  run(ENUM, env, ["init", "r", "--items", items]);
+  run(ENUM, env, ["claim", "r", "--count", "9"]);
+  run(ENUM, env, ["complete", "r", "a", "--result", JSON.stringify({ severity: "high" })]);
+  run(ENUM, env, ["complete", "r", "b", "--result", JSON.stringify({ severity: "low" })]);
+  // 'c' is left in_progress (no result) — it must still appear, nothing dropped.
+
+  const rows = lastJson(run(INSPECT, env, ["results", "r", "--cmd", "foreach", "--json"]));
+  assert.equal(rows.length, 3);
+  assert.equal(rows.find((x: any) => x.id === "a").result.severity, "high");
+
+  const cl = run(INSPECT, env, ["results", "r", "--cmd", "foreach", "--checklist"]).trim().split(/\r?\n/);
+  assert.equal(cl.length, 3); // one line per item
+  assert.ok(cl.some((l: string) => /^- \[ \] a/.test(l)));
+
+  const withField = run(INSPECT, env, ["results", "r", "--cmd", "foreach", "--checklist", "--field", "severity"]).trim().split(/\r?\n/);
+  assert.match(withField.find((l: string) => l.startsWith("- [ ] a"))!, /high/);
+});
