@@ -33,6 +33,11 @@ compaction. Close the laptop at step 47 of 100; reopen and it resumes at 48.
 > **You don't type the flags.** You describe the goal; the skill writes the exact commands. The
 > `/agentflow:…` lines in this README show *what runs under the hood*, for transparency.
 
+**Familiar by design.** If you've written a Claude Code skill, you already know the shape: a `WORKFLOW.md`
+is the same idea as a `SKILL.md` — frontmatter plus one heading per step — run right in your session.
+**No server, no Python, no extra services** — it runs on the same Node that powers Claude Code; Agent
+Flow just adds the durable state and deterministic control flow that turn those steps into a resumable pipeline.
+
 <!-- demo GIF (recorded with charmbracelet/vhs) goes here once captured:
      ![Agent Flow demo](docs/assets/demo.gif) -->
 
