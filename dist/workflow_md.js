@@ -27,7 +27,8 @@
  * stage becomes the `{type:"bash", command}` guard.
  */
 const STAGE_HEADING = /^##\s+(?:\d+[.)]\s*)?(.+?)\s*(?:·\s*|\(\s*)([a-z][a-z-]*)\s*\)?\s*$/;
-const PRIMITIVE_TYPES = ["enumerate", "foreach", "group", "reduce", "iterate", "step"];
+// `workflow` is sugar for a nested sub-workflow (compiles to a `pipe` child).
+const PRIMITIVE_TYPES = ["enumerate", "foreach", "group", "reduce", "iterate", "step", "pipe", "workflow"];
 function unquote(s) {
     const t = s.trim();
     if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))
@@ -279,7 +280,7 @@ function compileStage(s) {
                 continue;
             initArgs.push(flag, typeof v === "object" ? JSON.stringify(v) : String(v));
         }
-        stage["spec"] = { cmd: s.type, init_args: initArgs };
+        stage["spec"] = { cmd: s.type === "workflow" ? "pipe" : s.type, init_args: initArgs };
     }
     else {
         // step / skill / unknown — forward-compatible: emit as-is so pipe's validation surfaces a clear

@@ -62,7 +62,7 @@ import "./reduce.js";
 import "./step.js";
 
 const CMD = "pipe";
-const SUPPORTED_CHILD_CMDS = ["enumerate", "foreach", "group", "iterate", "reduce", "step"];
+const SUPPORTED_CHILD_CMDS = ["enumerate", "foreach", "group", "iterate", "reduce", "step", "pipe"];
 const PREVIEW_CHARS = 500;
 const STATUS_SKIPPED = "skipped";
 
@@ -273,6 +273,7 @@ function cmdInit(args: string[]): void {
       "max-agents": { type: "string" },
       force: { type: "boolean", default: false },
       "skip-validate-stages": { type: "boolean", default: false },
+      "validate-only": { type: "boolean", default: false },
     },
   });
   const runId = positionals[0];
@@ -282,6 +283,9 @@ function cmdInit(args: string[]): void {
   const workflowPath = values["workflow"] as string | undefined;
   if (Number(Boolean(stagesPath)) + Number(Boolean(workflowPath)) !== 1)
     die("error: provide exactly one of --stages or --workflow");
+  // Shape-only check (used by a parent stage's validatePrimitiveStage for a nested `pipe` child):
+  // returns before reading the workflow file, whose path may still be a dummy-resolved template.
+  if (values["validate-only"]) return print({ valid: true, cmd: CMD });
 
   // Workflow-file Source: a declarative WorkflowSpec {name?, description?, config?, stages[]}
   // compiles into the pipe's stages[]. Its optional config provides defaults for the run.
@@ -894,6 +898,20 @@ function cmdDrive(args: string[]): void {
       continue;
     }
     if (action === "spawn_primitive") {
+      if (t["cmd"] === "pipe") {
+        // Nested sub-workflow: init + start, then drive the child as far as it goes. Deterministic
+        // sub-stages complete inline; an LLM step inside the child pauses and the Stop hook resumes
+        // both (the parent yields via hasResidualWork while the child still has work).
+        const childRunId = t["suggested_child_run_id"];
+        if (autoInitChild("pipe", childRunId, t["init_args"]) !== 0) {
+          print({ action: "error", stage: "child_init", cmd: "pipe", run_id: childRunId });
+          return;
+        }
+        nodeRun([THIS_FILE, "start-primitive-child", runId, "--child-cmd", "pipe", "--child-run-id", childRunId]);
+        nodeRun([THIS_FILE, "drive", childRunId, "--max-steps", String(maxSteps)]);
+        actionsTaken.push({ step: stepsTaken, action: "auto_subworkflow", run_id: childRunId });
+        continue;
+      }
       if (driveCanAutoHandlePrimitive(t)) {
         const childCmd = t["cmd"];
         const childRunId = t["suggested_child_run_id"];
@@ -957,6 +975,96 @@ function cmdPlan(args: string[]): void {
   });
   // Unresolved forward references (later stages' result_pointers) remain as literal {{...}}.
   print({ run_id: runId, dry_run: true, stages: plan.length, plan });
+}
+
+// ---------- progress: one-glance "you are here" across the whole workflow ----------
+
+function bar(done: number, total: number, width = 10): string {
+  if (!total) return "░".repeat(width);
+  const f = Math.max(0, Math.min(width, Math.round((done / total) * width)));
+  return "█".repeat(f) + "░".repeat(width - f);
+}
+
+/** Progress of the active child primitive (so a foreach stage shows items, not just "running"). */
+function childProgress(childCmd: string, childRunId: string): StateDict | null {
+  const p = statePath(childCmd, childRunId);
+  if (!existsSync(p)) return null;
+  const s = loadState(p);
+  if (childCmd === "foreach") {
+    const items = Object.values(s["items"] ?? {}) as StateDict[];
+    const c: Record<string, number> = { pending: 0, in_progress: 0, done: 0, failed: 0 };
+    for (const it of items) c[it["status"]] = (c[it["status"]] ?? 0) + 1;
+    return { kind: "foreach", total: items.length, ...c };
+  }
+  if (childCmd === "iterate") return { kind: "iterate", iter: s["iteration_count"] ?? 0, max: s["config"]?.max_iterations ?? null };
+  if (childCmd === "group") return { kind: "group", groups: s["groups_count"] ?? 0, items: s["items_total"] ?? 0 };
+  if (childCmd === "pipe") { const st = (s["stages"] ?? []) as StateDict[]; return { kind: "pipe", done: st.filter((x) => x["status"] === STATUS_DONE).length, total: st.length }; }
+  return { kind: childCmd, child_status: s["status"] };
+}
+
+/** Recursively sum budget across the pipe and its primitive children (incl. nested pipes). */
+function budgetTotal(cmd: string, runId: string): { usd: number; agents: number; tokens: number } {
+  const out = { usd: 0, agents: 0, tokens: 0 };
+  const visit = (c: string, r: string): void => {
+    const p = statePath(c, r);
+    if (!existsSync(p)) return;
+    const s = loadState(p);
+    const b = s["budget"] ?? {};
+    out.usd += b["usd_estimate"] ?? 0;
+    out.agents += b["agents_dispatched"] ?? 0;
+    out.tokens += b["tokens_used"] ?? 0;
+    if (c === "pipe") for (const st of (s["stages"] ?? []) as StateDict[]) if (st["child_cmd"] && st["child_run_id"]) visit(st["child_cmd"] as string, st["child_run_id"] as string);
+  };
+  visit(cmd, runId);
+  return out;
+}
+
+/** A compact, human-readable "where are we" view: overall stage %, the active phase + its item
+ *  progress, cumulative scale (agents/$), and the resume counter. The orchestrator echoes this each
+ *  turn so a long, multi-resume run always shows a clear position. `--json` for machine use. */
+function cmdProgress(args: string[]): void {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { json: { type: "boolean", default: false } } });
+  const runId = positionals[0];
+  if (!runId) die("error: progress requires a run_id");
+  const state = load(runId);
+  const stages = (state["stages"] ?? []) as StateDict[];
+  const total = stages.length;
+  const doneCount = stages.filter((s) => s["status"] === STATUS_DONE).length;
+  const idx = Math.min(state["stage_index"] ?? 0, Math.max(0, total - 1));
+  const cur = stages[idx] ?? null;
+  const pct = total ? Math.round((doneCount / total) * 100) : 0;
+  const bud = budgetTotal(CMD, runId);
+  const usd = Math.round(bud.usd * 1e4) / 1e4;
+  const child = cur && cur["type"] === "primitive" && cur["child_cmd"] && cur["child_run_id"] ? childProgress(cur["child_cmd"] as string, cur["child_run_id"] as string) : null;
+  const running = ![STATUS_DONE, STATUS_FAILED, STATUS_ABORTED].includes(state["status"]);
+  const maxC = state["config"]?.max_auto_continues;
+
+  if (values["json"]) {
+    return print({
+      run_id: runId, status: state["status"], pct, stage_index: idx, total_stages: total, stages_done: doneCount,
+      current_stage: cur ? { name: cur["name"], type: cur["type"], status: cur["status"], child_cmd: cur["child_cmd"] ?? null } : null,
+      child, budget: { agents: bud.agents, usd, tokens: bud.tokens },
+      auto_continues: state["auto_continues"] ?? 0, max_auto_continues: maxC ?? null,
+    });
+  }
+
+  const head = state["status"] === STATUS_DONE ? "✓ done" : state["status"] === STATUS_FAILED ? "✗ failed" : `${pct}%`;
+  const phaseType = cur && cur["type"] !== "bash" && cur["type"] !== "json" ? ` (${cur["child_cmd"] ?? cur["type"]})` : "";
+  const lines = [
+    `${runId}  ▸ ${head}  (${doneCount}/${total} stages)`,
+    `  ${bar(doneCount, total)}  stage ${Math.min(idx + 1, total)}/${total} · ${cur ? cur["name"] : "—"}${phaseType} · ${cur ? cur["status"] : ""}`,
+  ];
+  if (child && child["kind"] === "foreach")
+    lines.push(`  └─ this phase: ${child["done"]}/${child["total"]} done${child["in_progress"] ? ` · ${child["in_progress"]} running` : ""}${child["failed"] ? ` · ${child["failed"]} failed` : ""}   ${bar(child["done"] as number, child["total"] as number)}`);
+  else if (child && child["kind"] === "pipe") lines.push(`  └─ sub-workflow: ${child["done"]}/${child["total"]} stages   ${bar(child["done"] as number, child["total"] as number)}`);
+  else if (child && child["kind"] === "iterate") lines.push(`  └─ iteration ${child["iter"]}/${child["max"] ?? "?"}`);
+  else if (child && child["child_status"]) lines.push(`  └─ ${child["kind"]}: ${child["child_status"]}`);
+  lines.push(`  scale: ${bud.agents} agents · ~$${usd.toFixed(2)}${running ? ` · resume ${state["auto_continues"] ?? 0}${maxC ? `/${maxC}` : ""}` : ""}`);
+  if (running) {
+    const remaining = stages.filter((s) => s["status"] !== STATUS_DONE && s["status"] !== STATUS_SKIPPED).map((s) => s["name"] as string);
+    if (remaining.length) lines.push(`  next: ${remaining.slice(0, 4).join(" → ")}${remaining.length > 4 ? " → …" : ""}`);
+  }
+  process.stdout.write(lines.join("\n") + "\n");
 }
 
 function cmdStatus(args: string[]): void {
@@ -1061,11 +1169,11 @@ function resumeMsg(runId: string, residual: ResidualWork): string {
   return `/pipe run '${runId}' needs orchestrator attention: ${detail}. Run the pipe \`tick ${runId}\` subcommand and act on the returned JSON.`;
 }
 
-const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg });
+const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPointer: (s) => (s["result_pointer"] ?? null) as string | null });
 
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
-  if (isHelp(sub)) return printUsage(CMD, ["init", "tick", "drive", "plan", "complete-bash-stage", "complete-json-stage", "start-primitive-child", "advance", "approve", "fail", "status", "runs", "increment-continues", "budget-add"]);
+  if (isHelp(sub)) return printUsage(CMD, ["init", "tick", "drive", "plan", "progress", "complete-bash-stage", "complete-json-stage", "start-primitive-child", "advance", "approve", "fail", "status", "runs", "increment-continues", "budget-add"]);
   switch (sub) {
     case "init":
       return cmdInit(rest);
@@ -1089,6 +1197,8 @@ function main(argv: string[]): void {
       return cmdFail(rest);
     case "status":
       return cmdStatus(rest);
+    case "progress":
+      return cmdProgress(rest);
     case "runs":
       return PRIM.cliRuns();
     case "increment-continues":

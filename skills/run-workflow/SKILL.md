@@ -55,4 +55,29 @@ Loop on the JSON result:
 - `action: "done"` → surface `result_pointer`.
 - `action: "failed"` → surface the error.
 
-The Stop hook resumes an in-flight run across turns automatically.
+## 3. Show progress every turn (so "where are we" is always clear)
+
+A long workflow runs across many resumes; the user must always be able to see the position at a glance.
+**At the start of each turn (and on every resume), run and show the progress block:**
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/state/pipe.js" progress <run-id>
+```
+
+It prints one compact view: overall `N/total` stages + %, the **current phase** and (for a foreach/group
+stage) its **item progress** with a bar, the cumulative **scale** (agents · $ · resume k/max), and the
+**next** stages. Echo it verbatim — don't paraphrase the numbers. Example mid-run:
+
+```
+my-run  ▸ 20%  (2/10 stages)
+  ██░░░░░░░░  stage 3/10 · review (foreach) · in_progress
+  └─ this phase: 1180/2411 done · 12 running   █████░░░░░
+  scale: 84 agents · ~$77.40 · resume 7/60
+  next: review → module-quality → build-group-input → …
+```
+
+This makes both the **phase** ("which of N stages") and the **within-phase countdown** ("X/Y items")
+visible together — not just one or the other. `progress --json` is available for tooling.
+
+The Stop hook resumes an in-flight run across turns automatically — lead each resumed turn with the
+progress block above.

@@ -366,3 +366,68 @@ test("pipe: init rejects a primitive stage with a bad flag (preflight validation
   writeFileSync(stages, JSON.stringify([{ name: "x", type: "primitive", spec: { cmd: "reduce", init_args: ["--output-format", "xml"] } }]), "utf8");
   assert.throws(() => run(env, ["init", "pbad", "--stages", stages]), /stage validation failed|output-format/);
 });
+
+test("pipe: a nested `pipe` child (sub-workflow) drives inline + hands its result to a later stage", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  // Deterministic child workflow: one bash stage emitting JSON.
+  const child = join(dir, "child.json");
+  writeFileSync(child, JSON.stringify({ name: "child", stages: [{ name: "emit", type: "bash", spec: { command: `printf '{"answer":42}' > "$PIPE_OUTPUT_PATH"` } }] }), "utf8");
+  // Parent: a `pipe` child stage, then a bash stage that reads the sub-workflow's result_pointer.
+  const parent = join(dir, "parent.json");
+  writeFileSync(
+    parent,
+    JSON.stringify({
+      name: "parent",
+      stages: [
+        { name: "sub", type: "primitive", spec: { cmd: "pipe", init_args: ["--workflow", child] } },
+        { name: "after", type: "bash", spec: { command: `cat "{{stages.sub.result_pointer}}" > "$PIPE_OUTPUT_PATH"` } },
+      ],
+    }),
+    "utf8",
+  );
+
+  const init = run(env, ["init", "par", "--workflow", parent]);
+  assert.equal(init.stages, 2);
+
+  const driven = run(env, ["drive", "par", "--max-steps", "50"]);
+  assert.equal(driven.action, "done");
+  // the sub-workflow ran inline (no agent dispatch needed for a deterministic child)
+  assert.ok((driven.actions_taken ?? []).some((a: any) => a.action === "auto_subworkflow"));
+
+  const status = run(env, ["status", "par"]);
+  const byName: Record<string, any> = {};
+  for (const s of status.stages) byName[s.name] = s;
+  assert.equal(byName["sub"].status, "done");
+  assert.equal(byName["sub"].child_cmd, "pipe"); // the child is itself a pipe
+  assert.equal(byName["after"].status, "done");
+  // the parent's later stage read the child pipe's emitted result
+  assert.match(readFileSync(byName["after"].result_pointer, "utf8"), /"answer":\s*42/);
+
+  // the child pipe run is recorded and done
+  const childStatus = run(env, ["status", byName["sub"].child_run_id]);
+  assert.equal(childStatus.status, "done");
+});
+
+test("pipe: progress --json reports overall stage %, current stage and cumulative budget", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pipe-"));
+  const env = { PIPE_STATE_DIR: dir };
+  const wf = join(dir, "wf.json");
+  writeFileSync(wf, JSON.stringify({ name: "p", stages: [
+    { name: "a", type: "bash", spec: { command: 'echo a > "$PIPE_OUTPUT_PATH"' } },
+    { name: "b", type: "bash", spec: { command: 'echo b > "$PIPE_OUTPUT_PATH"' } },
+  ] }), "utf8");
+  run(env, ["init", "pg", "--workflow", wf]);
+
+  const before = run(env, ["progress", "pg", "--json"]);
+  assert.equal(before.total_stages, 2);
+  assert.equal(before.stages_done, 0);
+  assert.equal(before.pct, 0);
+  assert.equal(before.current_stage.name, "a");
+
+  run(env, ["drive", "pg", "--max-steps", "20"]);
+  const after = run(env, ["progress", "pg", "--json"]);
+  assert.equal(after.status, "done");
+  assert.equal(after.pct, 100);
+  assert.equal(after.stages_done, 2);
+});
