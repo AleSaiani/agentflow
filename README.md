@@ -84,6 +84,8 @@ thing **resumes across turns** if interrupted. The digest lands as a plain file 
 
 | Command | What it does |
 |---|---|
+| `/agentflow:do` | Describe a one-off deterministic operation → it designs + runs an inline pipeline, then offers to promote it to a saved workflow |
+| `/agentflow:how` | Help desk: "how do I … with Agent Flow?" → the right command + a copy-paste recipe (read-only) |
 | `/agentflow:create-workflow` | Author a reusable `WORKFLOW.md` (validates + previews) |
 | `/agentflow:run-workflow` | Run a workflow end to end (`--dry-run`, `--param k=v`); echoes a progress block each turn |
 | `/agentflow:checklist` | Run a repeatable `- [ ]` to-do list — tick items, write back, resume only the open ones |

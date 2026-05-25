@@ -26,6 +26,8 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `step` | one unit | run ONE prompt once (inline / subagent / `claude -p` / `codex exec`); capture output |
 | `mailbox` | outbox/inbox | directed messages between instances (atomic FIFO recv, no locks) |
 | `checklist` | repeatable to-do | run a markdown `- [ ]` checklist, tick items, write back; resume only the open ones (sugar over `foreach --checkbox`) |
+| `do` | one-off | describe a deterministic operation → designs + runs an inline pipe (throwaway), then offers to promote it to a saved workflow |
+| `how` | help desk | "how do I … with Agent Flow?" → the right command + a copy-paste recipe, grounded in the docs (read-only) |
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |

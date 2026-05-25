@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`/agentflow:do`** — describe a one-off **deterministic** operation; it designs an inline pipe
+  (code-first, LLM step only where judgment is needed), names + runs it (no saved file), then offers to
+  **promote** it to a reusable `workflows/<name>/WORKFLOW.md`. The ephemeral sibling of create-workflow.
+- **`/agentflow:how`** — Agent Flow help desk: maps a plain-language intent to the right command(s) + a
+  copy-paste recipe, grounded in the installed docs/skills. Read-only (explains, doesn't execute).
 - **`pipe progress <id>`** — a one-glance "you are here" view for long, multi-resume runs: overall
   stage `N/total` + %, the current phase and (for a foreach/group child) its item progress with a bar,
   cumulative scale (agents · $ · resume k/max), and the next stages. `run-workflow` now echoes it each
