@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
+import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, isHelp, printUsage, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
 const CMD = "reduce";
 function pathFor(runId) {
     return statePath(CMD, runId);
@@ -235,6 +235,8 @@ function resumeMsg(runId, residual) {
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "start", "complete", "fail", "status", "materialize", "runs", "increment-continues", "budget-add"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

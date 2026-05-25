@@ -23,7 +23,7 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { Primitive, STATUS_ABORTED, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, findWorkspaceRoot, getPrimitive, loadState, makeBaseState, markDone, markFailed, markInProgress, now, parseBudgetCaps, print, saveAtomic, stateDir, statePath, } from "../common.js";
+import { Primitive, STATUS_ABORTED, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, isHelp, printUsage, findWorkspaceRoot, getPrimitive, loadState, makeBaseState, markDone, markFailed, markInProgress, now, parseBudgetCaps, print, saveAtomic, stateDir, statePath, } from "../common.js";
 import { runBash } from "../shell.js";
 import { parseWorkflowMd } from "../workflow_md.js";
 import { validateSchema } from "../schema.js";
@@ -1044,6 +1044,8 @@ function resumeMsg(runId, residual) {
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "tick", "drive", "plan", "complete-bash-stage", "complete-json-stage", "start-primitive-child", "advance", "approve", "fail", "status", "runs", "increment-continues", "budget-add"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

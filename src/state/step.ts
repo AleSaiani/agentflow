@@ -30,7 +30,7 @@ import {
   STATUS_FAILED,
   STATUS_IN_PROGRESS,
   STATUS_PENDING,
-  die,
+  die, isHelp, printUsage,
   loadState,
   makeBaseState,
   markDone,
@@ -274,6 +274,7 @@ const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPoin
 
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
+  if (isHelp(sub)) return printUsage(CMD, ["init", "run", "start", "complete", "fail", "status", "runs", "budget-add", "increment-continues"]);
   switch (sub) {
     case "init":
       return cmdInit(rest);

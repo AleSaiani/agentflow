@@ -18,7 +18,7 @@ import { createHash } from "node:crypto";
 import { hostname } from "node:os";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { Primitive, die, isPaused, loadState, makeBaseState, markDone, now, parseBudgetCaps, print, saveAtomic, statePath, } from "../common.js";
+import { Primitive, die, isHelp, printUsage, isPaused, loadState, makeBaseState, markDone, now, parseBudgetCaps, print, saveAtomic, statePath, } from "../common.js";
 import { loadSource } from "../source.js";
 const CMD = "queue";
 const DIRS = ["pending", "claimed", "done", "failed"];
@@ -307,6 +307,8 @@ function resumeMsg(runId, work) {
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPointer: (s) => (s["result_pointer"] ?? null) });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "add", "claim", "complete", "fail", "reclaim", "status", "list", "runs", "budget-add", "increment-continues"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
+import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, isHelp, printUsage, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
 const CMD = "step";
 const RUNTIMES = ["main", "subagent", "claude-cli", "codex-cli"];
 function pathFor(runId) {
@@ -252,6 +252,8 @@ function resumeMsg(runId, _work) {
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPointer: (s) => (s["result_pointer"] ?? null) });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "run", "start", "complete", "fail", "status", "runs", "budget-add", "increment-continues"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

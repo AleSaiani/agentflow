@@ -11,7 +11,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { parseArgs } from "node:util";
-import { PRIMITIVES, die, findWorkspaceRoot, getPrimitive, loadState, print, stateDir, statePath } from "./common.js";
+import { PRIMITIVES, die, isHelp, printUsage, findWorkspaceRoot, getPrimitive, loadState, print, stateDir, statePath } from "./common.js";
 // Ensure every primitive self-registers.
 import "./state/enumerate.js";
 import "./state/foreach.js";
@@ -474,6 +474,8 @@ function cmdWorkflows(args) {
 }
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage("inspect", ["runs", "workflows", "history", "show", "tree", "budget", "timeline", "board"]);
     switch (sub) {
         case "runs":
             return cmdRuns(rest);

@@ -19,7 +19,7 @@ import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { runBash } from "../shell.js";
-import { Primitive, STATUS_ABORTED, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, findWorkspaceRoot, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, stateDir, statePath, } from "../common.js";
+import { Primitive, STATUS_ABORTED, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, isHelp, printUsage, findWorkspaceRoot, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, stateDir, statePath, } from "../common.js";
 const CMD = "iterate";
 const PREVIEW_CHARS = 500;
 function pathFor(runId) {
@@ -396,6 +396,8 @@ function resumeMsg(runId, residual) {
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "run-iteration", "kill", "fail", "status", "runs", "increment-continues", "budget-add"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

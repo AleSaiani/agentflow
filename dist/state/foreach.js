@@ -19,7 +19,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, cacheKey, cacheLookup, cacheStore, die, isPaused, loadState, loadTaskKindTemplate, makeBaseState, parseBudgetCaps, markDone, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
+import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, cacheKey, cacheLookup, cacheStore, die, isHelp, printUsage, isPaused, loadState, loadTaskKindTemplate, makeBaseState, parseBudgetCaps, markDone, markInProgress, now, print, saveAtomic, statePath, } from "../common.js";
 import { loadSource, moveKanbanItem, writeChecklistView, writeFolderView } from "../source.js";
 const CMD = "foreach";
 // Valid kinds for --kind. Mirrors `skills/foreach/task-kinds.md`. "unknown" has no
@@ -641,6 +641,8 @@ const PRIM = new Primitive(CMD, {
 });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "claim", "claim-serial", "complete", "fail", "status", "list", "reset", "complete-batch", "view", "increment-continues", "runs", "budget-add"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

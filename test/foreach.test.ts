@@ -205,6 +205,16 @@ test("foreach CLI: --max-usd cost cap pauses the run when exceeded", () => {
   assert.match(status.paused_reason, /usd_estimate .* > cap 0\.1/);
 });
 
+test("foreach CLI: --help / no-arg print the subcommand list (exit 0); a real unknown still errors", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  for (const probe of [["--help"], ["-h"], []]) {
+    const r = run(dir, probe);
+    assert.equal(r.cmd, "foreach");
+    assert.ok(Array.isArray(r.subcommands) && r.subcommands.includes("claim"));
+  }
+  assert.throws(() => run(dir, ["definitely-not-a-subcommand"]));
+});
+
 test("foreach CLI: validate-only does not read items or write state", () => {
   const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
   const v = run(dir, ["init", "rX", "--items", join(dir, "nope.json"), "--validate-only"]);

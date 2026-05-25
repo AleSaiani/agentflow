@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, stateDir, statePath, } from "../common.js";
+import { Primitive, STATUS_DONE, STATUS_FAILED, STATUS_IN_PROGRESS, STATUS_PENDING, die, isHelp, printUsage, loadState, makeBaseState, markDone, markFailed, markInProgress, now, print, saveAtomic, stateDir, statePath, } from "../common.js";
 const CMD = "group";
 const DETERMINISTIC_METHODS = ["path-prefix", "regex", "jsonpath"];
 const LLM_METHODS = ["llm-classify"];
@@ -363,6 +363,8 @@ function resumeMsg(runId, residual) {
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg });
 function main(argv) {
     const [sub, ...rest] = argv;
+    if (isHelp(sub))
+        return printUsage(CMD, ["init", "run-deterministic", "prepare-classify", "apply-classification", "fail", "status", "runs", "increment-continues", "budget-add"]);
     switch (sub) {
         case "init":
             return cmdInit(rest);

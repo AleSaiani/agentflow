@@ -33,7 +33,7 @@ import {
   cacheKey,
   cacheLookup,
   cacheStore,
-  die,
+  die, isHelp, printUsage,
   isPaused,
   loadState,
   loadTaskKindTemplate,
@@ -653,6 +653,7 @@ const PRIM = new Primitive(CMD, {
 
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
+  if (isHelp(sub)) return printUsage(CMD, ["init", "claim", "claim-serial", "complete", "fail", "status", "list", "reset", "complete-batch", "view", "increment-continues", "runs", "budget-add"]);
   switch (sub) {
     case "init":
       return cmdInit(rest);

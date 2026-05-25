@@ -160,6 +160,16 @@ export function die(msg: string): never {
   process.exit(1);
 }
 
+/** True when the first arg is a help request or absent — so a CLI can print usage instead of erroring. */
+export function isHelp(sub: string | undefined): boolean {
+  return sub === undefined || sub === "" || sub === "-h" || sub === "--help" || sub === "help";
+}
+
+/** Print a self-documenting usage line (the subcommand list) as JSON, exit 0. */
+export function printUsage(cmd: string, subcommands: string[]): void {
+  print({ cmd, subcommands, usage: `<subcommand> <run-id> [flags]`, docs: `skills/${cmd}/SKILL.md · docs/reference.md` });
+}
+
 // cmd-name -> env var that overrides the runtime dir for that primitive.
 // Add an entry here when a new primitive is introduced.
 const OVERRIDE_ENV: Record<string, string> = {

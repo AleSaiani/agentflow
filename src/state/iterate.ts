@@ -31,7 +31,7 @@ import {
   STATUS_PENDING,
   type ResidualWork,
   type StateDict,
-  die,
+  die, isHelp, printUsage,
   findWorkspaceRoot,
   loadState,
   makeBaseState,
@@ -439,6 +439,7 @@ const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg });
 
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
+  if (isHelp(sub)) return printUsage(CMD, ["init", "run-iteration", "kill", "fail", "status", "runs", "increment-continues", "budget-add"]);
   switch (sub) {
     case "init":
       return cmdInit(rest);

@@ -25,7 +25,7 @@ import {
   type Item,
   type ResidualWork,
   type StateDict,
-  die,
+  die, isHelp, printUsage,
   isPaused,
   loadState,
   makeBaseState,
@@ -323,6 +323,7 @@ const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPoin
 
 function main(argv: string[]): void {
   const [sub, ...rest] = argv;
+  if (isHelp(sub)) return printUsage(CMD, ["init", "add", "claim", "complete", "fail", "reclaim", "status", "list", "runs", "budget-add", "increment-continues"]);
   switch (sub) {
     case "init":
       return cmdInit(rest);
