@@ -1,0 +1,289 @@
+{
+  "$schema": "agentflow/gdpr-repo-checklist@1",
+  "regulation": "GDPR (Regulation (EU) 2016/679) + ePrivacy Directive 2002/58/EC Art. 5(3)",
+  "note": "Internal-observer GDPR checklist for a source repository. decision_mode routes each check: 'auto' = decided deterministically by evaluate.mjs from the repo scan (files, dependencies, code patterns); 'llm' = bounded judgment over found documents/code excerpts (schema-validated); 'manual' = organizational facts not derivable from code (signed contracts, exercised procedures). Presence-style 'auto' checks detect existence only — adequacy/truthfulness is noted as manual in the rationale.",
+  "generated_for": "agentflow workflows/gdpr-repo",
+  "counts": { "total": 28, "auto": 20, "llm": 6, "manual": 2 },
+  "checks": [
+    {
+      "id": "GDPR-PRIVACY_DOCS-01", "title": "Privacy policy / notice document present in repo", "category": "privacy_docs",
+      "gdpr_articles": ["Art. 12", "Art. 13", "Art. 14"], "decision_mode": "auto",
+      "obligation": "A controller must provide transparent information about processing; a public-facing project should ship/maintain a privacy notice.",
+      "repo_observable": "A privacy policy/notice file or page exists in the repo (PRIVACY.md, privacy-policy.*, legal/privacy, locales privacy strings).",
+      "signals": ["file named privacy*/datenschutz*/informativa* present", "a docs/legal privacy page", "privacy route/template in a web app"],
+      "severity": "major", "pass_criteria": "A privacy notice document is present and tracked in the repo.",
+      "fail_indicators": ["no privacy notice anywhere in the repo"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-13-gdpr/"]
+    },
+    {
+      "id": "GDPR-PRIVACY_DOCS-02", "title": "Privacy notice covers the Art. 13 mandatory contents", "category": "privacy_docs",
+      "gdpr_articles": ["Art. 13"], "decision_mode": "llm",
+      "obligation": "The notice must state controller identity/contact, purposes + legal basis, recipients, retention, data-subject rights and the complaint right.",
+      "repo_observable": "The text of the privacy notice found in the repo can be read and checked for the Art. 13 elements.",
+      "signals": ["controller identity & contact", "purposes + legal basis per purpose", "recipients", "retention", "rights + complaint right", "transfers + safeguards"],
+      "severity": "major", "pass_criteria": "All Art. 13 mandatory elements are present in the notice text.",
+      "fail_indicators": ["missing legal basis", "no rights section", "no retention info"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-13-gdpr/"]
+    },
+    {
+      "id": "GDPR-PRIVACY_DOCS-03", "title": "Records of Processing (ROPA) maintained", "category": "privacy_docs",
+      "gdpr_articles": ["Art. 30"], "decision_mode": "auto",
+      "obligation": "Controllers/processors must keep records of processing activities.",
+      "repo_observable": "A record-of-processing / data-inventory / data-map document exists in the repo (presence only; adequacy is a manual review).",
+      "signals": ["file matching ropa/records-of-processing/data-inventory/data-map/processing-register"],
+      "severity": "minor", "pass_criteria": "A ROPA/data-inventory document is present. Its adequacy requires manual review.",
+      "fail_indicators": ["no records-of-processing artefact in the repo"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-30-gdpr/"]
+    },
+    {
+      "id": "GDPR-PRIVACY_DOCS-04", "title": "Data Processing Agreement (DPA) artefact present", "category": "privacy_docs",
+      "gdpr_articles": ["Art. 28"], "decision_mode": "auto",
+      "obligation": "Engaging a processor requires a contract with the Art. 28(3) mandatory terms.",
+      "repo_observable": "A DPA / data-processing-agreement template or reference exists in the repo (presence only; signed contracts are manual).",
+      "signals": ["file matching dpa/data-processing-agreement/subprocessors", "a subprocessors list"],
+      "severity": "minor", "pass_criteria": "A DPA artefact or subprocessor list is present. Signed contracts require manual review.",
+      "fail_indicators": ["no DPA / subprocessor documentation despite third-party processors in deps"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-28-gdpr/"]
+    },
+    {
+      "id": "GDPR-PRIVACY_DOCS-05", "title": "DPIA artefact present for high-risk processing", "category": "privacy_docs",
+      "gdpr_articles": ["Art. 35"], "decision_mode": "auto",
+      "obligation": "A data protection impact assessment is required for high-risk processing.",
+      "repo_observable": "A DPIA document exists in the repo (presence only; whether a DPIA was actually required/performed is manual).",
+      "signals": ["file matching dpia/data-protection-impact-assessment/pia"],
+      "severity": "minor", "pass_criteria": "A DPIA artefact is present where high-risk processing is plausible. Necessity is a manual judgement.",
+      "fail_indicators": ["special-category data handled but no DPIA artefact"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-35-gdpr/"]
+    },
+    {
+      "id": "GDPR-CONSENT-01", "title": "Consent-management tooling present where non-essential cookies/trackers are used", "category": "consent_cookies",
+      "gdpr_articles": ["Art. 7", "ePrivacy Art. 5(3)"], "decision_mode": "auto",
+      "obligation": "Non-essential cookies/trackers require prior opt-in consent; a web app using them should ship a consent mechanism.",
+      "repo_observable": "A CMP/consent library appears in dependencies when analytics/marketing SDKs are also present.",
+      "signals": ["dep matching cookiebot/onetrust/klaro/cookieconsent/react-cookie-consent/usercentrics/didomi", "a consent component in source"],
+      "severity": "major", "pass_criteria": "If non-essential trackers are present, a consent-management mechanism is also present.",
+      "fail_indicators": ["analytics/marketing SDKs in deps but no consent tooling"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-7-gdpr/", "https://eur-lex.europa.eu/eli/dir/2002/58/oj/eng"]
+    },
+    {
+      "id": "GDPR-CONSENT-02", "title": "Non-essential processing is gated behind consent in code", "category": "consent_cookies",
+      "gdpr_articles": ["Art. 7", "ePrivacy Art. 5(3)", "CJEU C-673/17 Planet49"], "decision_mode": "llm",
+      "obligation": "Analytics/marketing must execute only after a valid opt-in; code must not fire trackers unconditionally on load.",
+      "repo_observable": "Consent-gating logic around tracker initialisation can be read in the code excerpts.",
+      "signals": ["tracker init wrapped in a consent check", "no unconditional gtag/fbq/analytics init at startup"],
+      "severity": "major", "pass_criteria": "Tracker initialisation is conditioned on a recorded consent state.",
+      "fail_indicators": ["analytics initialised unconditionally at app start", "no consent check around tracker code"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-7-gdpr/"]
+    },
+    {
+      "id": "GDPR-SEC-01", "title": "No secrets or credentials committed to the repo", "category": "security_art32",
+      "gdpr_articles": ["Art. 32", "Art. 5(1)(f)"], "decision_mode": "auto",
+      "obligation": "Appropriate technical measures must protect personal data; committed secrets are a serious confidentiality risk.",
+      "repo_observable": "Committed secret material is detectable (a real .env, private keys, cloud keys, long inline tokens).",
+      "signals": ["committed .env (not .env.example)", "*.pem / id_rsa / PRIVATE KEY blocks", "AKIA... AWS keys", "api_key/secret = '<long value>'"],
+      "severity": "critical", "pass_criteria": "No secret material is committed; .env is gitignored and only .env.example is tracked.",
+      "fail_indicators": ["a committed .env with values", "a private key file", "hardcoded cloud/API keys"], "confidence": "high",
+      "references": ["https://gdpr-info.eu/art-32-gdpr/"]
+    },
+    {
+      "id": "GDPR-SEC-02", "title": "Passwords hashed with a strong algorithm", "category": "security_art32",
+      "gdpr_articles": ["Art. 32(1)(a)", "Art. 5(1)(f)"], "decision_mode": "auto",
+      "obligation": "Credentials must be protected with state-of-the-art measures; weak/absent hashing is non-compliant.",
+      "repo_observable": "Hashing usage is detectable in code: bcrypt/scrypt/argon2 (good) vs md5/sha1/plaintext for passwords (bad).",
+      "signals": ["bcrypt/scrypt/argon2 imports", "createHash('md5'|'sha1') near password", "plaintext password storage"],
+      "severity": "critical", "pass_criteria": "Passwords use bcrypt/scrypt/argon2; no md5/sha1/plaintext for credentials.",
+      "fail_indicators": ["md5/sha1 used for passwords", "no hashing of stored passwords"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-32-gdpr/"]
+    },
+    {
+      "id": "GDPR-SEC-03", "title": "Personal data is not written to logs", "category": "security_art32",
+      "gdpr_articles": ["Art. 5(1)(f)", "Art. 32"], "decision_mode": "auto",
+      "obligation": "Logging personal data widens the attack surface and breaches confidentiality/minimisation.",
+      "repo_observable": "Log statements referencing PII variables are detectable in source.",
+      "signals": ["console.log/logger(...) containing email/password/ssn/phone/token/credit"],
+      "severity": "major", "pass_criteria": "No log statements emit personal data or secrets.",
+      "fail_indicators": ["logging of email/password/tokens/PII"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-5-gdpr/", "https://gdpr-info.eu/art-32-gdpr/"]
+    },
+    {
+      "id": "GDPR-SEC-04", "title": "Cookies set with Secure, HttpOnly and SameSite", "category": "security_art32",
+      "gdpr_articles": ["Art. 32", "Art. 25"], "decision_mode": "auto",
+      "obligation": "Session/auth cookies carrying identifiers must be protected against theft/leakage.",
+      "repo_observable": "Cookie-setting code can be inspected for Secure/HttpOnly/SameSite attributes.",
+      "signals": ["res.cookie/set-cookie with httpOnly:true, secure:true, sameSite set", "missing flags on auth cookies"],
+      "severity": "major", "pass_criteria": "Cookies that carry identifiers set Secure, HttpOnly and a SameSite policy.",
+      "fail_indicators": ["auth cookie without HttpOnly/Secure", "no SameSite policy"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-32-gdpr/", "https://gdpr-info.eu/art-25-gdpr/"]
+    },
+    {
+      "id": "GDPR-SEC-05", "title": "Dependency manifest + lockfile present (vuln management)", "category": "security_art32",
+      "gdpr_articles": ["Art. 32"], "decision_mode": "auto",
+      "obligation": "State-of-the-art security includes managing known-vulnerable dependencies.",
+      "repo_observable": "A dependency manifest and a committed lockfile exist.",
+      "signals": ["package.json + lockfile", "requirements.txt / poetry.lock", "go.sum", "Gemfile.lock"],
+      "severity": "minor", "pass_criteria": "A manifest and a lockfile are committed, enabling reproducible, auditable dependencies.",
+      "fail_indicators": ["dependencies declared with no lockfile committed"], "confidence": "high",
+      "references": ["https://gdpr-info.eu/art-32-gdpr/"]
+    },
+    {
+      "id": "GDPR-SEC-06", "title": "Encryption of personal data in transit and at rest", "category": "security_art32",
+      "gdpr_articles": ["Art. 32(1)(a)"], "decision_mode": "llm",
+      "obligation": "Encryption/pseudonymisation appropriate to risk should protect personal data.",
+      "repo_observable": "TLS enforcement and at-rest encryption configuration can be judged from config/code excerpts.",
+      "signals": ["HTTPS/TLS enforced (HSTS, forceSSL, secure transport config)", "DB/storage encryption settings", "field-level encryption for sensitive data"],
+      "severity": "major", "pass_criteria": "Personal data is encrypted in transit and, where appropriate, at rest.",
+      "fail_indicators": ["plain-HTTP service config", "no transport security", "sensitive data stored unencrypted"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-32-gdpr/"]
+    },
+    {
+      "id": "GDPR-PII-01", "title": "Personal-data inventory from data models/schemas", "category": "pii_data_mapping",
+      "gdpr_articles": ["Art. 5", "Art. 30"], "decision_mode": "auto",
+      "obligation": "A controller must know what personal data it processes (the basis for minimisation, retention and rights).",
+      "repo_observable": "Personal-data fields are detectable in models/schemas/migrations/ORM entities.",
+      "signals": ["fields named email/phone/firstName/lastName/address/dateOfBirth/ipAddress/ssn in schemas/models/migrations"],
+      "severity": "major", "pass_criteria": "Personal-data fields are enumerated for review (inventory). This is informational, not pass/fail.",
+      "fail_indicators": ["large amounts of PII with no corresponding documentation/inventory"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-30-gdpr/"]
+    },
+    {
+      "id": "GDPR-PII-02", "title": "Data minimisation — collected PII appears necessary", "category": "pii_data_mapping",
+      "gdpr_articles": ["Art. 5(1)(c)"], "decision_mode": "llm",
+      "obligation": "Personal data must be adequate, relevant and limited to what is necessary for the purpose.",
+      "repo_observable": "The inventoried PII fields can be judged against the apparent purpose of the project.",
+      "signals": ["PII fields collected vs the stated/likely purpose", "excessive or unused sensitive fields"],
+      "severity": "minor", "pass_criteria": "Collected PII fields plausibly map to a legitimate purpose; no obvious over-collection.",
+      "fail_indicators": ["collecting sensitive fields with no apparent need"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-5-gdpr/"]
+    },
+    {
+      "id": "GDPR-PII-03", "title": "Special-category data handling (Art. 9)", "category": "pii_data_mapping",
+      "gdpr_articles": ["Art. 9"], "decision_mode": "auto",
+      "obligation": "Special-category data (health, biometric, race, religion, sexual orientation, etc.) requires an Art. 9 condition.",
+      "repo_observable": "Special-category terms are detectable in models/code.",
+      "signals": ["fields/terms: health/medical/diagnosis/biometric/fingerprint/race/ethnicity/religion/sexual/genetic/political"],
+      "severity": "major", "pass_criteria": "No special-category data, or its presence is flagged for an Art. 9 lawful-condition + DPIA review.",
+      "fail_indicators": ["special-category data processed with no DPIA/Art. 9 basis evident"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-9-gdpr/"]
+    },
+    {
+      "id": "GDPR-DSR-01", "title": "Data export / portability mechanism present", "category": "data_subject_rights",
+      "gdpr_articles": ["Art. 15", "Art. 20"], "decision_mode": "auto",
+      "obligation": "Data subjects can access their data and receive it in a portable format.",
+      "repo_observable": "An export/download/portability endpoint or handler is detectable in the code.",
+      "signals": ["routes/handlers matching export-data/data-export/download-my-data/portability/gdpr export"],
+      "severity": "major", "pass_criteria": "A data export/portability mechanism exists in the code.",
+      "fail_indicators": ["no access/export mechanism for user data"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-15-gdpr/", "https://gdpr-info.eu/art-20-gdpr/"]
+    },
+    {
+      "id": "GDPR-DSR-02", "title": "Data erasure / account deletion mechanism present", "category": "data_subject_rights",
+      "gdpr_articles": ["Art. 17"], "decision_mode": "auto",
+      "obligation": "Data subjects have the right to erasure ('right to be forgotten').",
+      "repo_observable": "An erasure/account-deletion endpoint or handler is detectable in the code.",
+      "signals": ["routes/handlers matching delete-account/erase/right-to-be-forgotten/gdpr delete/purge user"],
+      "severity": "major", "pass_criteria": "An erasure/account-deletion mechanism exists in the code.",
+      "fail_indicators": ["no deletion mechanism for user data"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-17-gdpr/"]
+    },
+    {
+      "id": "GDPR-DSR-03", "title": "Rights mechanisms are adequate across access/rectify/erase/port", "category": "data_subject_rights",
+      "gdpr_articles": ["Art. 15", "Art. 16", "Art. 17", "Art. 18", "Art. 20", "Art. 21"], "decision_mode": "llm",
+      "obligation": "The controller must facilitate exercise of all applicable data-subject rights.",
+      "repo_observable": "The detected rights handlers can be judged for coverage and completeness from code excerpts.",
+      "signals": ["coverage of access, rectification, erasure, restriction, portability, objection", "authenticated, scoped to the subject"],
+      "severity": "minor", "pass_criteria": "The implemented rights mechanisms reasonably cover the applicable rights.",
+      "fail_indicators": ["only deletion but no access/export", "rights handlers not authenticated"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-15-gdpr/"]
+    },
+    {
+      "id": "GDPR-XFER-01", "title": "Data storage/region configured outside the EEA", "category": "international_transfers",
+      "gdpr_articles": ["Art. 44", "Art. 45", "Art. 46"], "decision_mode": "auto",
+      "obligation": "Transfers to third countries require adequacy, safeguards (SCCs/BCRs) or a derogation.",
+      "repo_observable": "Cloud/storage regions in config reveal where personal data is likely stored/processed.",
+      "signals": ["region tokens us-east-1/us-west/ap-/asia-/non-EEA GCP/Azure regions in config/IaC"],
+      "severity": "major", "pass_criteria": "Personal-data storage is in the EEA, or non-EEA regions are backed by a valid transfer mechanism.",
+      "fail_indicators": ["non-EEA region configured for personal-data stores with no transfer safeguard noted"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-44-gdpr/", "https://gdpr-info.eu/art-46-gdpr/"]
+    },
+    {
+      "id": "GDPR-XFER-02", "title": "Third-party SDKs implying non-EEA processing", "category": "international_transfers",
+      "gdpr_articles": ["Art. 44", "Art. 28", "CJEU C-311/18 Schrems II"], "decision_mode": "auto",
+      "obligation": "Sending personal data to non-EEA SaaS/SDKs is a transfer requiring a mechanism and disclosure.",
+      "repo_observable": "Dependencies on US/non-EEA analytics, marketing and cloud SDKs are detectable.",
+      "signals": ["deps: google-analytics/segment/mixpanel/amplitude/sentry/facebook-pixel/hubspot/datadog/aws-sdk"],
+      "severity": "major", "pass_criteria": "Non-EEA processor SDKs are inventoried and covered by transfer mechanisms + disclosure.",
+      "fail_indicators": ["non-EEA SDKs receiving PII with no transfer mechanism/disclosure"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-44-gdpr/", "https://curia.europa.eu/juris/liste.jsf?num=C-311/18"]
+    },
+    {
+      "id": "GDPR-RET-01", "title": "Data retention / deletion logic present", "category": "retention",
+      "gdpr_articles": ["Art. 5(1)(e)"], "decision_mode": "auto",
+      "obligation": "Personal data must be kept no longer than necessary; storage limitation must be implemented.",
+      "repo_observable": "Retention/TTL/purge logic is detectable (TTL indexes, expiry fields, scheduled deletion jobs).",
+      "signals": ["ttl/expiresAt/retention fields", "cron/scheduled purge or cleanup jobs", "soft-delete + hard-delete after period"],
+      "severity": "minor", "pass_criteria": "Retention/expiry/purge logic exists for personal data.",
+      "fail_indicators": ["personal data persisted indefinitely with no retention/purge logic"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-5-gdpr/"]
+    },
+    {
+      "id": "GDPR-RET-02", "title": "Retention periods are defined and bounded", "category": "retention",
+      "gdpr_articles": ["Art. 5(1)(e)", "Art. 13(2)(a)"], "decision_mode": "llm",
+      "obligation": "Retention periods (or criteria) should be defined per data category.",
+      "repo_observable": "Retention config/docs can be judged for defined, bounded periods.",
+      "signals": ["explicit retention durations per category", "criteria documented", "vs unbounded/indefinite storage"],
+      "severity": "minor", "pass_criteria": "Bounded retention periods or clear criteria are defined.",
+      "fail_indicators": ["no defined retention", "indefinite retention of personal data"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-5-gdpr/"]
+    },
+    {
+      "id": "GDPR-PROC-01", "title": "Third-party processors inventory from dependencies", "category": "third_party_processors",
+      "gdpr_articles": ["Art. 28"], "decision_mode": "auto",
+      "obligation": "Each processor handling personal data must be known and governed by an Art. 28 contract.",
+      "repo_observable": "Third-party processor SDKs/services are detectable in dependencies and integrations.",
+      "signals": ["deps: stripe/twilio/sendgrid/mailchimp/auth0/firebase/intercom/hubspot/aws-sdk/@google-cloud"],
+      "severity": "minor", "pass_criteria": "Processors are inventoried for DPA coverage review (informational).",
+      "fail_indicators": ["processors used with no subprocessor list / DPA artefact"], "confidence": "medium",
+      "references": ["https://gdpr-info.eu/art-28-gdpr/"]
+    },
+    {
+      "id": "GDPR-PROC-02", "title": "Signed DPAs exist for each processor", "category": "third_party_processors",
+      "gdpr_articles": ["Art. 28(3)"], "decision_mode": "manual",
+      "obligation": "A binding Art. 28(3) contract must exist with each processor.",
+      "repo_observable": "Not derivable from code — the existence of signed processor contracts requires internal/legal review.",
+      "signals": ["N/A from the repo — manual contract review required"],
+      "severity": "minor", "pass_criteria": "Flagged for manual review; cannot be confirmed from the repo.",
+      "fail_indicators": ["none derivable from code"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-28-gdpr/"]
+    },
+    {
+      "id": "GDPR-CHILD-01", "title": "Age-gate / parental-consent where children may be targeted", "category": "children",
+      "gdpr_articles": ["Art. 8"], "decision_mode": "auto",
+      "obligation": "Information-society services offered to children need age verification / parental consent below the applicable age.",
+      "repo_observable": "Age-gate / date-of-birth / parental-consent logic is detectable in code where relevant.",
+      "signals": ["age-gate / minimum-age / dateOfBirth validation / parental-consent / COPPA references"],
+      "severity": "minor", "pass_criteria": "If the service may target children, age/parental-consent handling exists. Otherwise N/A.",
+      "fail_indicators": ["evidently child-directed product with no age handling"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-8-gdpr/"]
+    },
+    {
+      "id": "GDPR-GOV-01", "title": "DPO / privacy contact documented", "category": "governance",
+      "gdpr_articles": ["Art. 37", "Art. 38", "Art. 39", "Art. 13(1)(b)"], "decision_mode": "auto",
+      "obligation": "Where a DPO is designated, their contact must be published; a privacy contact should be reachable.",
+      "repo_observable": "A DPO/privacy contact is detectable in repo docs (SECURITY.md, README, privacy notice).",
+      "signals": ["dpo@ / privacy@ contact", "named data protection officer", "security/privacy contact in SECURITY.md"],
+      "severity": "minor", "pass_criteria": "A privacy/DPO contact is documented in the repo.",
+      "fail_indicators": ["no privacy/DPO contact anywhere"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-37-gdpr/"]
+    },
+    {
+      "id": "GDPR-GOV-02", "title": "Breach-notification procedure documented", "category": "governance",
+      "gdpr_articles": ["Art. 33", "Art. 34"], "decision_mode": "manual",
+      "obligation": "Controllers must notify the supervisory authority within 72 hours and, where high-risk, affected data subjects.",
+      "repo_observable": "An incident/breach runbook may exist in the repo, but readiness/exercise of the procedure is a manual/organizational fact.",
+      "signals": ["an incident-response / breach runbook (presence only)"],
+      "severity": "minor", "pass_criteria": "Flagged for manual review; readiness cannot be confirmed from the repo.",
+      "fail_indicators": ["none derivable from code"], "confidence": "low",
+      "references": ["https://gdpr-info.eu/art-33-gdpr/", "https://gdpr-info.eu/art-34-gdpr/"]
+    }
+  ]
+}

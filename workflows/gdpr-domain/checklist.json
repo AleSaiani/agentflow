@@ -1,0 +1,1227 @@
+{
+  "$schema": "agentflow/gdpr-domain-checklist@1",
+  "regulation": "GDPR (Regulation (EU) 2016/679) + ePrivacy Directive 2002/58/EC Art. 5(3)",
+  "note": "Externally-observable compliance checklist for a public domain. decision_mode routes each check: 'auto' = decided deterministically by evaluate.mjs from collected evidence; 'llm' = bounded judgment over the privacy-notice text (schema-validated); 'manual' = not observable from outside / requires interactive-browser or internal review.",
+  "generated_for": "agentflow workflows/gdpr-domain",
+  "counts": {
+    "total": 41,
+    "auto": 11,
+    "llm": 17,
+    "manual": 13
+  },
+  "checks": [
+    {
+      "id": "GDPR-CONSENT_COOKIES-01",
+      "title": "No non-essential cookies/trackers set before consent",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 6(1)(a)",
+        "Art. 4(11)",
+        "Recital 32",
+        "CJEU C-673/17 Planet49"
+      ],
+      "obligation": "Storing or reading any non-strictly-necessary information on the user's device requires prior informed opt-in consent before that storage/access occurs.",
+      "external_observable": "Inspect Set-Cookie headers and client storage (cookies, localStorage, IndexedDB) on the very first HTTP response and initial page render, before any interaction with a consent UI.",
+      "signals": [
+        "Set-Cookie with analytics/marketing cookie (_ga, _gid, _fbp, IDE, MUID) present on first response before consent",
+        "localStorage/IndexedDB keys for trackers written pre-consent",
+        "third-party tracker network requests fired on initial load before any click"
+      ],
+      "severity": "critical",
+      "pass_criteria": "Only strictly-necessary cookies (session, CSRF, load-balancing, consent-state) are present before the user makes a consent choice; all analytics/marketing storage is deferred until opt-in.",
+      "fail_indicators": [
+        "_ga / _gid / _gat (Google Analytics) set before consent",
+        "_fbp or fr (Meta) set before consent",
+        "third-party marketing cookies present on landing with no interaction",
+        "tracker scripts execute network calls before consent click"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://eur-lex.europa.eu/eli/dir/2002/58/oj/eng",
+        "https://gdpr-info.eu/recitals/no-32/",
+        "https://curia.europa.eu/juris/liste.jsf?num=C-673/17",
+        "https://www.edpb.europa.eu/system/files/2024-10/edpb_guidelines_202302_technical_scope_art_53_eprivacydirective_v2_en_0.pdf"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-02",
+      "title": "Cookie consent banner is present on first visit",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 7",
+        "Art. 12",
+        "Recital 32"
+      ],
+      "obligation": "Before setting non-essential cookies the site must provide clear, comprehensive information and a means to give or refuse consent.",
+      "external_observable": "Detect a consent banner/CMP overlay rendered on first load for a fresh (cookieless) visitor.",
+      "signals": [
+        "DOM element or iframe matching known CMP vendors (OneTrust, Cookiebot, Quantcast/TCF, Usercentrics, Didomi, CookieYes)",
+        "presence of __tcfapi / __cmp TCF API in window",
+        "visible banner text referencing cookies/consent"
+      ],
+      "severity": "major",
+      "pass_criteria": "A consent banner or layer is shown on first visit and offers a real choice before non-essential processing.",
+      "fail_indicators": [
+        "no banner at all while non-essential cookies are being set",
+        "banner only links to policy with no choice controls"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://www.edpb.europa.eu/sites/default/files/files/file1/edpb_guidelines_202005_consent_en.pdf",
+        "https://eur-lex.europa.eu/eli/dir/2002/58/oj/eng"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-03",
+      "title": "Reject-all available at first layer with equal prominence",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "Art. 4(11)",
+        "Art. 7(1)",
+        "Recital 42",
+        "Recital 43",
+        "EDPB Cookie Banner Taskforce 2023"
+      ],
+      "obligation": "Refusing consent must be as easy as giving it; where an Accept-all is offered, an equally accessible Reject-all must be presented on the same layer.",
+      "external_observable": "Compare the buttons on the first banner layer: presence, label, size, colour/contrast and layer position of a Reject/Decline-all versus Accept-all.",
+      "signals": [
+        "first-layer button labelled 'Reject all' / 'Decline' / 'Refuse'",
+        "Reject button at same DOM layer as Accept (no extra click into settings)",
+        "comparable styling/contrast between Accept and Reject"
+      ],
+      "severity": "critical",
+      "pass_criteria": "A Reject-all (or equivalent) is present on the first layer with prominence comparable to Accept-all.",
+      "fail_indicators": [
+        "only 'Accept all' + 'Settings' on first layer, no first-layer reject",
+        "Reject hidden behind extra clicks",
+        "Reject rendered low-contrast/grey vs prominent coloured Accept"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://www.edpb.europa.eu/system/files/2023-01/edpb_20230118_report_cookie_banner_taskforce_en.pdf",
+        "https://gdpr-info.eu/art-7-gdpr/",
+        "https://gdpr-info.eu/recitals/no-42/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-04",
+      "title": "No pre-ticked / pre-enabled non-essential consent toggles",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "Art. 4(11)",
+        "Art. 7",
+        "Recital 32",
+        "CJEU C-673/17 Planet49",
+        "CJEU C-61/19 Orange Romania"
+      ],
+      "obligation": "Consent requires a clear affirmative act; pre-ticked boxes, default-on toggles, silence or inactivity do not constitute valid consent.",
+      "external_observable": "Open the banner's granular/settings layer and inspect the default state of non-essential purpose toggles before any user action.",
+      "signals": [
+        "checkbox/toggle for analytics or marketing rendered in 'on'/checked state by default",
+        "TCF purpose toggles defaulted to enabled",
+        "input[type=checkbox][checked] for non-essential categories"
+      ],
+      "severity": "critical",
+      "pass_criteria": "All non-essential category toggles default to OFF/unchecked; only strictly-necessary is on and locked.",
+      "fail_indicators": [
+        "analytics toggle checked by default",
+        "marketing/advertising toggle on by default",
+        "'legitimate interest' sliders pre-enabled for non-essential vendors"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://curia.europa.eu/juris/liste.jsf?num=C-673/17",
+        "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex:62019CJ0061",
+        "https://gdpr-info.eu/recitals/no-32/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-05",
+      "title": "No cookie wall forcing consent for access",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "Art. 7(4)",
+        "Art. 4(11)",
+        "Recital 42",
+        "Recital 43",
+        "EDPB Guidelines 05/2020"
+      ],
+      "obligation": "Consent is not freely given if access to a service is conditioned on consent to non-essential processing (cookie walls).",
+      "external_observable": "Check whether content is blocked/inaccessible until Accept is clicked, with no equivalent non-consent path.",
+      "signals": [
+        "full-page modal blocking all content with only an Accept action",
+        "page body hidden/scroll-locked until consent given",
+        "no usable site state after choosing Reject"
+      ],
+      "severity": "major",
+      "pass_criteria": "Site content remains accessible after refusing non-essential cookies; no take-it-or-leave-it wall.",
+      "fail_indicators": [
+        "content unreachable unless 'Accept' clicked",
+        "Reject leads to blank page or denial of access"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://www.edpb.europa.eu/sites/default/files/files/file1/edpb_guidelines_202005_consent_en.pdf",
+        "https://gdpr-info.eu/art-7-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-06",
+      "title": "Consent withdrawal is as easy as giving consent",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "Art. 7(3)",
+        "Recital 42",
+        "EDPB Cookie Banner Taskforce 2023"
+      ],
+      "obligation": "Data subjects must be able to withdraw consent at any time, and withdrawal must be as easy as giving it.",
+      "external_observable": "Look for a persistent re-access control to the consent settings after the banner is dismissed (floating icon, footer link, 'Cookie settings').",
+      "signals": [
+        "persistent 'Cookie settings'/'Manage cookies' link in footer",
+        "floating CMP widget/icon to reopen preferences",
+        "withdrawal reachable in same number of clicks as consent"
+      ],
+      "severity": "major",
+      "pass_criteria": "A reachable, persistent mechanism to withdraw/modify consent exists after the initial choice.",
+      "fail_indicators": [
+        "no way to reopen consent settings once banner dismissed",
+        "withdrawal requires emailing the company / multi-step hunt"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-7-gdpr/",
+        "https://www.edpb.europa.eu/system/files/2023-01/edpb_20230118_report_cookie_banner_taskforce_en.pdf"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-07",
+      "title": "Banner gives granular per-purpose choice, not all-or-nothing",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "Art. 4(11)",
+        "Art. 6(1)(a)",
+        "Recital 32",
+        "Recital 43",
+        "EDPB Guidelines 05/2020"
+      ],
+      "obligation": "Consent must be specific to each distinct processing purpose; bundled consent for multiple purposes is invalid.",
+      "external_observable": "Inspect whether the banner exposes separate controls for distinct purposes (analytics vs marketing vs personalisation) rather than a single Accept.",
+      "signals": [
+        "separate toggles per purpose category in settings layer",
+        "TCF purpose list with individual controls",
+        "distinct consent for each processing purpose"
+      ],
+      "severity": "major",
+      "pass_criteria": "Distinct, separately selectable consent options exist for each non-essential purpose category.",
+      "fail_indicators": [
+        "single global Accept covering analytics+ads+personalisation with no granularity",
+        "purposes bundled with no opt-out per purpose"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/recitals/no-32/",
+        "https://www.edpb.europa.eu/sites/default/files/files/file1/edpb_guidelines_202005_consent_en.pdf"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-CONSENT_COOKIES-08",
+      "title": "Consent choice is honoured (no firing after Reject)",
+      "category": "consent_cookies",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 7(1)",
+        "Art. 5(2) accountability"
+      ],
+      "obligation": "After a user refuses, non-essential cookies/trackers must not be set or read.",
+      "external_observable": "Click Reject-all, then re-inspect cookies/storage and outbound network requests for tracker activity.",
+      "signals": [
+        "no new analytics/marketing cookies after Reject",
+        "no tracker network requests to ad/analytics hosts post-Reject",
+        "consent-state cookie reflects refusal"
+      ],
+      "severity": "critical",
+      "pass_criteria": "No non-essential cookies set and no tracker calls made after the user chooses Reject.",
+      "fail_indicators": [
+        "_ga / _fbp / ad cookies appear after clicking Reject",
+        "tracker beacons fire to google-analytics.com / facebook.net after refusal"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://eur-lex.europa.eu/eli/dir/2002/58/oj/eng",
+        "https://gdpr-info.eu/art-7-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-01",
+      "title": "Privacy policy is present and reachable",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 12(1)",
+        "Art. 13",
+        "Recital 58"
+      ],
+      "obligation": "The controller must provide information about processing in a concise, transparent, intelligible and easily accessible form.",
+      "external_observable": "Find a linked, reachable privacy notice (footer link, /privacy, /privacy-policy, /datenschutz, /privacy-policy.html) returning HTTP 200.",
+      "signals": [
+        "footer link text 'Privacy Policy'/'Privacy Notice'/'Datenschutz'/'Informativa privacy'",
+        "reachable /privacy or /privacy-policy URL (200)",
+        "link present on landing page within 1 click"
+      ],
+      "severity": "critical",
+      "pass_criteria": "A privacy notice is reachable from the homepage within one click and loads successfully.",
+      "fail_indicators": [
+        "no privacy link anywhere",
+        "privacy link 404s or redirects to unrelated page",
+        "privacy buried beyond reasonable navigation"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://gdpr-info.eu/art-12-gdpr/",
+        "https://gdpr-info.eu/art-13-gdpr/",
+        "https://gdpr-info.eu/recitals/no-58/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-02",
+      "title": "Notice states controller identity and contact details",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 13(1)(a)",
+        "Art. 13(1)(b)"
+      ],
+      "obligation": "The notice must identify the controller (and representative where applicable) and provide contact details.",
+      "external_observable": "Parse the privacy notice text for a named legal entity and contact details (postal address, email).",
+      "signals": [
+        "named company/legal entity in notice",
+        "postal address present",
+        "controller contact email present",
+        "EU representative named where controller is non-EU"
+      ],
+      "severity": "major",
+      "pass_criteria": "The notice clearly names the controller and provides at least one working contact channel.",
+      "fail_indicators": [
+        "no identifiable controller entity",
+        "no contact details at all",
+        "non-EU controller with no Art. 27 representative listed"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-03",
+      "title": "Notice states purposes and legal basis of processing",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 13(1)(c)",
+        "Art. 13(1)(d)",
+        "Art. 6(1)"
+      ],
+      "obligation": "The notice must state the purposes of processing and the legal basis, and the legitimate interests pursued where Art. 6(1)(f) is relied upon.",
+      "external_observable": "Search the notice for stated purposes and an explicit legal basis per purpose; for legitimate interest, a description of the interest.",
+      "signals": [
+        "explicit purposes enumerated (e.g. analytics, marketing, order fulfilment)",
+        "legal basis named per purpose (consent / contract / legitimate interest)",
+        "legitimate interest described where invoked"
+      ],
+      "severity": "major",
+      "pass_criteria": "Each processing purpose has a stated legal basis; legitimate-interest reliance is explained.",
+      "fail_indicators": [
+        "no legal basis stated",
+        "vague 'we process data to improve services' with no basis",
+        "legitimate interest claimed with no description"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/",
+        "https://gdpr-info.eu/art-6-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-04",
+      "title": "Notice lists recipients / categories of recipients",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 13(1)(e)"
+      ],
+      "obligation": "The notice must disclose the recipients or categories of recipients of the personal data.",
+      "external_observable": "Search the notice for named recipients or recipient categories (processors, ad networks, analytics providers, hosting).",
+      "signals": [
+        "named third parties (e.g. Google, Meta, AWS, Stripe)",
+        "recipient categories listed (payment processors, analytics providers, hosting)",
+        "alignment between listed recipients and trackers actually observed loading"
+      ],
+      "severity": "major",
+      "pass_criteria": "Recipients or recipient categories are disclosed and broadly consistent with observed third-party hosts.",
+      "fail_indicators": [
+        "no recipients disclosed at all",
+        "trackers observed loading (e.g. facebook.net) that are nowhere mentioned in the notice"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-05",
+      "title": "Notice states retention period or criteria",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 13(2)(a)"
+      ],
+      "obligation": "The notice must state the storage period or, if not possible, the criteria used to determine it.",
+      "external_observable": "Search the notice for explicit retention periods or stated criteria for determining them.",
+      "signals": [
+        "stated retention duration (e.g. '24 months')",
+        "criteria for determining retention described",
+        "per-category retention table"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Retention periods or determining criteria are stated. Note: the truthfulness of stated periods is not externally verifiable.",
+      "fail_indicators": [
+        "no mention of retention/storage period at all",
+        "vague 'as long as necessary' with no criteria"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-06",
+      "title": "Notice enumerates data subject rights and complaint right",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 13(2)(b)",
+        "Art. 13(2)(c)",
+        "Art. 13(2)(d)",
+        "Art. 15",
+        "Art. 16",
+        "Art. 17",
+        "Art. 18",
+        "Art. 20",
+        "Art. 21"
+      ],
+      "obligation": "The notice must inform of the rights of access, rectification, erasure, restriction, portability, objection, the right to withdraw consent, and the right to lodge a complaint with a supervisory authority.",
+      "external_observable": "Search the notice for enumerated data subject rights, withdrawal of consent, and the supervisory-authority complaint right.",
+      "signals": [
+        "list of rights: access, rectification, erasure, restriction, portability, objection",
+        "right to withdraw consent stated",
+        "right to lodge complaint with supervisory authority mentioned"
+      ],
+      "severity": "major",
+      "pass_criteria": "All applicable rights, consent withdrawal, and the complaint right are described.",
+      "fail_indicators": [
+        "no rights section",
+        "complaint-to-DPA right omitted",
+        "withdrawal-of-consent right omitted"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/",
+        "https://gdpr-info.eu/art-15-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-07",
+      "title": "Notice uses clear, plain, accessible language",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "Art. 12(1)",
+        "Recital 39",
+        "Recital 58"
+      ],
+      "obligation": "Information must be concise, intelligible and in clear and plain language.",
+      "external_observable": "Assess the rendered notice for readability, layering/structure, and language matching the site's primary/targeted language.",
+      "signals": [
+        "layered/structured notice with headings",
+        "notice language matches site audience language",
+        "absence of impenetrable legalese-only single block"
+      ],
+      "severity": "minor",
+      "pass_criteria": "The notice is structured, readable and in the audience's language.",
+      "fail_indicators": [
+        "wall-of-text untranslated boilerplate in wrong language",
+        "no structure or headings making required info undiscoverable"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-12-gdpr/",
+        "https://gdpr-info.eu/recitals/no-58/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-TRANSPARENCY_PRIVACY_NOTICE-08",
+      "title": "Cookie/tracker disclosure exists and matches reality",
+      "category": "transparency_privacy_notice",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 13",
+        "Recital 32",
+        "EDPB Guidelines 02/2023"
+      ],
+      "obligation": "Users must be given clear and comprehensive information about cookies/trackers, their purposes and duration.",
+      "external_observable": "Compare a cookie/tracker disclosure (cookie policy or CMP list) against the cookies/hosts actually observed.",
+      "signals": [
+        "dedicated cookie policy or in-CMP cookie list",
+        "named cookies with purpose and duration",
+        "consistency between declared and actually-set cookies"
+      ],
+      "severity": "major",
+      "pass_criteria": "A cookie disclosure exists and substantially matches the cookies/trackers actually observed.",
+      "fail_indicators": [
+        "cookies set with no disclosure anywhere",
+        "declared list omits trackers observed loading (e.g. undisclosed fingerprinting/pixels)"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/",
+        "https://www.edpb.europa.eu/system/files/2024-10/edpb_guidelines_202302_technical_scope_art_53_eprivacydirective_v2_en_0.pdf"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-LAWFUL_BASIS-01",
+      "title": "A lawful basis is stated for each processing purpose",
+      "category": "lawful_basis",
+      "gdpr_articles": [
+        "Art. 6(1)",
+        "Art. 5(1)(a)",
+        "Art. 13(1)(c)"
+      ],
+      "obligation": "Processing must rest on at least one of the six lawful bases in Art. 6(1), and the basis must be communicated.",
+      "external_observable": "Read the privacy notice for an explicit Art. 6(1) basis mapped to each stated purpose.",
+      "signals": [
+        "basis named per purpose (consent, contract, legal obligation, legitimate interest, etc.)",
+        "consent used as basis for marketing/analytics",
+        "legitimate-interest balancing referenced where relied on"
+      ],
+      "severity": "major",
+      "pass_criteria": "Every stated purpose has a declared lawful basis. Substantive correctness of the basis is not externally verifiable.",
+      "fail_indicators": [
+        "no lawful basis stated for any purpose",
+        "consent claimed as basis while cookies fire before consent (basis contradicted by behaviour)"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-6-gdpr/",
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-LAWFUL_BASIS-02",
+      "title": "Consent-based processing is backed by valid consent mechanics",
+      "category": "lawful_basis",
+      "gdpr_articles": [
+        "Art. 6(1)(a)",
+        "Art. 7",
+        "Art. 4(11)",
+        "CJEU C-673/17 Planet49"
+      ],
+      "obligation": "Where consent is the basis, it must be freely given, specific, informed, unambiguous and demonstrable.",
+      "external_observable": "Cross-check declared consent basis against observed banner behaviour (opt-in, granularity, pre-consent firing).",
+      "signals": [
+        "banner mechanics consistent with claimed consent basis",
+        "no pre-consent firing where consent is the declared basis",
+        "demonstrable opt-in flow"
+      ],
+      "severity": "major",
+      "pass_criteria": "Observed consent UI mechanics are consistent with a valid Art. 4(11)/Art. 7 consent.",
+      "fail_indicators": [
+        "notice claims consent basis but trackers fire pre-consent",
+        "consent basis claimed with pre-ticked toggles or no reject option"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-7-gdpr/",
+        "https://gdpr-info.eu/art-6-gdpr/",
+        "https://curia.europa.eu/juris/liste.jsf?num=C-673/17"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-DATA_SUBJECT_RIGHTS-01",
+      "title": "Accessible channel to exercise data subject rights",
+      "category": "data_subject_rights",
+      "gdpr_articles": [
+        "Art. 12(2)",
+        "Art. 15",
+        "Art. 16",
+        "Art. 17",
+        "Art. 18",
+        "Art. 20",
+        "Art. 21",
+        "Art. 22"
+      ],
+      "obligation": "The controller must facilitate the exercise of data subject rights and provide a means to make such requests.",
+      "external_observable": "Locate a request channel in the notice (privacy/DSR email, web form, postal address, rights-request page).",
+      "signals": [
+        "privacy@ or dpo@ email for requests",
+        "dedicated DSR/'manage my data' web form",
+        "postal address for written requests",
+        "instructions on how to exercise each right"
+      ],
+      "severity": "major",
+      "pass_criteria": "At least one concrete, reachable channel for exercising rights is provided.",
+      "fail_indicators": [
+        "no contact method for rights requests",
+        "generic sales contact only with no privacy channel"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-12-gdpr/",
+        "https://gdpr-info.eu/art-15-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-DATA_SUBJECT_RIGHTS-02",
+      "title": "Right to object to direct marketing is offered",
+      "category": "data_subject_rights",
+      "gdpr_articles": [
+        "Art. 21(2)",
+        "Art. 21(3)",
+        "Art. 13(2)(b)"
+      ],
+      "obligation": "Data subjects have an absolute right to object to processing for direct marketing, and must be informed of it explicitly.",
+      "external_observable": "Check the notice and any marketing sign-up flow for an explicit opt-out/objection to direct marketing and unsubscribe mechanics.",
+      "signals": [
+        "explicit 'object to marketing' / opt-out statement",
+        "newsletter sign-up presents unsubscribe info",
+        "marketing consent separable from other processing"
+      ],
+      "severity": "minor",
+      "pass_criteria": "The right to object to direct marketing is clearly offered and explained.",
+      "fail_indicators": [
+        "no marketing objection/opt-out mentioned",
+        "marketing bundled with no separate opt-out"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-21-gdpr/",
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-DATA_SUBJECT_RIGHTS-03",
+      "title": "Disclosure of automated decision-making / profiling",
+      "category": "data_subject_rights",
+      "gdpr_articles": [
+        "Art. 13(2)(f)",
+        "Art. 22",
+        "Recital 71"
+      ],
+      "obligation": "Where solely automated decisions with legal/similar effect exist, the controller must disclose this and provide meaningful information about the logic involved.",
+      "external_observable": "Search the notice for any statement on automated decision-making or profiling and accompanying logic explanation.",
+      "signals": [
+        "section on automated decision-making/profiling",
+        "meaningful information about the logic",
+        "statement of significance/consequences for the data subject"
+      ],
+      "severity": "minor",
+      "pass_criteria": "If profiling/ADM is used it is disclosed with logic explained; absence of such processing is also acceptable. Whether ADM actually occurs is not externally verifiable.",
+      "fail_indicators": [
+        "evident profiling features (e.g. personalised pricing signals) with no ADM disclosure"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-22-gdpr/",
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-SECURITY_TRANSPORT-01",
+      "title": "Site served over valid HTTPS with modern TLS",
+      "category": "security_transport",
+      "gdpr_articles": [
+        "Art. 32(1)",
+        "Art. 5(1)(f)",
+        "Art. 25"
+      ],
+      "obligation": "The controller must implement technical measures appropriate to risk to ensure confidentiality and integrity of personal data in transit.",
+      "external_observable": "Perform a TLS handshake and certificate validation; check protocol version and cipher strength.",
+      "signals": [
+        "valid, non-expired, trusted certificate",
+        "TLS >= 1.2 (ideally 1.3) negotiated",
+        "no support for SSLv3/TLS 1.0/1.1",
+        "strong cipher suites only"
+      ],
+      "severity": "critical",
+      "pass_criteria": "Valid certificate and TLS 1.2+ with strong ciphers; no deprecated protocols.",
+      "fail_indicators": [
+        "expired/self-signed/untrusted certificate",
+        "TLS 1.0/1.1 or SSLv3 supported",
+        "site reachable over plain HTTP serving forms"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://gdpr-info.eu/art-32-gdpr/",
+        "https://gdpr-info.eu/art-5-gdpr/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-SECURITY_TRANSPORT-02",
+      "title": "HTTP redirects to HTTPS and HSTS is set",
+      "category": "security_transport",
+      "gdpr_articles": [
+        "Art. 32(1)",
+        "Art. 5(1)(f)",
+        "Art. 25(1)"
+      ],
+      "obligation": "Appropriate measures should enforce encrypted transport to protect personal data integrity and confidentiality.",
+      "external_observable": "Request the HTTP (port 80) URL and inspect for redirect to HTTPS; inspect response headers for Strict-Transport-Security.",
+      "signals": [
+        "HTTP 301/308 redirect to https://",
+        "Strict-Transport-Security header present with reasonable max-age",
+        "includeSubDomains / preload where appropriate"
+      ],
+      "severity": "major",
+      "pass_criteria": "HTTP redirects to HTTPS and an HSTS header is present.",
+      "fail_indicators": [
+        "plain HTTP served without redirect",
+        "no HSTS header",
+        "mixed-content resources loaded over HTTP"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://gdpr-info.eu/art-32-gdpr/",
+        "https://gdpr-info.eu/art-25-gdpr/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-SECURITY_TRANSPORT-03",
+      "title": "Forms collecting personal data submit securely",
+      "category": "security_transport",
+      "gdpr_articles": [
+        "Art. 32(1)",
+        "Art. 5(1)(f)",
+        "Art. 25(2)"
+      ],
+      "obligation": "Personal data collected via forms must be transmitted with appropriate security (encrypted transport).",
+      "external_observable": "Inspect form action targets and page transport for login/contact/checkout/registration forms.",
+      "signals": [
+        "form action posts to an https:// endpoint",
+        "no personal-data form on a plain-HTTP page",
+        "no form action to a third-party host inconsistent with the notice"
+      ],
+      "severity": "major",
+      "pass_criteria": "All personal-data-collecting forms post over HTTPS to disclosed endpoints.",
+      "fail_indicators": [
+        "form posts over HTTP",
+        "password/payment form on insecure page",
+        "undisclosed third-party form endpoint capturing PII"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://gdpr-info.eu/art-32-gdpr/",
+        "https://gdpr-info.eu/art-25-gdpr/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-SECURITY_TRANSPORT-04",
+      "title": "Security-hardening response headers present",
+      "category": "security_transport",
+      "gdpr_articles": [
+        "Art. 32(1)",
+        "Art. 25(1)"
+      ],
+      "obligation": "State-of-the-art technical measures appropriate to risk should be applied to reduce data-exposure risks.",
+      "external_observable": "Inspect HTTP response headers for common hardening directives.",
+      "signals": [
+        "Content-Security-Policy present",
+        "X-Content-Type-Options: nosniff",
+        "Referrer-Policy restricting referrer leakage",
+        "X-Frame-Options/frame-ancestors anti-clickjacking",
+        "no Server/X-Powered-By version leakage"
+      ],
+      "severity": "minor",
+      "pass_criteria": "A reasonable set of hardening headers is present (CSP, nosniff, Referrer-Policy, anti-clickjacking).",
+      "fail_indicators": [
+        "no security headers at all",
+        "verbose version-disclosing Server headers",
+        "Referrer-Policy leaking full URLs to third parties"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://gdpr-info.eu/art-32-gdpr/",
+        "https://gdpr-info.eu/art-25-gdpr/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-THIRD_PARTY_TRACKING-01",
+      "title": "Enumerate third-party tracking hosts loaded",
+      "category": "third_party_tracking",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 6",
+        "Art. 13(1)(e)",
+        "CJEU C-40/17 Fashion ID"
+      ],
+      "obligation": "Embedding third-party content that transmits user data makes the operator a joint controller and requires a lawful basis/consent and disclosure.",
+      "external_observable": "Capture all outbound network requests and classify third-party hosts by category (analytics, advertising, social, CDN, tag managers).",
+      "signals": [
+        "third-party hosts loaded: google-analytics.com, googletagmanager.com, facebook.net, doubleclick.net, hotjar.com, etc.",
+        "tag manager containers present",
+        "social plugins/SDKs loaded"
+      ],
+      "severity": "major",
+      "pass_criteria": "All third-party trackers are inventoried; non-essential ones load only after consent and are disclosed.",
+      "fail_indicators": [
+        "advertising/analytics third parties loading on first paint pre-consent",
+        "trackers present but undisclosed in the notice"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://curia.europa.eu/juris/liste.jsf?num=C-40/17",
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-THIRD_PARTY_TRACKING-02",
+      "title": "Social plugins / embeds do not transmit data before consent",
+      "category": "third_party_tracking",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 6",
+        "Art. 26",
+        "CJEU C-40/17 Fashion ID"
+      ],
+      "obligation": "Social plugins (Like buttons, embedded video/maps) create joint controllership and must not transmit personal data before a lawful basis/consent exists.",
+      "external_observable": "Detect embedded social/third-party widgets and check whether they call home before any consent.",
+      "signals": [
+        "Facebook Like/SDK, X/Twitter widgets, YouTube/Vimeo embeds, Google Maps iframes firing on load",
+        "requests carrying cookies/IP to social hosts pre-consent",
+        "absence of click-to-load / consent gating for embeds"
+      ],
+      "severity": "major",
+      "pass_criteria": "Social/third-party embeds are consent-gated (e.g. click-to-load) and do not transmit data pre-consent.",
+      "fail_indicators": [
+        "Like button or YouTube embed sends data to third party on first load before consent",
+        "Google Maps/embed loads cookies pre-consent"
+      ],
+      "confidence": "high",
+      "references": [
+        "https://curia.europa.eu/juris/liste.jsf?num=C-40/17",
+        "https://gdpr-info.eu/art-26-gdpr/"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-THIRD_PARTY_TRACKING-03",
+      "title": "No covert device fingerprinting before consent",
+      "category": "third_party_tracking",
+      "gdpr_articles": [
+        "ePrivacy Art. 5(3)",
+        "Art. 5(1)(a)",
+        "EDPB Guidelines 02/2023"
+      ],
+      "obligation": "Fingerprinting that reads/stores information on the device falls under Art. 5(3) and requires consent unless strictly necessary.",
+      "external_observable": "Detect fingerprinting techniques executing before consent (canvas/WebGL/font enumeration, audio fingerprinting, aggressive device-attribute reads).",
+      "signals": [
+        "canvas/WebGL fingerprinting scripts running pre-consent",
+        "known fingerprinting libraries (FingerprintJS) loaded",
+        "extensive navigator/device probing before any consent"
+      ],
+      "severity": "major",
+      "pass_criteria": "No non-essential fingerprinting occurs before consent.",
+      "fail_indicators": [
+        "canvas/audio fingerprinting executed on first load",
+        "FingerprintJS or similar active pre-consent"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://www.edpb.europa.eu/system/files/2024-10/edpb_guidelines_202302_technical_scope_art_53_eprivacydirective_v2_en_0.pdf",
+        "https://eur-lex.europa.eu/eli/dir/2002/58/oj/eng"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-INTERNATIONAL_TRANSFERS-01",
+      "title": "Detect likely third-country transfers via tracker geography",
+      "category": "international_transfers",
+      "gdpr_articles": [
+        "Art. 44",
+        "Art. 45",
+        "Art. 46",
+        "CJEU C-311/18 Schrems II"
+      ],
+      "obligation": "Transfers of personal data to third countries require an adequacy decision, appropriate safeguards (SCCs/BCRs), or a derogation.",
+      "external_observable": "Map loaded third-party hosts and resolved IP/CDN geography to infer transfers to non-EEA recipients (notably US ad/analytics providers).",
+      "signals": [
+        "data sent to US-based hosts (google-analytics.com, facebook.net, doubleclick.net)",
+        "IP geolocation/ASN of endpoints outside EEA",
+        "non-EEA tag/CDN endpoints receiving identifiers"
+      ],
+      "severity": "major",
+      "pass_criteria": "Any inferred transfer is to a recipient covered by adequacy (e.g. DPF-certified US org) or backed by safeguards described in the notice.",
+      "fail_indicators": [
+        "personal data sent to non-EEA trackers with no transfer disclosure",
+        "US trackers fire pre-consent with no transfer mechanism stated"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-44-gdpr/",
+        "https://gdpr-info.eu/art-46-gdpr/",
+        "https://curia.europa.eu/juris/liste.jsf?num=C-311/18"
+      ],
+      "decision_mode": "auto"
+    },
+    {
+      "id": "GDPR-INTERNATIONAL_TRANSFERS-02",
+      "title": "Notice discloses transfers and safeguards (SCC/DPF/adequacy)",
+      "category": "international_transfers",
+      "gdpr_articles": [
+        "Art. 13(1)(f)",
+        "Art. 46",
+        "Art. 49",
+        "EU-US DPF Adequacy Decision 2023"
+      ],
+      "obligation": "Where data is transferred to a third country, the notice must reference the safeguards (e.g. SCCs, DPF/adequacy) and how to obtain a copy.",
+      "external_observable": "Search the notice for international-transfer disclosure and named transfer mechanisms.",
+      "signals": [
+        "mention of transfers outside EEA",
+        "named mechanism: adequacy decision / EU-US Data Privacy Framework / Standard Contractual Clauses / BCRs",
+        "statement on how to obtain SCC copy"
+      ],
+      "severity": "major",
+      "pass_criteria": "Transfers are disclosed with a valid named safeguard consistent with the trackers observed. Whether SCCs/TIA actually exist is not externally verifiable.",
+      "fail_indicators": [
+        "US recipients observed loading but notice silent on transfers",
+        "transfers mentioned with no mechanism named",
+        "reliance on invalidated Privacy Shield language"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://gdpr-info.eu/art-13-gdpr/",
+        "https://gdpr-info.eu/art-46-gdpr/",
+        "https://commission.europa.eu/document/fa09cbad-dd7d-4684-ae60-be03fcb0fddf_en"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-CHILDREN-01",
+      "title": "Children's consent / age handling where service targets minors",
+      "category": "children",
+      "gdpr_articles": [
+        "Art. 8",
+        "Art. 6(1)(a)",
+        "Recital 38"
+      ],
+      "obligation": "For information society services offered to children, consent must be given or authorised by a parent below the applicable age (16, or as low as 13 by member-state law).",
+      "external_observable": "Assess whether the site is directed at children (theme, content, language) and whether any age-gate or parental-consent mechanism exists at sign-up.",
+      "signals": [
+        "child-oriented content/branding/games",
+        "age-gate or date-of-birth field at registration",
+        "parental-consent step where minors targeted",
+        "absence of marketing trackers on child-directed pages"
+      ],
+      "severity": "major",
+      "pass_criteria": "If the service is directed at or likely used by children, an age-verification / parental-consent mechanism is present.",
+      "fail_indicators": [
+        "evidently child-directed service with no age gate and consent-based marketing trackers",
+        "no age handling on a kids' product"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-8-gdpr/",
+        "https://gdpr-info.eu/recitals/no-38/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-CHILDREN-02",
+      "title": "Child-comprehensible transparency where minors targeted",
+      "category": "children",
+      "gdpr_articles": [
+        "Art. 12(1)",
+        "Art. 8",
+        "Recital 58"
+      ],
+      "obligation": "Information addressed to a child must be in clear and plain language the child can easily understand.",
+      "external_observable": "On child-directed pages, assess whether privacy information is presented in age-appropriate language.",
+      "signals": [
+        "simplified/child-friendly privacy explanation on kids' pages",
+        "age-appropriate consent prompts"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Child-directed services present age-appropriate transparency.",
+      "fail_indicators": [
+        "only dense adult legalese on a clearly child-directed service"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-12-gdpr/",
+        "https://gdpr-info.eu/recitals/no-58/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-GOVERNANCE_CONTACT-01",
+      "title": "DPO contact details published where a DPO is required",
+      "category": "governance_contact",
+      "gdpr_articles": [
+        "Art. 37",
+        "Art. 38",
+        "Art. 39",
+        "Art. 13(1)(b)"
+      ],
+      "obligation": "Where a DPO is designated, the controller must publish and communicate the DPO's contact details.",
+      "external_observable": "Search the notice/site for DPO contact details (dpo@ email, named DPO, postal contact).",
+      "signals": [
+        "dpo@domain email",
+        "named Data Protection Officer",
+        "DPO postal/contact section in notice"
+      ],
+      "severity": "minor",
+      "pass_criteria": "DPO contact details are published where a DPO is required. Whether a DPO is legally required depends on internal processing facts not externally verifiable.",
+      "fail_indicators": [
+        "large-scale/sensitive processing evident but no DPO contact anywhere",
+        "notice refers to a DPO with no contact details"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-37-gdpr/",
+        "https://gdpr-info.eu/art-13-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-GOVERNANCE_CONTACT-02",
+      "title": "EU representative published for non-EU controllers",
+      "category": "governance_contact",
+      "gdpr_articles": [
+        "Art. 27",
+        "Art. 13(1)(a)",
+        "Art. 3(2)"
+      ],
+      "obligation": "A controller not established in the EU but targeting EU data subjects must designate and publish an EU representative.",
+      "external_observable": "Determine apparent establishment (entity address, hosting, targeting) and search the notice for a named Art. 27 EU representative.",
+      "signals": [
+        "named EU representative with EEA address in notice",
+        "controller entity located outside EEA while targeting EU users",
+        "representative contact channel listed"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Non-EU controllers targeting the EU name an EU representative. Establishment status is only inferable, not certain.",
+      "fail_indicators": [
+        "clearly non-EU controller targeting EU users with no Art. 27 representative listed"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-27-gdpr/",
+        "https://gdpr-info.eu/art-3-gdpr/"
+      ],
+      "decision_mode": "llm"
+    },
+    {
+      "id": "GDPR-GOVERNANCE_CONTACT-03",
+      "title": "Records of processing (Art. 30) — internal, not observable",
+      "category": "governance_contact",
+      "gdpr_articles": [
+        "Art. 30"
+      ],
+      "obligation": "Controllers/processors must maintain internal records of processing activities.",
+      "external_observable": "Not externally observable. Existence and adequacy of ROPA can only be confirmed by internal documentation review or a supervisory authority request.",
+      "signals": [
+        "N/A from outside — requires manual/internal review of the controller's records"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Flagged for manual/internal audit; cannot be passed or failed from external observation alone.",
+      "fail_indicators": [
+        "none externally observable"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-30-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-GOVERNANCE_CONTACT-04",
+      "title": "DPIA (Art. 35) — internal, not observable",
+      "category": "governance_contact",
+      "gdpr_articles": [
+        "Art. 35"
+      ],
+      "obligation": "A data protection impact assessment is required for high-risk processing.",
+      "external_observable": "Not externally observable. Whether a DPIA was performed for high-risk processing requires internal documentation review.",
+      "signals": [
+        "N/A from outside — manual/internal review required; high-risk processing may be inferred but DPIA existence cannot"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Flagged for manual/internal audit; cannot be judged from external observation alone.",
+      "fail_indicators": [
+        "none externally observable"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-35-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-GOVERNANCE_CONTACT-05",
+      "title": "Processor contracts (Art. 28) — internal, not observable",
+      "category": "governance_contact",
+      "gdpr_articles": [
+        "Art. 28"
+      ],
+      "obligation": "Engaging a processor requires a binding contract with the Art. 28(3) mandatory terms.",
+      "external_observable": "Not externally observable. Third-party processors can be inferred from loaded hosts, but the existence/adequacy of DPAs requires internal contract review.",
+      "signals": [
+        "N/A from outside — processors inferable from trackers, but contracts require internal review"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Flagged for manual/internal audit; cannot be passed externally.",
+      "fail_indicators": [
+        "none externally observable"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-28-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-GOVERNANCE_CONTACT-06",
+      "title": "Breach notification process (Art. 33/34) — internal, not observable",
+      "category": "governance_contact",
+      "gdpr_articles": [
+        "Art. 33",
+        "Art. 34"
+      ],
+      "obligation": "Controllers must notify the supervisory authority within 72 hours and, where high-risk, the affected data subjects.",
+      "external_observable": "Not externally observable. Breach-handling readiness/procedures require internal review; only publicly disclosed past breaches may occasionally be visible.",
+      "signals": [
+        "N/A from outside — internal process review required; historical public breach disclosures may exist"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Flagged for manual/internal audit; cannot be judged from external observation alone.",
+      "fail_indicators": [
+        "none externally observable (beyond any public record of an unhandled past breach)"
+      ],
+      "confidence": "low",
+      "references": [
+        "https://gdpr-info.eu/art-33-gdpr/",
+        "https://gdpr-info.eu/art-34-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-DARK_PATTERNS-01",
+      "title": "No visual nudging steering toward Accept",
+      "category": "dark_patterns",
+      "gdpr_articles": [
+        "Art. 4(11)",
+        "Art. 7",
+        "Art. 25(1)",
+        "Recital 32",
+        "EDPB Guidelines 03/2022"
+      ],
+      "obligation": "Consent must be freely given; interfaces must not deceptively steer users toward consenting (deceptive design / dark patterns).",
+      "external_observable": "Compare the visual treatment (colour, contrast, size, emphasis) of Accept vs Reject controls on the banner.",
+      "signals": [
+        "Accept highlighted in bright/high-contrast colour while Reject is greyed/low-contrast",
+        "Accept large vs Reject tiny or text-only link",
+        "emphasis/animation directing to Accept"
+      ],
+      "severity": "major",
+      "pass_criteria": "Accept and Reject have visually comparable, non-manipulative prominence.",
+      "fail_indicators": [
+        "bright green Accept vs faint grey Reject",
+        "Reject reduced to a small text link beside a big Accept button"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://www.edpb.europa.eu/system/files/2023-02/edpb_03-2022_guidelines_on_deceptive_design_patterns_in_social_media_platform_interfaces_v2_en_0.pdf",
+        "https://gdpr-info.eu/art-7-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-DARK_PATTERNS-02",
+      "title": "No confusing/double-negative or misleading consent wording",
+      "category": "dark_patterns",
+      "gdpr_articles": [
+        "Art. 4(11)",
+        "Art. 7(2)",
+        "Art. 12(1)",
+        "EDPB Guidelines 03/2022"
+      ],
+      "obligation": "Consent requests must use clear, plain language and must not confuse or mislead the user about the effect of their choice.",
+      "external_observable": "Read banner/settings copy for confusing wording, double negatives, or misleading framing of the choice.",
+      "signals": [
+        "double-negative toggles ('do not not collect')",
+        "ambiguous button labels ('OK' / 'Got it' that imply acceptance)",
+        "misleading framing of refusal consequences"
+      ],
+      "severity": "minor",
+      "pass_criteria": "Consent wording is clear, unambiguous and not misleading.",
+      "fail_indicators": [
+        "only an 'OK/Got it' button implying consent with no real choice",
+        "double negatives or confusing toggle labels"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://www.edpb.europa.eu/system/files/2023-02/edpb_03-2022_guidelines_on_deceptive_design_patterns_in_social_media_platform_interfaces_v2_en_0.pdf",
+        "https://gdpr-info.eu/art-7-gdpr/"
+      ],
+      "decision_mode": "manual"
+    },
+    {
+      "id": "GDPR-DARK_PATTERNS-03",
+      "title": "No nagging / repeated re-prompting after refusal",
+      "category": "dark_patterns",
+      "gdpr_articles": [
+        "Art. 7(3)",
+        "Art. 4(11)",
+        "EDPB Guidelines 03/2022"
+      ],
+      "obligation": "Repeatedly re-prompting users who have refused, to pressure consent, undermines the freely-given requirement (the 'nagging' dark pattern).",
+      "external_observable": "After choosing Reject, navigate the site and reload to see whether the banner reappears persistently demanding consent.",
+      "signals": [
+        "banner re-appears on every page load after a clear refusal",
+        "refusal not persisted (no consent-state cookie honoured)",
+        "repeated interstitials re-asking for consent"
+      ],
+      "severity": "minor",
+      "pass_criteria": "A refusal is persisted for a reasonable period without immediate re-nagging on each page.",
+      "fail_indicators": [
+        "banner reappears every navigation after Reject",
+        "refusal state not stored, forcing repeated choices"
+      ],
+      "confidence": "medium",
+      "references": [
+        "https://www.edpb.europa.eu/system/files/2023-02/edpb_03-2022_guidelines_on_deceptive_design_patterns_in_social_media_platform_interfaces_v2_en_0.pdf",
+        "https://gdpr-info.eu/art-7-gdpr/"
+      ],
+      "decision_mode": "manual"
+    }
+  ]
+}
