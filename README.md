@@ -70,7 +70,10 @@ thing **resumes across turns** if interrupted. The digest lands as a plain file 
   **lock-free queue** (atomic-rename claim, no double-processing); coordinate instances via a
   **mailbox** (directed outbox/inbox).
 - **Stay in control** — **cost caps** (`--max-usd`) pause a run; a `--stop-file` pauses on demand;
-  `board`/`history`/`inspect` show what's in flight and what it cost; `notify` pings you when done.
+  `pipe progress` shows where you are; `board`/`history`/`inspect` show what's in flight and what it cost.
+- **Reuse results without re-running** — a finished run's outputs live in its `state.json`. `inspect
+  results <run>` dumps them (`--json` / `--checklist`) so you can transform a long, expensive run's
+  output deterministically — e.g. turn 2,000 review results into a `CHECKLIST.md` without one re-review.
 - **Zero runtime dependencies** — TypeScript compiled to a committed `dist/`; Node builtins only.
 
 ## Commands
@@ -82,7 +85,8 @@ thing **resumes across turns** if interrupted. The digest lands as a plain file 
 | Command | What it does |
 |---|---|
 | `/agentflow:create-workflow` | Author a reusable `WORKFLOW.md` (validates + previews) |
-| `/agentflow:run-workflow` | Run a workflow end to end (`--dry-run`, `--param k=v`) |
+| `/agentflow:run-workflow` | Run a workflow end to end (`--dry-run`, `--param k=v`); echoes a progress block each turn |
+| `/agentflow:checklist` | Run a repeatable `- [ ]` to-do list — tick items, write back, resume only the open ones |
 | `/agentflow:workflows` | List the workflows authored in this workspace |
 | `/agentflow:audit` | Shipped recipe: discover → review each → group → executive digest |
 
@@ -104,7 +108,7 @@ thing **resumes across turns** if interrupted. The digest lands as a plain file 
 |---|---|
 | `/agentflow:queue` | A lock-free shared work queue — many workers drain it safely (atomic-rename claim) |
 | `/agentflow:mailbox` | Directed messages between instances (outbox/inbox, atomic FIFO recv) |
-| `/agentflow:board` · `inspect` · `history` | Read-only: live dashboard · one run's detail/tree/budget · run log |
+| `/agentflow:board` · `inspect` · `history` | Read-only: live dashboard · one run's detail/tree/budget · run log · **`inspect results <run>`** dumps a finished run's outputs (`--json`/`--checklist`) for reuse without re-running · **`pipe progress <run>`** shows where you are |
 | `/agentflow:notify` | Ping a webhook (Slack/Discord) and/or desktop when a long run finishes |
 
 Sources are pluggable everywhere: a folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON
@@ -125,6 +129,50 @@ Described in plain language (left) → what Agent Flow runs (right). Full versio
 | "Have a second model critique the draft, loop until solid." | two `/agentflow:step` (different `--model`) inside `/agentflow:until` |
 | "Review the diff; only deploy if it's safe." | a `step` emits `{blocking}` → `fork` routes to `ship` or `fix` |
 | "Audit `src`, but stop if it passes $5." | `/agentflow:audit … ` with `--max-usd 5` (pauses at the cap) |
+| "Turn that finished review into a to-do list — don't re-run it." | `inspect results <run> --checklist > CHECKLIST.md` → `/agentflow:checklist CHECKLIST.md` |
+
+## Controlling & reusing a run
+
+The other half of the story: once a run is going (or finished), you stay in command. These are the
+levers — all on durable state, so nothing is ever lost or has to be redone.
+
+**Choose how it executes** (parallelism and agent count are *separate* knobs):
+
+| You want | Use | Effect |
+|---|---|---|
+| Fast, parallel (default) | `--concurrency N --chunk-size M` | up to N agents at once, M items each |
+| One at a time | `--serial` (= `--concurrency 1`) | same total agents, no parallelism |
+| **Fewer agents / less cost** | bigger `--chunk-size` (more items per agent) or coarser items | fewer dispatches |
+| No subagents at all | `--execution main-thread` | the main thread does each item inline (small lists only) |
+
+**Steer a run while it's going.** A run advances in chunks and yields between them, so you're never
+locked out:
+- **Pause gracefully**: create the `--stop-file` you passed → it pauses at the next chunk; delete it to
+  resume. **Cap cost**: `--max-usd 5` pauses at the limit. **Interrupt**: `Esc` — the state is on disk, resume later.
+- **See where you are**: `pipe progress <run>` (run-workflow prints it every turn) — overall stage %, the
+  current phase + its item countdown with a bar, cumulative agents/$, and what's next. For a finer
+  update cadence, lower `--chunk-size`.
+
+**Reuse a finished run — without re-running it.** Every result is persisted in the run's `state.json`.
+Operate on it deterministically (code over the saved items, so nothing is dropped):
+
+```bash
+# All outputs, full fidelity (one row per item: id + status + result)
+node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" results <run-id> --json
+
+# Turn them into a to-do list deterministically — every item becomes a line, then action it
+node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" results <run-id> --checklist > CHECKLIST.md   # --field <a.b> to pull a summary field
+/agentflow:checklist CHECKLIST.md
+```
+
+Fixed the workflow and only need the *last* stage? Re-running re-uses cached items (`--cache` skips
+unchanged ones), or point a new one-shot step at the existing run instead of repeating the expensive part.
+
+**One-shot vs saved workflows.** Saved/reusable → `WORKFLOW.md` + `run-workflow`. Throwaway → run inline
+stages with `pipe init <id> --stages '[…]'` (no file to keep). Runs are disposable: `--force` overwrites a
+run-id, and a run is just a folder under `.agentflow/<cmd>/<id>/` you can delete.
+
+See the [Cookbook](docs/cookbook.md) for full recipes.
 
 ## Documentation
 

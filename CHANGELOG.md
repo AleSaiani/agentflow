@@ -5,6 +5,36 @@ All notable changes to **Agent Flow** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`pipe progress <id>`** — a one-glance "you are here" view for long, multi-resume runs: overall
+  stage `N/total` + %, the current phase and (for a foreach/group child) its item progress with a bar,
+  cumulative scale (agents · $ · resume k/max), and the next stages. `run-workflow` now echoes it each
+  turn so both the phase and the within-phase countdown are always visible together. `--json` for tooling.
+- **`inspect results <run>`** — extract a finished run's outputs for deterministic reuse **without
+  re-running** (results are persisted in `state.json`): `--json` (one row per item, lossless),
+  `--checklist` (a `- [ ]` line per item — nothing dropped), `--field a.b` to pull a result field,
+  `--status` to filter. Turns an expensive review run into a `CHECKLIST.md` for `/agentflow:checklist`.
+- README: a **"Controlling & reusing a run"** section (execution knobs — parallel/serial/fewer-agents/
+  inline; steering a live run; reuse-without-re-run; one-shot vs saved workflows).
+- **Nested sub-workflows (composition).** A `pipe` can now be a child of a `pipe`: author a stage as
+  `## <name> · workflow` (`- workflow: <path>` + repeatable `- param:`), or `cmd: "pipe"` in JSON.
+  Deterministic sub-workflows run to completion inline; LLM-containing ones pause and the Stop hook
+  resumes them. Provenance shows in `inspect tree`; budgets roll up. (`pipe` added to supported child
+  cmds; `pipe init --validate-only`; `drive` recursively drives a pipe child.)
+- **`/agentflow:checklist`** — sugar over `foreach --checkbox` for a repeatable user to-do list: run the
+  open `- [ ]` items, tick them, write the file back; re-running resumes only the still-open items.
+- **Flagship compliance/security workflow suite** (showcasing the determinism boundary on law/standard-
+  mapped checklists → self-contained HTML reports):
+  - `workflows/gdpr-domain/` — external GDPR/ePrivacy audit of a domain (41 checks: code + bounded LLM +
+    manual), with an optional **live-browser layer** (Vercel CLI / Playwright MCP via a subagent step).
+  - `workflows/gdpr-repo/` — internal GDPR audit of a repository (28 checks).
+  - `workflows/security-domain/` & `workflows/security-repo/` — fully-deterministic OWASP web-security
+    and SAST-lite source audits (16 checks each, no LLM).
+  - `workflows/security-pack/` — a meta-workflow nesting security-domain + security-repo into one index
+    (a worked example of workflow composition).
+
 ## [1.0.0-beta.2] - 2026-05-24
 
 Production-hardening + capability expansion over beta.1.

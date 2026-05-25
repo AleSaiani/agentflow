@@ -25,6 +25,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `queue` | shared queue | many workers drain one queue safely (atomic-rename claim, no locks) |
 | `step` | one unit | run ONE prompt once (inline / subagent / `claude -p` / `codex exec`); capture output |
 | `mailbox` | outbox/inbox | directed messages between instances (atomic FIFO recv, no locks) |
+| `checklist` | repeatable to-do | run a markdown `- [ ]` checklist, tick items, write back; resume only the open ones (sugar over `foreach --checkbox`) |
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |
@@ -137,6 +138,7 @@ loops come from an `iterate` stage. Reads children's state to advance; never mut
 **CLI** (`dist/state/pipe.js`):
 - `init <id> (--stages <json> | --workflow <md|json>) [--param name=value …] [--max-usd N] [--max-tokens N] [--max-agents N] [--context-policy …] [--max-stages N] [--no-stop-on-failure] [--skip-validate-stages] [--force]`
 - `tick <id>` → next action · `drive <id> [--max-steps N]` → auto-run until an agent is needed · `plan <id>` → **dry-run** the resolved stage plan
+- `progress <id> [--json]` → one-glance "you are here": overall stage %, the current phase + (for a foreach/group child) its item progress with a bar, cumulative agents/$ and the resume counter, and the next stages. `run-workflow` echoes it each turn.
 - `complete-bash-stage <id> --exit-code N --output-path <f> [--error "…"]` · `complete-json-stage <id> --output-path <f>`
 - `start-primitive-child <id> --child-cmd <cmd> --child-run-id <id>` · `advance <id>` · `fail <id>` · `status <id>` · `runs` · `budget-add`
 
@@ -236,7 +238,15 @@ A `WorkflowSpec` compiles 1:1 into `pipe.stages[]`:
 
 - **bash** → `{ "command": "<shell; writes $PIPE_OUTPUT_PATH>", "output_path"?: "…" }`
 - **json** → `{ "value": <any JSON; string leaves resolve templates>, "output_path"?: "…" }`
-- **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate|step", "init_args": [ … ] }`
+- **primitive** → `{ "cmd": "enumerate|foreach|group|reduce|iterate|step|pipe", "init_args": [ … ] }`
+
+**Composition / nested sub-workflows.** A stage with `cmd: "pipe"` runs another workflow as a child
+pipe — true nesting. In WORKFLOW.md author it as `## <name> · workflow` (sugar for `· pipe`), with
+`- workflow: {{workflow.dir}}/../other/WORKFLOW.md` and repeatable `- param: key={{params.x}}` bullets.
+A deterministic sub-workflow is driven to completion inline; one containing an LLM `step` pauses and the
+Stop hook resumes it. Provenance shows in `/agentflow:inspect tree`; budgets roll up. See
+`workflows/security-pack/` for a worked example. Pass a child's result on with
+`{{stages.<name>.result_pointer}}` (the sub-workflow's final output).
 
 **Params** are supplied at run time with `--param name=value` (repeatable) and referenced anywhere as
 `{{params.<name>}}` (use `|shell` when injecting into a `bash` command). A `required` param with no
