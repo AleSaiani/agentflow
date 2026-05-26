@@ -1,0 +1,129 @@
+#!/usr/bin/env node
+/**
+ * Stage-4 report for pr-review. Reads the review `foreach` run's state directly (no plugin-root needed),
+ * flattens every file's findings, computes a deterministic rollup + gate (block at or above a severity
+ * threshold), and writes a PR-comment-ready markdown report. The verdict is structured output — the gate
+ * is decided by code over the findings' severities, not by free text. Node builtins only.
+ *
+ * Env: PRREVIEW_REVIEW_RUN (required — the review foreach run-id), PRREVIEW_CENSUS (classify output, for
+ *   the file→lenses/reason map + a completeness check), PRREVIEW_GATE (info|minor|major|critical, default
+ *   major), PRREVIEW_OUT (markdown path, default ./pr-review-report.md), PRREVIEW_FAIL_ON_BLOCK ("1" → exit
+ *   non-zero when blocked, for CI), FOREACH_STATE_DIR / PRREVIEW_FOREACH_DIR (state dir override).
+ */
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { SEVERITY_RANK } from "./lenses.mjs";
+
+const runId = process.env.PRREVIEW_REVIEW_RUN;
+if (!runId) {
+  process.stderr.write("report: PRREVIEW_REVIEW_RUN (review foreach run-id) is required\n");
+  process.exit(1);
+}
+const feDir = process.env.FOREACH_STATE_DIR || process.env.PRREVIEW_FOREACH_DIR || join(".agentflow", "foreach");
+const gate = (process.env.PRREVIEW_GATE || "major").toLowerCase();
+const gateRank = SEVERITY_RANK[gate] ?? SEVERITY_RANK.major;
+const outPath = process.env.PRREVIEW_OUT || "./pr-review-report.md";
+
+const statePath = join(feDir, runId, "state.json");
+if (!existsSync(statePath)) {
+  process.stderr.write(`report: review state not found at ${statePath}\n`);
+  process.exit(1);
+}
+const state = JSON.parse(readFileSync(statePath, "utf8"));
+const reviewed = Object.values(state.items ?? {});
+
+// census: id → {reason, lenses}
+const census = new Map();
+if (process.env.PRREVIEW_CENSUS && existsSync(process.env.PRREVIEW_CENSUS)) {
+  for (const it of JSON.parse(readFileSync(process.env.PRREVIEW_CENSUS, "utf8"))) {
+    census.set(it.id, { reason: it.data?.reason ?? "changed", lenses: it.data?.lenses ?? [] });
+  }
+}
+
+/** A reviewed item's result may be {findings:[…]}, a bare array, or a JSON string — be tolerant. */
+function findingsOf(result) {
+  let r = result;
+  if (r == null) return [];
+  if (typeof r === "string") {
+    try {
+      r = JSON.parse(r);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(r)) return r;
+  if (Array.isArray(r.findings)) return r.findings;
+  return [];
+}
+
+const byFile = new Map();
+const bySeverity = { info: 0, minor: 0, major: 0, critical: 0 };
+let total = 0;
+for (const it of reviewed) {
+  const fileId = it.id;
+  const fs = findingsOf(it.result).map((f) => ({
+    rule_id: f.rule_id ?? f.rule ?? "unspecified",
+    severity: (f.severity ?? "minor").toLowerCase(),
+    line: f.line ?? null,
+    note: f.note ?? f.message ?? "",
+    suggestion: f.suggestion ?? null,
+    file: f.file ?? fileId,
+  }));
+  for (const f of fs) {
+    if (!(f.severity in bySeverity)) f.severity = "minor";
+    bySeverity[f.severity]++;
+    total++;
+  }
+  if (fs.length) byFile.set(fileId, fs);
+}
+
+const blocked = Object.entries(bySeverity).some(([sev, n]) => n > 0 && SEVERITY_RANK[sev] >= gateRank);
+const verdict = blocked ? "CHANGES REQUESTED" : "OK";
+
+// Completeness: every classified file should have been reviewed.
+const missing = census.size ? census.size - reviewed.length : 0;
+
+// ---- markdown (PR-comment-ready) ----
+const reason = (id) => census.get(id)?.reason ?? "changed";
+const order = (a, b) => (reason(a[0]) === reason(b[0]) ? a[0].localeCompare(b[0]) : reason(a[0]) === "changed" ? -1 : 1);
+const SEV_BADGE = { critical: "🔴 critical", major: "🟠 major", minor: "🟡 minor", info: "🔵 info" };
+
+const lines = [];
+lines.push(`## Code review — ${blocked ? "🔴 changes requested" : "🟢 ok"}`);
+lines.push("");
+lines.push(`**${total}** finding${total === 1 ? "" : "s"} across **${reviewed.length}** reviewed file${reviewed.length === 1 ? "" : "s"} · gate: \`${gate}\``);
+lines.push("");
+lines.push(`| critical | major | minor | info |`);
+lines.push(`|---|---|---|---|`);
+lines.push(`| ${bySeverity.critical} | ${bySeverity.major} | ${bySeverity.minor} | ${bySeverity.info} |`);
+lines.push("");
+if (total === 0) {
+  lines.push("No issues found against the applied lenses. ✅");
+} else {
+  for (const [fileId, fs] of [...byFile].sort(order)) {
+    fs.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
+    lines.push(`### \`${fileId}\`${reason(fileId) === "related" ? " _(related)_" : ""}`);
+    for (const f of fs) {
+      const loc = f.line ? `:${f.line}` : "";
+      lines.push(`- ${SEV_BADGE[f.severity]} **${f.rule_id}**${loc} — ${f.note}`);
+      if (f.suggestion) lines.push(`  - _suggestion:_ ${f.suggestion}`);
+    }
+    lines.push("");
+  }
+}
+if (missing > 0) lines.push(`> ⚠ ${missing} classified file(s) were not reviewed — re-run to complete.`);
+lines.push("");
+lines.push(`<sub>Generated by Agent Flow · workflows/pr-review.</sub>`);
+
+mkdirSync(dirname(outPath) || ".", { recursive: true });
+writeFileSync(outPath, lines.join("\n"), "utf8");
+
+process.stdout.write(
+  JSON.stringify(
+    { verdict, blocked, gate, files_reviewed: reviewed.length, findings: total, by_severity: bySeverity, report_md: outPath, incomplete: missing > 0 },
+    null,
+    2,
+  ),
+);
+if (blocked && process.env.PRREVIEW_FAIL_ON_BLOCK === "1") process.exit(2);

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`pr-review` workflow** — adaptive, **diff-scoped** code review. `discover` (git diff for changed
+  files + grep for the files that reference them) → `classify` (detect each file's stack, resolve lenses
+  through a **cascade** + always `security` + team rules → a materialized census) → `review` (foreach,
+  one pass per file against its resolved rules, cached) → `report` (deterministic rollup + **gate** at a
+  severity threshold + PR-comment markdown). Ships `csharp`, `typescript-react`, `security` lenses;
+  customize via `<repo>/.agentflow/lenses/<key>.json` (per-stack) and `review-rules.json` (team rules) —
+  **additive, with override by rule id or whole lens**. The exhaustive set is every changed + related
+  file; the verdict is code over the findings' severities (the determinism boundary on enumeration).
+- **Shipped workflows are now discoverable when installed** — `/agentflow:workflows` (and `inspect
+  workflows`) scans BOTH the workspace `workflows/` (origin `local`) AND the plugin's bundled
+  `workflows/` (origin `shipped`); a local workflow shadows a shipped one of the same name.
+  `/agentflow:run-workflow` resolves a bare name (`run pr-review`) → workspace first, else shipped.
 - **`/agentflow:runs`** — the run **control panel** (read *and* write, complementing read-only
   `board`/`inspect`). A *job* is a top-level run (workflow/`pipe`, `do`, standalone primitive); a `pipe`'s
   stage sub-runs are managed with their parent.

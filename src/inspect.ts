@@ -13,7 +13,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { parseArgs } from "node:util";
 
-import { PRIMITIVES, type StateDict, die, isHelp, printUsage, findWorkspaceRoot, getPrimitive, loadState, print, stateDir, statePath } from "./common.js";
+import { PRIMITIVES, type StateDict, die, isHelp, printUsage, findWorkspaceRoot, getPrimitive, loadState, pluginRoot, print, stateDir, statePath } from "./common.js";
 import { parseWorkflowMd } from "./workflow_md.js";
 
 // Ensure every primitive self-registers.
@@ -392,67 +392,81 @@ function cmdBoard(args: string[]): void {
   process.stdout.write(lines.join("\n") + "\n");
 }
 
-/** List authored workflows under <workspace>/workflows/ (format-agnostic: WORKFLOW.md or workflow.json). */
+/** Scan one `<root>/workflows/` dir into `found`, tagging `origin`; a name already `seen` is skipped
+ *  (so a workspace-local workflow shadows a shipped one of the same name). */
+function scanWorkflowsRoot(root: string, origin: string, found: StateDict[], seen: Set<string>): void {
+  const wfRoot = join(root, "workflows");
+  if (!existsSync(wfRoot)) return;
+  for (const name of readdirSync(wfRoot).sort()) {
+    const full = join(wfRoot, name);
+    const isDir = statSync(full).isDirectory();
+    // A workflow is a folder holding WORKFLOW.md (preferred, human-authored) or workflow.json
+    // (compiled spec), or a bare workflows/<name>.json.
+    let mdPath: string | null = null;
+    let jsonPath: string | null = null;
+    if (isDir) {
+      if (existsSync(join(full, "WORKFLOW.md"))) mdPath = join(full, "WORKFLOW.md");
+      if (existsSync(join(full, "workflow.json"))) jsonPath = join(full, "workflow.json");
+    } else if (name.endsWith(".json")) {
+      jsonPath = full;
+    }
+    if (!mdPath && !jsonPath) continue;
+    const entry: StateDict = {
+      name: name.replace(/\.json$/, ""),
+      origin,
+      format: mdPath && jsonPath ? "md+json" : mdPath ? "md" : "json",
+      path: relative(root, (mdPath ?? jsonPath) as string).split(sep).join("/"),
+    };
+    if (jsonPath) {
+      try {
+        const wf = JSON.parse(readFileSync(jsonPath, "utf8"));
+        if (wf.name) entry["name"] = wf.name;
+        entry["description"] = wf.description ?? "";
+        entry["stages"] = Array.isArray(wf.stages) ? wf.stages.length : 0;
+        entry["params"] = wf.params && typeof wf.params === "object" ? Object.keys(wf.params) : [];
+      } catch {
+        entry["error"] = "malformed workflow.json";
+      }
+    } else if (mdPath) {
+      // Most shipped/authored workflows are WORKFLOW.md only — parse the same metadata the
+      // catalog promises (stage count, params, description) straight from the markdown.
+      try {
+        const wf = parseWorkflowMd(readFileSync(mdPath, "utf8"));
+        if (typeof wf["name"] === "string") entry["name"] = wf["name"];
+        entry["description"] = typeof wf["description"] === "string" ? wf["description"] : "";
+        entry["stages"] = Array.isArray(wf["stages"]) ? (wf["stages"] as unknown[]).length : 0;
+        entry["params"] = wf["params"] && typeof wf["params"] === "object" ? Object.keys(wf["params"] as object) : [];
+      } catch {
+        entry["error"] = "malformed WORKFLOW.md";
+      }
+    }
+    const key = entry["name"] as string;
+    if (seen.has(key)) continue; // already provided by a higher-priority (local) root
+    seen.add(key);
+    found.push(entry);
+  }
+}
+
+/** List workflows from BOTH the workspace `workflows/` (local) and the plugin's bundled `workflows/`
+ *  (shipped) — so a `run-workflow`-able catalog exists even for an installed plugin. */
 function cmdWorkflows(args: string[]): void {
   const { values } = parseArgs({ args, allowPositionals: false, strict: true, options: { json: { type: "boolean", default: false } } });
-  const root = findWorkspaceRoot();
-  const wfRoot = join(root, "workflows");
   const found: StateDict[] = [];
-  if (existsSync(wfRoot)) {
-    for (const name of readdirSync(wfRoot).sort()) {
-      const full = join(wfRoot, name);
-      const isDir = statSync(full).isDirectory();
-      // A workflow is a folder holding WORKFLOW.md (preferred, human-authored) or workflow.json
-      // (compiled spec), or a bare workflows/<name>.json.
-      let mdPath: string | null = null;
-      let jsonPath: string | null = null;
-      if (isDir) {
-        if (existsSync(join(full, "WORKFLOW.md"))) mdPath = join(full, "WORKFLOW.md");
-        if (existsSync(join(full, "workflow.json"))) jsonPath = join(full, "workflow.json");
-      } else if (name.endsWith(".json")) {
-        jsonPath = full;
-      }
-      if (!mdPath && !jsonPath) continue;
-      const entry: StateDict = {
-        name: name.replace(/\.json$/, ""),
-        format: mdPath && jsonPath ? "md+json" : mdPath ? "md" : "json",
-        path: relative(root, (mdPath ?? jsonPath) as string).split(sep).join("/"),
-      };
-      if (jsonPath) {
-        try {
-          const wf = JSON.parse(readFileSync(jsonPath, "utf8"));
-          if (wf.name) entry["name"] = wf.name;
-          entry["description"] = wf.description ?? "";
-          entry["stages"] = Array.isArray(wf.stages) ? wf.stages.length : 0;
-          entry["params"] = wf.params && typeof wf.params === "object" ? Object.keys(wf.params) : [];
-        } catch {
-          entry["error"] = "malformed workflow.json";
-        }
-      } else if (mdPath) {
-        // Most shipped/authored workflows are WORKFLOW.md only — parse the same metadata the
-        // catalog promises (stage count, params, description) straight from the markdown.
-        try {
-          const wf = parseWorkflowMd(readFileSync(mdPath, "utf8"));
-          if (typeof wf["name"] === "string") entry["name"] = wf["name"];
-          entry["description"] = typeof wf["description"] === "string" ? wf["description"] : "";
-          entry["stages"] = Array.isArray(wf["stages"]) ? (wf["stages"] as unknown[]).length : 0;
-          entry["params"] = wf["params"] && typeof wf["params"] === "object" ? Object.keys(wf["params"] as object) : [];
-        } catch {
-          entry["error"] = "malformed WORKFLOW.md";
-        }
-      }
-      found.push(entry);
-    }
-  }
+  const seen = new Set<string>();
+  const workspace = findWorkspaceRoot();
+  const plugin = pluginRoot();
+  scanWorkflowsRoot(workspace, "local", found, seen); // local first → shadows a shipped name
+  if (plugin !== workspace) scanWorkflowsRoot(plugin, "shipped", found, seen);
+
   if (values["json"]) return print(found);
   if (found.length === 0) {
-    process.stdout.write(`No workflows found under ${wfRoot}/. Author one with /agentflow:create-workflow.\n`);
+    process.stdout.write(`No workflows found. Author one with /agentflow:create-workflow, or run a shipped one with /agentflow:run-workflow.\n`);
     return;
   }
   const lines = [`=== Workflows (${found.length}) ===`];
   for (const w of found) {
     const params = (w["params"] as string[] | undefined) ?? [];
-    const meta = [w["format"], w["stages"] !== undefined ? `${w["stages"]} stages` : null, params.length ? `params: ${params.join(",")}` : null]
+    const meta = [w["origin"], w["format"], w["stages"] !== undefined ? `${w["stages"]} stages` : null, params.length ? `params: ${params.join(",")}` : null]
       .filter(Boolean)
       .join(", ");
     lines.push(`  ${w["name"]}  (${meta})`);

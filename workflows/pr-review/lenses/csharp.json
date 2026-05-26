@@ -1,0 +1,14 @@
+{
+  "lens": "csharp",
+  "override": false,
+  "rules": [
+    { "id": "cs-async-void", "severity": "major", "guidance": "Avoid `async void` except for event handlers — exceptions can't be caught and crash the process. Return `Task`." },
+    { "id": "cs-blocking-async", "severity": "major", "guidance": "Don't block on async with `.Result` / `.Wait()` / `.GetAwaiter().GetResult()` — it risks deadlocks. `await` instead." },
+    { "id": "cs-idisposable", "severity": "major", "guidance": "Dispose `IDisposable`/`IAsyncDisposable` instances (e.g. with `using`); a leaked handle/connection is a resource bug." },
+    { "id": "cs-configureawait", "severity": "minor", "guidance": "Library/non-UI code should `ConfigureAwait(false)` to avoid capturing a sync context." },
+    { "id": "cs-catch-all", "severity": "minor", "guidance": "Don't swallow exceptions with empty `catch {}` or `catch (Exception)` that ignores; log or rethrow with context." },
+    { "id": "cs-string-concat-loop", "severity": "minor", "guidance": "Building strings in a loop with `+=` is O(n^2); use `StringBuilder`." },
+    { "id": "cs-ef-tracking", "severity": "info", "guidance": "Read-only EF Core queries should use `AsNoTracking()` to avoid change-tracking overhead." },
+    { "id": "cs-nullable", "severity": "minor", "guidance": "Honor nullable reference types: don't dereference a possibly-null value without a check; avoid `!` (null-forgiving) unless justified." }
+  ]
+}

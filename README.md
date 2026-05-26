@@ -181,9 +181,10 @@ still scriptable via their CLIs: the FP vocabulary `enumerate` · `foreach` · `
 cross-instance messages), `notify` (webhook/desktop), `history`. Sources are pluggable everywhere — a
 folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON list, or another run's output.
 
-**Shipped workflows** — ready-to-run recipes under `workflows/`: `audit` (code review → digest),
-`gdpr-domain`/`gdpr-repo`, `security-domain`/`security-repo`/`security-pack`, `release-gate`. List them
-with `/agentflow:workflows`; run one with `/agentflow:run-workflow workflows/<name>/WORKFLOW.md`.
+**Shipped workflows** — ready-to-run recipes under `workflows/`: **`pr-review`** (adaptive, diff-scoped
+code review), `audit` (whole-tree review → digest), `gdpr-domain`/`gdpr-repo`,
+`security-domain`/`security-repo`/`security-pack`, `release-gate`. List them with `/agentflow:workflows`
+(local **and** shipped, with stage count + params); run one with `/agentflow:run-workflow <name>`.
 
 ## Controlling & reusing a run
 

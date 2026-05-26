@@ -18,6 +18,11 @@ typically `workflows/<name>/WORKFLOW.md` — a self-contained folder whose `bash
 scripts via `{{workflow.dir}}`, so it runs unchanged wherever the folder is. Pick a stable `<run-id>`
 (default: derive from the workflow name) so re-runs resume.
 
+**Resolving a bare name.** If the user names a workflow without a path (e.g. "run pr-review"), resolve it:
+a workspace `./workflows/<name>/WORKFLOW.md` wins; otherwise the **shipped** one at
+`${CLAUDE_PLUGIN_ROOT}/workflows/<name>/WORKFLOW.md`. `/agentflow:workflows` lists both (local + shipped)
+with origin, stage count, and params — use it to discover the name.
+
 ## 1. Init the pipe from the workflow
 
 ```bash

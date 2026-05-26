@@ -1,0 +1,15 @@
+{
+  "lens": "security",
+  "override": false,
+  "rules": [
+    { "id": "sec-injection", "severity": "critical", "guidance": "Untrusted input concatenated into SQL, a shell command, or `eval`/dynamic code is an injection flaw. Use parameterized queries / safe APIs." },
+    { "id": "sec-secrets", "severity": "critical", "guidance": "No hardcoded credentials, API keys, tokens, or private keys in source. Use config/secret stores." },
+    { "id": "sec-xss", "severity": "major", "guidance": "User-controlled data written to HTML/DOM without escaping is XSS. Encode on output; avoid raw HTML sinks." },
+    { "id": "sec-weak-crypto", "severity": "major", "guidance": "Don't use MD5/SHA1/DES/ECB for security; use a vetted algorithm (e.g. SHA-256+, AES-GCM) and a CSPRNG." },
+    { "id": "sec-ssrf", "severity": "major", "guidance": "Server-side requests to a user-controlled URL/host risk SSRF; validate/allowlist the destination." },
+    { "id": "sec-deserialization", "severity": "major", "guidance": "Deserializing untrusted data with a type-permissive deserializer enables RCE; constrain types or use a safe format." },
+    { "id": "sec-authz", "severity": "major", "guidance": "Sensitive operations must check authorization (ownership/role), not just authentication — watch for missing checks on new endpoints." },
+    { "id": "sec-tls-verify", "severity": "major", "guidance": "Don't disable TLS/certificate verification (`rejectUnauthorized:false`, `verify=False`, `ServerCertificateValidationCallback => true`)." },
+    { "id": "sec-sensitive-log", "severity": "minor", "guidance": "Don't log secrets, tokens, full PII, or full request bodies; redact." }
+  ]
+}

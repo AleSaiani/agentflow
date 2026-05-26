@@ -1,0 +1,14 @@
+{
+  "lens": "typescript-react",
+  "override": false,
+  "rules": [
+    { "id": "tsr-no-any", "severity": "minor", "guidance": "Avoid `any` — it disables type-checking. Prefer a precise type, `unknown` + narrowing, or a generic." },
+    { "id": "tsr-exhaustive-deps", "severity": "major", "guidance": "`useEffect`/`useCallback`/`useMemo` dependency arrays must list every referenced value, or you get stale closures." },
+    { "id": "tsr-list-key", "severity": "major", "guidance": "List items rendered with `.map` need a stable, unique `key`; a missing key causes incorrect reconciliation." },
+    { "id": "tsr-index-key", "severity": "minor", "guidance": "Don't use the array index as a React `key` when the list can reorder/insert — it breaks state association." },
+    { "id": "tsr-set-state-in-render", "severity": "major", "guidance": "Never call a state setter during render — it loops/crashes. Do it in an effect or an event handler." },
+    { "id": "tsr-async-effect", "severity": "minor", "guidance": "Don't make the `useEffect` callback itself `async` (it returns a Promise, not a cleanup); define an inner async fn and call it." },
+    { "id": "tsr-dangerously-set-html", "severity": "major", "guidance": "`dangerouslySetInnerHTML` with non-sanitized content is an XSS sink; sanitize or avoid." },
+    { "id": "tsr-strict-equality", "severity": "minor", "guidance": "Use `===`/`!==`; `==` does surprising coercion." }
+  ]
+}

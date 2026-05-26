@@ -1,0 +1,9 @@
+{
+  "lens": "team",
+  "override": false,
+  "rules": [
+    { "id": "team-no-todo", "severity": "minor", "guidance": "No new `TODO`/`FIXME`/`HACK` left in changed code without a linked ticket." },
+    { "id": "team-public-doc", "severity": "minor", "guidance": "New public functions/classes/endpoints carry a short doc comment (what + why)." },
+    { "id": "team-no-console", "severity": "minor", "guidance": "No stray debug logging (`console.log`, `Console.WriteLine`, `print`) left in production paths." }
+  ]
+}
