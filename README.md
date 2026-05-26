@@ -182,9 +182,10 @@ cross-instance messages), `notify` (webhook/desktop), `history`. Sources are plu
 folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON list, or another run's output.
 
 **Shipped workflows** — ready-to-run recipes under `workflows/`: **`pr-review`** (adaptive, diff-scoped
-code review), `audit` (whole-tree review → digest), `gdpr-domain`/`gdpr-repo`,
-`security-domain`/`security-repo`/`security-pack`, `release-gate`. List them with `/agentflow:workflows`
-(local **and** shipped, with stage count + params); run one with `/agentflow:run-workflow <name>`.
+code review), **`knowledge-build`** (repo → structured md docs, bootstrap/update), `audit` (whole-tree
+review → digest), `gdpr-domain`/`gdpr-repo`, `security-domain`/`security-repo`/`security-pack`,
+`release-gate`. List them with `/agentflow:workflows` (local **and** shipped, with stage count + params);
+run one with `/agentflow:run-workflow <name>`.
 
 ## Controlling & reusing a run
 

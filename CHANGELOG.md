@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`knowledge-build` workflow** — turn a repo into **structured markdown documentation** (a folder tree
+  the team owns). `resolve` (mode + git ref) → `walk` (every code file, the deterministic coverage
+  baseline) → `plan` (LLM proposes a doc schema + groups every file into code/domain entities) →
+  `validate` (guarantees coverage — unassigned files sweep into `_unclassified`) → `document` (foreach,
+  one md per entity, cached) → `relate` (LLM-derived relationships, a deterministic list from a fixed
+  vocabulary — a graph-DB seed) → `finalize` (`index.md` + `relations.md` + a manifest). Two modes:
+  **`bootstrap`** (records the git HEAD in the manifest) and **`update`** (diffs since the recorded ref →
+  re-documents only the new/changed entities). The LLM enumerates/relates; **code guarantees every file
+  is covered**.
 - **`pr-review` workflow** — adaptive, **diff-scoped** code review. `discover` (git diff for changed
   files + grep for the files that reference them) → `classify` (detect each file's stack, resolve lenses
   through a **cascade** + always `security` + team rules → a materialized census) → `review` (foreach,
