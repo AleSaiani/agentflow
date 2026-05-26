@@ -53,7 +53,8 @@ Drive exactly like `/agentflow:run-workflow`: handle `needs_agent` (dispatch the
 When it worked, offer: *"Keep this as a reusable workflow?"* If yes, hand off to
 **/agentflow:create-workflow** to materialize `workflows/<name>/WORKFLOW.md` — lift inline `bash` commands
 into sibling scripts called via `{{workflow.dir}}`, and declare `params` for the inputs you hard-coded. If
-no, it stays a disposable run under `.agentflow/pipe/<name>/` — delete it anytime.
+no, it stays a disposable run under `.agentflow/pipe/<name>/` — remove it anytime with
+`/agentflow:runs rm <name>`, or let `/agentflow:runs clean` GC finished runs in bulk.
 
 ## Rules
 - **Ephemeral by default**: `do` does NOT write a `workflows/` folder unless the user promotes it.

@@ -16,6 +16,7 @@ coverage/
 # STATUS.md/HISTORY.md are internal session bridges (local paths, roadmap) — kept out of the public repo.
 .claude/STATUS.md
 .claude/HISTORY.md
+.claude/PLAN-*.md
 .claude/settings.local.json
 .claude/*.local.json
 

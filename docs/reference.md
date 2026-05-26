@@ -8,6 +8,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 - [The primitives](#the-primitives) — enumerate · foreach · reduce · group · loops · pipe
 - [Authoring & running workflows](#authoring--running-workflows) — create-workflow · run-workflow
 - [Inspecting](#inspecting) — inspect · board
+- [Controlling runs](#controlling-runs) — runs (queue, pause, clean)
 - [Workflow-file schema](#workflow-file-schema)
 - [Sources & views](#sources--views)
 - [Conventions](#conventions) — cross-turn, budget, cache, models
@@ -31,6 +32,7 @@ the skill does. All state lives in `state.json` under `.agentflow/<cmd>/<run-id>
 | `run-workflow` | execute | run a workflow-file end to end |
 | `create-workflow` | author | build a reusable workflow-file |
 | `inspect` / `board` / `history` / `workflows` | observe | read-only status, trees, budget, dashboard, time-ordered run log, and the authored-workflow catalog |
+| `runs` | control | list jobs in scheduling order, pause/resume one job or the whole engine, set priority, delete / GC finished runs |
 | `audit` | recipe | discover → review → partition → digest |
 
 The engine CLIs are `node "${CLAUDE_PLUGIN_ROOT}/dist/state/<cmd>.js" <subcommand> <run-id> [flags]`
@@ -206,6 +208,27 @@ with `/agentflow:run-workflow`. See [Workflow-file schema](#workflow-file-schema
 - `budget <id> [--json]` — cost aggregated across a run and its children
 - `timeline <id> [--limit N]` — timestamps + budget events
 - `board [--json] [--no-failed]` — active / done / failed / blockers + suggested next actions
+
+## Controlling runs
+
+`/agentflow:runs` (read **and** write — the control panel). CLI: `dist/runs.js`. A *job* is a top-level run
+(a workflow/`pipe`, a `do`, a standalone primitive); a `pipe`'s stage sub-runs are managed with their parent.
+
+- `runs [list] [--all] [--json]` — top-level jobs in **scheduling order**; the `POS` column is the queue
+  the Stop hook walks (priority desc, then oldest job first / FIFO). `--all` includes finished/failed.
+- `runs pause` / `runs resume` — the **global** stop button: create/remove `.agentflow/PAUSED`. While it
+  exists, the Stop hook auto-resumes nothing. (`runs resume` with no id == global.)
+- `runs stop <id>` / `runs resume <id>` — pause/resume **one** job (and its subtree) via a `paused` flag;
+  other jobs keep advancing. Non-destructive: state is preserved.
+- `runs priority <id> <n>` — set a job's scheduling priority (integer, default 0; higher runs sooner).
+- `runs rm <id> [--force]` — delete a run and its subtree. Refuses an active job, or a child of a running
+  pipe, unless `--force`.
+- `runs clean [--failed] [--all] [--older-than <30m|24h|7d|2w>] [--dry-run]` — GC **finished** top-level
+  jobs (completed by default; `--failed` adds failed, `--all` adds aborted too). Never touches a running
+  job or its children. Use `--dry-run` to preview.
+
+Two pause levels, by design: **global** (`pause`, the engine freeze) and **per-job** (`stop <id>`). The
+Stop hook honors both; neither loses state. Disambiguate a clashing id with `<cmd>/<id>` (e.g. `pipe/x`).
 
 ---
 

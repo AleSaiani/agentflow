@@ -46,5 +46,6 @@ If something is active, sending any next message will trigger the Stop hook at e
 ## Important rules
 
 - **Read-only**: never mutates state.
+- **To ACT on what board shows, use `/agentflow:runs`** — the writable sibling: pause/resume one job or the whole engine, set priority (queue order), delete a run, or `clean` up finished ones. Board reports; `runs` controls.
 - **Different from `/agentflow:inspect runs`**: `/agentflow:board` is for the "session start" overview with suggestions; `/agentflow:inspect runs` is the bare tabular listing. `/agentflow:board` is opinionated, `/agentflow:inspect` is plumbing.
 - **Always safe to run**: no flags, no risk. Use it freely.

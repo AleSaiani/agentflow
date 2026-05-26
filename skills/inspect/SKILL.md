@@ -87,5 +87,6 @@ Print created_at / started_at / updated_at / completed_at plus the last N budget
 ## Important rules
 
 - **Read-only**: `/agentflow:inspect` never modifies state. If you need to fix something (reset stuck items, force a transition), use the primitive's own state CLI (`state/foreach.js reset`, etc.).
+- **To CONTROL runs, use `/agentflow:runs`** (the writable sibling): pause/resume a job or the whole engine, set priority, delete a run, `clean` finished ones. Note the name overlap — `inspect runs` is a read-only *listing*; `runs` (the skill) is the *control panel*.
 - **No auto-continue interaction**: `/agentflow:inspect` does not appear in the Stop hook's PRIMITIVES registry — it has no runs to resume.
 - **Output is for humans first, JSON second**: most subcommands print a readable table or tree. Pass `--json` (or `--pretty` for `show`) when you need structured output for further processing.

@@ -267,7 +267,7 @@
         <div class="card reveal"><span class="ix">03</span><h3>Workflows as readable markdown</h3><p>Same shape as a <code>SKILL.md</code> — frontmatter + one heading per stage. Parameterize with <code>--param</code>, branch with <code>fork</code>, validate a step against a schema, nest sub-workflows.</p></div>
         <div class="card reveal"><span class="ix">04</span><h3>Any runtime for a step</h3><p>Run a prompt inline, in a subagent, or sessionlessly via <code>claude -p</code> / <code>codex exec</code> — the basis for cross-model conversations.</p></div>
         <div class="card reveal"><span class="ix">05</span><h3>Scale safely</h3><p>Split a list across terminals with <code>--shard</code>, or drain one lock-free <code>queue</code> from many workers (atomic-rename claim, no double-processing); coordinate via a <code>mailbox</code>.</p></div>
-        <div class="card reveal"><span class="ix">06</span><h3>Stay in control</h3><p>Cost caps (<code>--max-usd</code>) pause a run; a <code>--stop-file</code> pauses on demand; <code>pipe progress</code> shows where you are; <code>board</code>/<code>inspect</code> show cost &amp; what's in flight.</p></div>
+        <div class="card reveal"><span class="ix">06</span><h3>Stay in control</h3><p>Cost caps (<code>--max-usd</code>) pause a run. Many jobs at once? <code>runs</code> shows the queue (priority, then FIFO); <code>runs pause</code> freezes the whole engine, <code>runs stop &lt;id&gt;</code> just one — all non-destructive. <code>board</code>/<code>inspect</code> show cost &amp; what's in flight.</p></div>
         <div class="card reveal"><span class="ix">07</span><h3>Reuse without re-running</h3><p><code>inspect results &lt;run&gt;</code> dumps a finished run's outputs (<code>--json</code> / <code>--checklist</code>) so you transform an expensive run deterministically — no re-review.</p></div>
         <div class="card wide reveal">
           <div><h3>Zero runtime dependencies</h3><p style="margin-top:6px">TypeScript compiled to a committed <code>dist/</code>; <strong style="color:var(--text)">Node builtins only</strong> — no third-party npm packages. Apache-2.0.</p></div>
@@ -307,6 +307,7 @@
         <div class="ex-row"><div class="say">“Chew through this list from 3 terminals.”</div><div class="run">/agentflow:queue --items work.json --prompt "…"  (×3)</div></div>
         <div class="ex-row"><div class="say">“Review the diff; only deploy if it's safe.”</div><div class="run">step emits {blocking} → fork routes to ship | fix</div></div>
         <div class="ex-row"><div class="say">“Turn that finished review into a to-do list — don't re-run it.”</div><div class="run">inspect results &lt;run&gt; --checklist &gt; CHECKLIST.md</div></div>
+        <div class="ex-row"><div class="say">“Too much running — hold everything, I'll resume later.”</div><div class="run">runs pause   →   runs resume</div></div>
       </div>
     </div>
   </section>

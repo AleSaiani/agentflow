@@ -18,6 +18,12 @@ for a template that wires most of them.)
   run when exceeded (status shows `paused`; the Stop hook won't resume). Record spend with `budget-add`.
 - **Manual pause**: `--stop-file <path>` — while the file exists, the run stops claiming and won't
   auto-resume. `touch` it to pause every worker; delete it to continue.
+- **Pause without a stop-file**: `/agentflow:runs stop <id>` pauses one job (and its subtree);
+  `/agentflow:runs pause` is the global stop button (the `.agentflow/PAUSED` sentinel) — freezes every
+  run at once. `runs resume [<id>]` reverts. All non-destructive; nothing is lost or redone.
+- **Many jobs, defined order**: `/agentflow:runs` lists jobs in scheduling order (priority, then FIFO);
+  `runs priority <id> N` reorders the queue. `runs clean [--older-than 7d|--failed|--all]` GCs finished
+  runs so `.agentflow/` doesn't grow without bound.
 - Watch spend live with `/agentflow:board` and `/agentflow:inspect budget <run-id>`.
 
 ## Human-in-the-loop — gate irreversible actions

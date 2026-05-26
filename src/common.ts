@@ -505,11 +505,13 @@ export function checkBudgetCaps(state: StateDict): [boolean, string | null] {
 }
 
 /**
- * A run is *paused* (not failed, not done) when its `config.stop_file` exists on disk, or a budget
- * cap is exceeded. The Stop hook skips paused runs (no auto-resume); `status` surfaces it. Remove the
- * stop-file / raise the cap to resume. Centralizes the pause contract across every primitive.
+ * A run is *paused* (not failed, not done) when it carries a manual `paused` flag, its
+ * `config.stop_file` exists on disk, or a budget cap is exceeded. The Stop hook skips paused runs
+ * (no auto-resume); `status` surfaces it. Clear the flag / remove the stop-file / raise the cap to
+ * resume. Centralizes the pause contract across every primitive.
  */
 export function isPaused(state: StateDict): [boolean, string | null] {
+  if (state["paused"] === true) return [true, "manually paused (resume with `runs resume <id>`)"];
   const stopFile = (state["config"] as StateDict | undefined)?.["stop_file"];
   if (stopFile && existsSync(String(stopFile))) return [true, `stop-file present: ${stopFile}`];
   return checkBudgetCaps(state);
@@ -525,6 +527,116 @@ export function parseBudgetCaps(values: Record<string, unknown>): Record<string,
   if (tokens !== undefined) caps["max_tokens"] = parseInt(String(tokens), 10);
   if (agents !== undefined) caps["max_agents"] = parseInt(String(agents), 10);
   return Object.keys(caps).length ? caps : null;
+}
+
+// ---------- multi-run control: global pause + top-level job resolution ----------
+//
+// The engine can run several top-level *jobs* at once — a job being a run the user launched
+// directly (a workflow/`pipe`, a `do`, or a standalone primitive). A `pipe` spawns child runs
+// (its stages) that live as their own state.json but are NOT independent jobs: they belong to the
+// parent pipeline. These helpers let the Stop hook schedule jobs in a defined order, and let the
+// `runs` command observe / pause at the job level. The parent↔child link lives only on the parent
+// (pipe `stages[].child_run_id`) — a child's `parent_run_id` is reserved but not populated — so
+// "is this a sub-run?" is answered by the inverse map built from every pipe's stages.
+
+/** Root of the runtime tree: `<workspace>/.agentflow`. Override via $AGENTFLOW_DIR (tests). */
+export function agentflowDir(): string {
+  const override = process.env["AGENTFLOW_DIR"];
+  if (override) return resolve(override);
+  return join(findWorkspaceRoot(), ".agentflow");
+}
+
+/** The global-pause sentinel. Its mere presence freezes ALL auto-continuation (the engine "stop
+ *  button"); absence = running. Default-absent, so it never changes pre-existing behavior. */
+export function globalPauseFile(): string {
+  return join(agentflowDir(), "PAUSED");
+}
+
+export function isGloballyPaused(): boolean {
+  return existsSync(globalPauseFile());
+}
+
+/** Create/remove the global-pause sentinel. Returns true if this call changed the state. */
+export function setGlobalPause(on: boolean): boolean {
+  const f = globalPauseFile();
+  const already = existsSync(f);
+  if (on) {
+    if (!already) {
+      mkdirSync(dirname(f), { recursive: true });
+      writeFileSync(f, `# Agent Flow is paused. Delete this file (or run \`runs resume\`) to resume.\npaused_at=${now()}\n`, "utf8");
+    }
+    return !already;
+  }
+  if (already) unlinkSync(f);
+  return already;
+}
+
+/** Best-effort state read; null on missing/corrupt (never throws or exits — for scanners). */
+export function tryLoadState(cmd: string, runId: string): StateDict | null {
+  const p = statePath(cmd, runId);
+  if (!existsSync(p)) return null;
+  try {
+    return JSON.parse(readFileSync(p, "utf8")) as StateDict;
+  } catch {
+    return null;
+  }
+}
+
+/** Split a `"<cmd>/<run_id>"` key. run_ids are directory names, so they never contain `/`. */
+export function splitRunKey(key: string): [string, string] {
+  const i = key.indexOf("/");
+  return i < 0 ? [key, ""] : [key.slice(0, i), key.slice(i + 1)];
+}
+
+/**
+ * Map of every pipe-stage child `"<cmd>/<run_id>"` → its parent `"pipe/<run_id>"`, gathered across
+ * all `pipe` runs (nested pipes included, since each lives in the pipe state dir and lists its own
+ * direct children). A run that appears as a KEY here is a sub-run, never a top-level job.
+ */
+export function childToParent(): Map<string, string> {
+  const map = new Map<string, string>();
+  const d = stateDir("pipe");
+  if (!existsSync(d)) return map;
+  for (const name of readdirSync(d)) {
+    const p = join(d, name, "state.json");
+    if (!existsSync(p)) continue;
+    let s: StateDict;
+    try {
+      s = JSON.parse(readFileSync(p, "utf8")) as StateDict;
+    } catch {
+      continue;
+    }
+    for (const st of (s["stages"] ?? []) as StateDict[]) {
+      const cc = st["child_cmd"];
+      const cr = st["child_run_id"];
+      if (cc && cr) map.set(`${cc}/${cr}`, `pipe/${name}`);
+    }
+  }
+  return map;
+}
+
+/** Walk the child→parent chain up to the top-level job key (`"<cmd>/<run_id>"`). */
+export function rootJobKey(cmd: string, runId: string, childMap: Map<string, string> = childToParent()): string {
+  let key = `${cmd}/${runId}`;
+  const seen = new Set<string>();
+  while (childMap.has(key) && !seen.has(key)) {
+    seen.add(key);
+    key = childMap.get(key) as string;
+  }
+  return key;
+}
+
+/** Every run across every registered primitive, as `"<cmd>/<run_id>"`. Requires the caller to have
+ *  imported the primitive modules (so PRIMITIVES is populated) — as the hook and `runs` both do. */
+export function allRunKeys(): string[] {
+  const out: string[] = [];
+  for (const cmd of PRIMITIVES.keys()) for (const id of listRuns(cmd)) out.push(`${cmd}/${id}`);
+  return out;
+}
+
+/** Just the top-level jobs (runs not referenced as any pipe's stage child). */
+export function topLevelRunKeys(childMap: Map<string, string> = childToParent()): string[] {
+  return allRunKeys().filter((k) => !childMap.has(k));
 }
 
 // ---------- cache: skip-if-unchanged for per-item primitives ----------

@@ -6,6 +6,15 @@
  * `auto_continue=true` and residual work, and emits `{"decision":"block","reason":"..."}` to
  * block turn termination — the continuity engine that carries loops across turns.
  *
+ * Scheduling (one run-step per turn): when several top-level jobs are in flight, they advance in a
+ * defined order — by priority (desc) then oldest-job-first (FIFO over the job's created_at), so a
+ * batch is processed predictably rather than alphabetically. Within a single job, a `pipe`'s
+ * children still advance before the parent (registry order is the tiebreaker). Round-robin
+ * fairness across jobs is deferred — FIFO runs the oldest job to completion first.
+ *
+ * Global pause: if the `.agentflow/PAUSED` sentinel exists, the hook does nothing (every run is
+ * frozen, state preserved). A single job is paused via its own `paused` flag / stop-file / cap.
+ *
  * Safety cap: per-run `auto_continues`, capped at `max_auto_continues`. Atomic pre-increment
  * guarantees the counter advances even if Claude makes no real progress next turn.
  *
@@ -16,7 +25,20 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { PRIMITIVES, type ResidualWork, isPaused, saveAtomic, stateDir } from "../common.js";
+import {
+  PRIMITIVES,
+  type PrimitiveSpec,
+  type ResidualWork,
+  type StateDict,
+  childToParent,
+  isGloballyPaused,
+  isPaused,
+  rootJobKey,
+  saveAtomic,
+  splitRunKey,
+  stateDir,
+  tryLoadState,
+} from "../common.js";
 
 // Import every state module so they self-register into PRIMITIVES.
 // Order matters: /pipe yields to its primitive children, so children must come FIRST
@@ -30,17 +52,50 @@ import "../state/queue.js";
 import "../state/step.js";
 import "../state/pipe.js";
 
+interface Candidate {
+  cmd: string;
+  name: string;
+  sp: string;
+  state: StateDict;
+  spec: PrimitiveSpec;
+  residual: ResidualWork;
+  priority: number;
+  createdAt: string;
+  reg: number;
+}
+
 function findActiveRun(): [string, string, string] | null {
+  // Global pause: the engine "stop button" — freeze ALL auto-continuation, state preserved.
+  if (isGloballyPaused()) return null;
+
+  const childMap = childToParent();
+  // Registry order = the import order below (children-first; `pipe` last). Used only as the
+  // within-job tiebreaker so a pipe never sorts ahead of its own children.
+  const order = [...PRIMITIVES.keys()];
+  const regIndex = (cmd: string): number => {
+    const i = order.indexOf(cmd);
+    return i < 0 ? 999 : i;
+  };
+  const rootCache = new Map<string, StateDict | null>();
+  const rootState = (key: string): StateDict | null => {
+    if (!rootCache.has(key)) {
+      const [c, r] = splitRunKey(key);
+      rootCache.set(key, tryLoadState(c, r));
+    }
+    return rootCache.get(key) ?? null;
+  };
+
+  const candidates: Candidate[] = [];
   for (const [cmd, spec] of PRIMITIVES) {
     const d = stateDir(cmd);
     if (!existsSync(d)) continue;
 
-    for (const name of readdirSync(d).sort()) {
+    for (const name of readdirSync(d)) {
       const sp = join(d, name, "state.json");
       if (!existsSync(sp)) continue;
-      let state: Record<string, any>;
+      let state: StateDict;
       try {
-        state = JSON.parse(readFileSync(sp, "utf8"));
+        state = JSON.parse(readFileSync(sp, "utf8")) as StateDict;
       } catch {
         continue;
       }
@@ -51,21 +106,41 @@ function findActiveRun(): [string, string, string] | null {
       const cap = config["max_auto_continues"] ?? 20;
       if ((state["auto_continues"] ?? 0) >= cap) continue;
 
-      // Paused (stop-file present or budget cap exceeded) → do not auto-resume.
+      // Paused itself (manual flag, stop-file, or budget cap) → do not auto-resume.
       if (isPaused(state)[0]) continue;
 
       const residual: ResidualWork | null = spec.hasResidualWork(state);
       if (residual === null) continue;
 
-      // Atomic pre-increment: ensures the cap advances even if Claude makes no real
-      // progress in the following turn.
-      state["auto_continues"] = (state["auto_continues"] ?? 0) + 1;
-      saveAtomic(sp, state);
+      // Resolve the top-level job. Pausing a job pauses its whole subtree: skip a child whose
+      // root job is paused. Scheduling keys (priority, created_at) come from the job, not the
+      // sub-run, so a pipeline advances as one unit in FIFO order.
+      const root = rootState(rootJobKey(cmd, name, childMap));
+      if (root && isPaused(root)[0]) continue;
+      const keyed = root ?? state;
+      const priority = Number(keyed["priority"] ?? keyed["config"]?.priority ?? 0) || 0;
+      const createdAt = String(keyed["created_at"] ?? state["created_at"] ?? "");
 
-      return [cmd, name, spec.resumeMsg(name, residual)];
+      candidates.push({ cmd, name, sp, state, spec, residual, priority, createdAt, reg: regIndex(cmd) });
     }
   }
-  return null;
+  if (candidates.length === 0) return null;
+
+  // Higher priority first, then oldest job first (FIFO), then children before their parent pipe
+  // (registry order), then run-id — a total, deterministic order.
+  candidates.sort(
+    (a, b) =>
+      b.priority - a.priority ||
+      a.createdAt.localeCompare(b.createdAt) ||
+      a.reg - b.reg ||
+      a.name.localeCompare(b.name),
+  );
+
+  const win = candidates[0] as Candidate;
+  // Atomic pre-increment: ensures the cap advances even if Claude makes no real progress next turn.
+  win.state["auto_continues"] = (win.state["auto_continues"] ?? 0) + 1;
+  saveAtomic(win.sp, win.state);
+  return [win.cmd, win.name, win.spec.resumeMsg(win.name, win.residual)];
 }
 
 /** Drain stdin (the hook payload) so the caller's write side never blocks. */

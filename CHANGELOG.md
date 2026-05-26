@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`/agentflow:runs`** — the run **control panel** (read *and* write, complementing read-only
+  `board`/`inspect`). A *job* is a top-level run (workflow/`pipe`, `do`, standalone primitive); a `pipe`'s
+  stage sub-runs are managed with their parent.
+  - `runs [list] [--all] [--json]` — top-level jobs in **scheduling order** (the `POS` column = the queue
+    the Stop hook walks).
+  - `runs pause` / `runs resume` — **global** stop button (the `.agentflow/PAUSED` sentinel): while present,
+    the Stop hook auto-resumes nothing.
+  - `runs stop <id>` / `runs resume <id>` — pause/resume **one** job (and its subtree) via a `paused` flag;
+    other jobs keep advancing. Non-destructive (state preserved).
+  - `runs priority <id> <n>` — set scheduling priority (default 0; higher runs sooner).
+  - `runs rm <id> [--force]` — delete a run + subtree (refuses an active job / a running pipe's child
+    unless `--force`); `runs clean [--failed|--all] [--older-than 7d] [--dry-run]` — GC **finished** jobs
+    only (never a running job's children).
+- **Deterministic multi-run scheduling.** The Stop hook now advances concurrent top-level jobs in a
+  defined order — **priority desc, then oldest-job-first (FIFO over the job's `created_at`)** — instead of
+  alphabetically. One run-step per turn; a `pipe`'s children still advance before the parent (round-robin
+  fairness is intentionally deferred). Pausing a job pauses its whole subtree.
+
 ## [1.0.0-beta.2] - 2026-05-25
 
 ### Added

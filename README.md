@@ -174,6 +174,7 @@ are **building blocks** the engine composes for you, kept out of the `/` menu so
 | `checklist` | Run a repeatable `- [ ]` to-do list — tick items, write back, resume only the open ones |
 | `audit` | Shipped recipe: discover → review each → group → executive digest |
 | `workflows` · `board` · `inspect` | Observe: workflow catalog · live dashboard · a run's detail/tree/budget — plus `inspect results <run>` (reuse a finished run) and `pipe progress <run>` (where you are) |
+| `runs` | Control: list jobs in scheduling order, pause/resume one job or the whole engine, set priority, delete or clean up finished runs |
 
 **Building blocks** — composed by the engine, hidden from the `/` menu (`user-invocable: false`) but
 still scriptable via their CLIs: the FP vocabulary `enumerate` · `foreach` · `reduce` · `group` ·
@@ -191,6 +192,10 @@ redone:
 - **Steer it live** — create the `--stop-file` to pause at the next chunk (delete to resume); `--max-usd`
   pauses at a cost cap; `Esc` interrupts and the state is on disk. `pipe progress <run>` shows stage %,
   the current phase + item countdown, cumulative agents/$, and what's next.
+- **Run many, in order** — when several jobs are in flight, `runs` shows the queue (priority, then
+  oldest-first) and lets you steer it: `runs pause`/`resume` is the global stop button, `runs stop <id>`
+  pauses just one job, `runs priority <id> N` bumps it up. `runs clean` GCs finished runs so the workspace
+  stays tidy. (Pausing is non-destructive — state is kept and the run picks up where it left off.)
 - **Reuse a finished run without re-running** — every result is persisted; `inspect results <run> --json`
   (or `--checklist`) operates on the saved items deterministically, so nothing is dropped.
 
@@ -240,7 +245,7 @@ npm run build && npm test`) and the PR workflow. Security reports go through the
 
 `1.0.0-beta.2`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation, stage
 retry/timeout, approval gate, on-failure), `queue`/`mailbox`/`step`, inspect/board, and the hooks
-(cross-turn resume + preserve-chat) are implemented and covered by an automated suite (**86 tests**, run
+(cross-turn resume + preserve-chat) are implemented and covered by an automated suite (**94 tests**, run
 in CI) including a simulated cross-turn loop. The recommended final check before production is a **live
 multi-turn Claude Code session smoke test**. Roadmap and deferred items live in [CHANGELOG.md](CHANGELOG.md).
 
