@@ -84,7 +84,7 @@ ${sections}
 const stamp = new Date().toISOString().slice(0, 10);
 const outPath = resolve(process.env.SECDOM_REPORT_OUT || `./security-report-${domain.replace(/[^a-z0-9.-]/gi, "_")}-${stamp}.html`);
 writeFileSync(outPath, html, "utf8");
-const summaryPath = outPath.replace(/\.html$/, ".summary.json");
+const summaryPath = (outPath.endsWith(".html") ? outPath.slice(0, -5) : outPath) + ".summary.json";
 writeFileSync(summaryPath, JSON.stringify({ domain, generated_at: new Date().toISOString(), verdict, score, counts: byStatus, fails_critical: failsCritical, fails_major: failsMajor, report_html: outPath, results }, null, 2), "utf8");
 process.stdout.write(JSON.stringify({ domain, verdict, score, counts: byStatus, gaps_backfilled: gaps, report_html: outPath, summary_json: summaryPath }, null, 2));
 if (results.length !== checklist.checks.length) { process.stderr.write(`\nreport: integrity error\n`); process.exit(1); }

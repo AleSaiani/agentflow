@@ -301,7 +301,7 @@
         <h2>You say it in plain language → Agent Flow runs it.</h2>
       </div>
       <div class="ex reveal">
-        <div class="ex-row"><div class="say">“Audit <code>src</code> for bugs and give me a report.”</div><div class="run">/agentflow:audit --target src --file-glob "**/*.cs"</div></div>
+        <div class="ex-row"><div class="say">“Audit <code>src</code> for bugs and give me a report.”</div><div class="run">run-workflow workflows/audit/WORKFLOW.md --param target=src</div></div>
         <div class="ex-row"><div class="say">“Draft every chapter of this outline.”</div><div class="run">enumerate outline → foreach draft → reduce stitch</div></div>
         <div class="ex-row"><div class="say">“Keep fixing the build until it passes.”</div><div class="run">/agentflow:until --stage "npm run build" --stop "npm run build"</div></div>
         <div class="ex-row"><div class="say">“Chew through this list from 3 terminals.”</div><div class="run">/agentflow:queue --items work.json --prompt "…"  (×3)</div></div>

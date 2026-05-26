@@ -11,9 +11,11 @@ description: |
 
   DON'T use for a few named files (read them inline), exploratory questions ("what does this do?"), or
   generic per-item work that isn't a code review (→ /agentflow:foreach).
-  Explicit invocation (`/agentflow:audit …`) skips these checks.
+  Not a `/`-menu command — it's the shipped `workflows/audit/` recipe: reach it by asking ("audit src
+  for bugs"), or run it directly with `/agentflow:run-workflow workflows/audit/WORKFLOW.md`.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
-argument-hint: --target <path> [--file-glob "**/*.cs"] [--review-model haiku|sonnet|opus] [--group-depth N] [--digest-model opus|sonnet|haiku] [--run-id NAME]
+argument-hint: --target <path> [--file-glob "**/*.cs"] [--exclude <globs>] [--run-id NAME]
+user-invocable: false
 ---
 
 # /agentflow:audit
@@ -60,8 +62,8 @@ Per-invocation inputs are **declared params**, passed to `init` with `--param` (
 - `exclude` (default empty) — comma-separated exclude globs
 
 To tune the review/digest models or group depth, copy the whole `workflows/audit/` folder into your
-project's `workflows/` and edit the `--model` / `--method-config` values; pass that copy's
-`workflow.json` to `--workflow`.
+project's `workflows/` and edit the `--model` / `--method-config` values in its `WORKFLOW.md`; pass that
+copy's `WORKFLOW.md` to `--workflow`.
 
 ## Step 3 — (the pipeline is the workflow-file)
 

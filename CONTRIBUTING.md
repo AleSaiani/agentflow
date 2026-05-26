@@ -15,6 +15,10 @@ npm test           # tsc + node --test over test/**
 npm run validate   # claude plugin validate .
 ```
 
+> **Windows:** run these in **Git Bash**. In PowerShell the `npm` shim (`npm.ps1`) is often blocked by
+> the execution policy — use `npm.cmd test` / `cmd /c npm test`, or just switch to Git Bash (already a
+> requirement, since shell stages run under bash).
+
 To try it live, point Claude Code at your clone:
 
 ```shell

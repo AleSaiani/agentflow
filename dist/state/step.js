@@ -250,6 +250,28 @@ function resumeMsg(runId, _work) {
         `inline (main), then \`step complete ${runId} (--output "<text>" | --output-path <file>)\`.`);
 }
 const PRIM = new Primitive(CMD, { isDone, hasResidualWork, resumeMsg, resultPointer: (s) => (s["result_pointer"] ?? null) });
+function cmdBudgetAdd(args) {
+    const { values, positionals } = parseArgs({
+        args, allowPositionals: true, strict: true,
+        options: {
+            tokens: { type: "string", default: "0" },
+            usd: { type: "string" },
+            "event-type": { type: "string", default: "agent_dispatch" },
+            model: { type: "string" },
+            meta: { type: "string" },
+        },
+    });
+    const runId = positionals[0];
+    if (!runId)
+        die("error: budget-add requires a run_id");
+    PRIM.cliBudgetAdd(runId, {
+        tokens: parseInt(values["tokens"], 10),
+        usd: values["usd"] !== undefined ? parseFloat(values["usd"]) : null,
+        eventType: values["event-type"],
+        model: values["model"] ?? null,
+        metaJson: values["meta"] ?? null,
+    });
+}
 function main(argv) {
     const [sub, ...rest] = argv;
     if (isHelp(sub))
@@ -270,7 +292,7 @@ function main(argv) {
         case "runs":
             return PRIM.cliRuns();
         case "budget-add":
-            return PRIM.cliBudgetAdd(rest[0] ?? "", {});
+            return cmdBudgetAdd(rest);
         case "increment-continues":
             return PRIM.cliIncrementContinues(rest[0] ?? "");
         default:

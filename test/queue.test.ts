@@ -87,3 +87,16 @@ test("queue: --stop-file pauses claiming; reclaim returns stale claims; add enqu
   assert.equal(run(dir, ["add", "q2", "--items", more]).added, 1);
   assert.equal(run(dir, ["status", "q2"]).pending, 3);
 });
+
+test("queue: budget-add records the --tokens/--usd/--event-type flags (not a silent no-op)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "queue-"));
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }]), "utf8");
+  run(dir, ["init", "qb", "--items", items, "--prompt", "x"]);
+
+  // A non-"agent_dispatch" event must still record cost but NOT bump the agent counter.
+  const r = run(dir, ["budget-add", "qb", "--tokens", "100", "--usd", "1", "--event-type", "custom"]);
+  assert.equal(r.tokens_used, 100);
+  assert.equal(r.usd_estimate, 1);
+  assert.equal(r.agents_dispatched, 0);
+});

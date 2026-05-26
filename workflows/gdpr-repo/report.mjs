@@ -161,7 +161,7 @@ const stamp = new Date().toISOString().slice(0, 10);
 const outPath = resolve(process.env.GDPR_REPORT_OUT || `./gdpr-repo-report-${repoName.replace(/[^a-z0-9.-]/gi, "_")}-${stamp}.html`);
 writeFileSync(outPath, html, "utf8");
 const summary = { repo: repoName, repo_dir: repoDir, generated_at: new Date().toISOString(), verdict, score, counts: byStatus, fails_critical: failsCritical, fails_major: failsMajor, report_html: outPath, results };
-const summaryPath = outPath.replace(/\.html$/, ".summary.json");
+const summaryPath = (outPath.endsWith(".html") ? outPath.slice(0, -5) : outPath) + ".summary.json";
 writeFileSync(summaryPath, JSON.stringify(summary, null, 2), "utf8");
 
 process.stdout.write(JSON.stringify({ repo: repoName, verdict, score, counts: byStatus, gaps_backfilled: gaps, report_html: outPath, summary_json: summaryPath }, null, 2));

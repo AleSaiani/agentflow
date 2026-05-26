@@ -148,14 +148,14 @@ Described in plain language (left) → what Agent Flow runs (right). Full versio
 
 | You say | It runs |
 |---|---|
-| "Audit `src` for bugs and give me a report." | `/agentflow:audit --target src --file-glob "**/*.cs"` |
+| "Audit `src` for bugs and give me a report." | `/agentflow:run-workflow workflows/audit/WORKFLOW.md --param target=src --param glob="**/*.cs"` |
 | "Draft every chapter of this outline." | `enumerate` outline → chapters · `foreach` draft each · `reduce` stitch |
 | "Work through every task file in `tasks/`." | `/agentflow:foreach --folder tasks --prompt "Do the task in this file"` (file kanban) |
 | "Keep fixing the build until it passes." | `/agentflow:until --stage "npm run build" --stop "npm run build"` |
 | "Chew through this list from 3 terminals." | `/agentflow:queue --items work.json --prompt "…"` in each terminal |
 | "Have a second model critique the draft, loop until solid." | two `/agentflow:step` (different `--model`) inside `/agentflow:until` |
 | "Review the diff; only deploy if it's safe." | a `step` emits `{blocking}` → `fork` routes to `ship` or `fix` |
-| "Audit `src`, but stop if it passes $5." | `/agentflow:audit …` with `--max-usd 5` (pauses at the cap) |
+| "Audit `src`, but stop if it passes $5." | `/agentflow:run-workflow workflows/audit/WORKFLOW.md --param target=src --max-usd 5` (pauses at the cap) |
 | "Turn that finished review into a to-do list — don't re-run it." | `inspect results <run> --checklist > CHECKLIST.md` → `/agentflow:checklist` |
 
 ## Commands
@@ -172,7 +172,6 @@ are **building blocks** the engine composes for you, kept out of the `/` menu so
 | `create-workflow` | Author a reusable `WORKFLOW.md` (validates + previews) |
 | `run-workflow` | Run a workflow end to end (`--dry-run`, `--param k=v`); echoes a progress block each turn |
 | `checklist` | Run a repeatable `- [ ]` to-do list — tick items, write back, resume only the open ones |
-| `audit` | Shipped recipe: discover → review each → group → executive digest |
 | `workflows` · `board` · `inspect` | Observe: workflow catalog · live dashboard · a run's detail/tree/budget — plus `inspect results <run>` (reuse a finished run) and `pipe progress <run>` (where you are) |
 | `runs` | Control: list jobs in scheduling order, pause/resume one job or the whole engine, set priority, delete or clean up finished runs |
 
@@ -181,6 +180,10 @@ still scriptable via their CLIs: the FP vocabulary `enumerate` · `foreach` · `
 `repeat`/`until`/`while` · `step` · `pipe`, plus `queue` (lock-free shared queue), `mailbox` (directed
 cross-instance messages), `notify` (webhook/desktop), `history`. Sources are pluggable everywhere — a
 folder, a markdown checklist (`- [ ] task {model:opus}`), a JSON list, or another run's output.
+
+**Shipped workflows** — ready-to-run recipes under `workflows/`: `audit` (code review → digest),
+`gdpr-domain`/`gdpr-repo`, `security-domain`/`security-repo`/`security-pack`, `release-gate`. List them
+with `/agentflow:workflows`; run one with `/agentflow:run-workflow workflows/<name>/WORKFLOW.md`.
 
 ## Controlling & reusing a run
 

@@ -14,6 +14,7 @@ import { join, relative, sep } from "node:path";
 import { parseArgs } from "node:util";
 
 import { PRIMITIVES, type StateDict, die, isHelp, printUsage, findWorkspaceRoot, getPrimitive, loadState, print, stateDir, statePath } from "./common.js";
+import { parseWorkflowMd } from "./workflow_md.js";
 
 // Ensure every primitive self-registers.
 import "./state/enumerate.js";
@@ -426,6 +427,18 @@ function cmdWorkflows(args: string[]): void {
           entry["params"] = wf.params && typeof wf.params === "object" ? Object.keys(wf.params) : [];
         } catch {
           entry["error"] = "malformed workflow.json";
+        }
+      } else if (mdPath) {
+        // Most shipped/authored workflows are WORKFLOW.md only — parse the same metadata the
+        // catalog promises (stage count, params, description) straight from the markdown.
+        try {
+          const wf = parseWorkflowMd(readFileSync(mdPath, "utf8"));
+          if (typeof wf["name"] === "string") entry["name"] = wf["name"];
+          entry["description"] = typeof wf["description"] === "string" ? wf["description"] : "";
+          entry["stages"] = Array.isArray(wf["stages"]) ? (wf["stages"] as unknown[]).length : 0;
+          entry["params"] = wf["params"] && typeof wf["params"] === "object" ? Object.keys(wf["params"] as object) : [];
+        } catch {
+          entry["error"] = "malformed WORKFLOW.md";
         }
       }
       found.push(entry);

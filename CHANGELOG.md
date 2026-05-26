@@ -26,6 +26,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alphabetically. One run-step per turn; a `pipe`'s children still advance before the parent (round-robin
   fairness is intentionally deferred). Pausing a job pauses its whole subtree.
 
+### Changed
+- **`/agentflow:workflows` now reads metadata from `WORKFLOW.md`**, not just `workflow.json` — the catalog
+  shows stage count, declared params, and description for every shipped/authored workflow (previously
+  md-only workflows listed just name/format/path).
+- **`audit` is no longer a `/`-menu command** — it is the shipped `workflows/audit/` recipe, like the
+  other shipped workflows. Reach it by asking ("audit src for bugs") or run it explicitly with
+  `/agentflow:run-workflow workflows/audit/WORKFLOW.md --param target=…`. Its skill is now
+  `user-invocable: false` (still model-invocable); the over-advertised `--review-model`/`--group-depth`/
+  `--digest-model` flags (never wired) were removed from its hint.
+
+### Fixed
+- **`budget-add` ignored its flags for `step` and `queue`** — both called the recorder with no options, so
+  `--tokens`/`--usd`/`--event-type`/`--model`/`--meta` were dropped (telemetry recorded 0, and token/USD
+  caps never tripped for queue runs). Both now parse the flags like every other primitive.
+- **Report writers could overwrite the HTML report.** When `report_out` lacked a `.html` suffix, the
+  `.summary.json` path was derived by a no-op `.replace(/\.html$/, …)` and collided with the HTML file.
+  `security-repo`/`security-domain`/`gdpr-repo`/`gdpr-domain` now derive a distinct summary path for any suffix.
+- Docs: `audit` skill pointed at a non-existent `workflow.json` for the copy-and-tune path (it ships as
+  `WORKFLOW.md`); `CONTRIBUTING.md` now notes the Windows/PowerShell `npm` shim caveat (use Git Bash / `npm.cmd`).
+
 ## [1.0.0-beta.2] - 2026-05-25
 
 ### Added
