@@ -1,0 +1,13 @@
+{
+  "lens": "java",
+  "override": false,
+  "rules": [
+    { "id": "java-try-with-resources", "severity": "major", "guidance": "Use try-with-resources for `AutoCloseable` (streams, connections) so they close on every path." },
+    { "id": "java-npe", "severity": "minor", "guidance": "Guard against NPE: prefer `Optional`/null checks; don't return null collections (return empty)." },
+    { "id": "java-catch-generic", "severity": "minor", "guidance": "Don't catch `Exception`/`Throwable` broadly and swallow; catch specific types or rethrow with context." },
+    { "id": "java-string-concat-loop", "severity": "minor", "guidance": "Use `StringBuilder` for string building in loops, not `+`." },
+    { "id": "java-equals-hashcode", "severity": "minor", "guidance": "Override `equals` and `hashCode` together; use `Objects.equals/hash`." },
+    { "id": "java-sql-injection", "severity": "critical", "guidance": "Use `PreparedStatement` with bind params; never concatenate untrusted input into SQL." },
+    { "id": "java-mutable-exposure", "severity": "minor", "guidance": "Don't expose internal mutable collections/arrays directly; return copies or unmodifiable views." }
+  ]
+}

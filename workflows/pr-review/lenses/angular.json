@@ -1,0 +1,13 @@
+{
+  "lens": "angular",
+  "override": false,
+  "rules": [
+    { "id": "ng-unsub", "severity": "major", "guidance": "Unsubscribe from manual subscriptions (takeUntil/async pipe/DestroyRef) — leaked subscriptions cause memory leaks and duplicate work." },
+    { "id": "ng-onpush", "severity": "minor", "guidance": "Prefer `ChangeDetectionStrategy.OnPush` for components with immutable inputs; avoid heavy work in templates/getters re-run each CD cycle." },
+    { "id": "ng-no-dom", "severity": "major", "guidance": "Don't touch the DOM directly (`document`, `nativeElement`); use Renderer2/bindings so it stays SSR-safe and testable." },
+    { "id": "ng-bypass-security", "severity": "major", "guidance": "`bypassSecurityTrust*` on untrusted content is an XSS sink; sanitize instead." },
+    { "id": "ng-no-logic-in-template", "severity": "minor", "guidance": "Keep complex logic/function calls out of templates (they run every change-detection); precompute in the component." },
+    { "id": "ng-typed-forms", "severity": "info", "guidance": "Use typed reactive forms and avoid `any` in form models." },
+    { "id": "ng-standalone-di", "severity": "minor", "guidance": "Provide services at the right scope (`providedIn`); avoid re-providing a singleton service per component unintentionally." }
+  ]
+}

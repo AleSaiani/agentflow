@@ -53,6 +53,23 @@ for (const area of [...byArea.keys()].sort()) {
 }
 writeFileSync(join(outDir, "index.md"), idx.join("\n"), "utf8");
 
+// ---- graph export: the LLM-derived relations as a deterministic graph (the graph-DB seed / v2) ----
+// Three portable formats from the same nodes+edges: graph.json, Graphviz .dot, Neo4j Cypher.
+const nodes = items.map((it) => ({ id: it.id, kind: it.data.kind, area: it.data.area }));
+const edges = relations.map((e) => ({ from: e.from ?? "?", to: e.to ?? "?", kind: e.kind ?? "related-to" }));
+writeFileSync(join(outDir, "graph.json"), JSON.stringify({ nodes, edges }, null, 2), "utf8");
+const dq = (s) => '"' + String(s).replace(/"/g, '\\"') + '"';
+const dot = ["digraph knowledge {", "  rankdir=LR; node [shape=box, style=rounded];"];
+for (const n of nodes) dot.push(`  ${dq(n.id)} [label=${dq(n.id + "\\n(" + n.kind + ")")}];`);
+for (const e of edges) dot.push(`  ${dq(e.from)} -> ${dq(e.to)} [label=${dq(e.kind)}];`);
+dot.push("}");
+writeFileSync(join(outDir, "graph.dot"), dot.join("\n") + "\n", "utf8");
+const sq = (s) => "'" + String(s).replace(/'/g, "\\'") + "'";
+const relType = (k) => String(k).toUpperCase().replace(/[^A-Z0-9]+/g, "_") || "RELATED_TO";
+const cy = nodes.map((n) => `MERGE (n:Entity {id:${sq(n.id)}}) SET n.kind=${sq(n.kind)}, n.area=${sq(n.area)};`);
+for (const e of edges) cy.push(`MATCH (a:Entity {id:${sq(e.from)}}),(b:Entity {id:${sq(e.to)}}) MERGE (a)-[:${relType(e.kind)}]->(b);`);
+writeFileSync(join(outDir, "graph.cypher"), cy.join("\n") + "\n", "utf8");
+
 // ---- manifest (advance the reference) ----
 // In update mode, merge: keep manifest entries not re-documented this run, overwrite the ones that were.
 let prior = [];
@@ -69,4 +86,4 @@ for (const [k, v] of nowDocumented) merged.set(k, v);
 const manifest = { ref: cfg.ref, generated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), mode: cfg.mode, out_dir: outDir, entities: [...merged.values()] };
 writeFileSync(cfg.manifest_path, JSON.stringify(manifest, null, 2), "utf8");
 
-process.stdout.write(JSON.stringify({ index: join(outDir, "index.md").split("\\").join("/"), entities: items.length, relations: relations.length, manifest: cfg.manifest_path, ref: cfg.ref }, null, 2));
+process.stdout.write(JSON.stringify({ index: join(outDir, "index.md").split("\\").join("/"), entities: items.length, relations: relations.length, graph: { nodes: nodes.length, edges: edges.length, formats: ["graph.json", "graph.dot", "graph.cypher"] }, manifest: cfg.manifest_path, ref: cfg.ref }, null, 2));

@@ -1,0 +1,13 @@
+{
+  "lens": "node",
+  "override": false,
+  "rules": [
+    { "id": "node-sync-in-async", "severity": "major", "guidance": "Don't use blocking `*Sync` fs/crypto calls on a hot/request path; use the async APIs so the event loop isn't stalled." },
+    { "id": "node-unhandled-rejection", "severity": "major", "guidance": "Every Promise / async call is awaited or has a `.catch`; an unhandled rejection can crash the process." },
+    { "id": "node-error-first-cb", "severity": "minor", "guidance": "Honor error-first callbacks / propagate errors; don't swallow the `err` argument." },
+    { "id": "node-stream-backpressure", "severity": "minor", "guidance": "Respect stream backpressure (use `pipeline`/await `write` drain) instead of buffering unbounded data in memory." },
+    { "id": "node-path-traversal", "severity": "major", "guidance": "Join user input into a path only after validating it stays within the intended root (path traversal)." },
+    { "id": "node-env-config", "severity": "info", "guidance": "Read config/secrets from env or a secret store, not hardcoded; validate required env at startup." },
+    { "id": "node-no-process-exit", "severity": "minor", "guidance": "Avoid `process.exit()` in library/request code — it truncates pending I/O; throw or return instead." }
+  ]
+}

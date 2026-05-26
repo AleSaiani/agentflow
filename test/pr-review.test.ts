@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-import { resolveLens, detectStack, SEVERITY_RANK } from "../workflows/pr-review/lenses.mjs";
+import { resolveLens, detectStack, refineStack, SEVERITY_RANK } from "../workflows/pr-review/lenses.mjs";
 
 const WF = resolve("workflows/pr-review");
 const DISCOVER = join(WF, "discover.mjs");
@@ -63,16 +63,22 @@ test("lens cascade: additive merge by id + per-id override + whole-lens override
   assert.deepEqual(replaced.map((r: any) => r.id), ["z"]);
 });
 
-test("detectStack maps extensions; unknown → null", () => {
+test("detectStack maps extensions; refineStack disambiguates JS/TS family by content", () => {
   assert.equal(detectStack("src/Foo.cs"), "csharp");
   assert.equal(detectStack("a/b.tsx"), "typescript-react");
   assert.equal(detectStack("x.py"), "python");
+  assert.equal(detectStack("svc.ts"), "node"); // plain TS defaults to node, refined by content
   assert.equal(detectStack("README.md"), null);
   assert.ok(SEVERITY_RANK.critical > SEVERITY_RANK.major && SEVERITY_RANK.major > SEVERITY_RANK.minor);
+
+  assert.equal(refineStack("node", "import { Component } from '@angular/core';"), "angular");
+  assert.equal(refineStack("node", "import React from 'react';"), "typescript-react");
+  assert.equal(refineStack("node", "import { readFileSync } from 'node:fs';"), "node"); // plain node
+  assert.equal(refineStack("csharp", "anything"), "csharp"); // non-JS/TS untouched
 });
 
 test("shipped lenses are valid JSON with id+severity+guidance rules", () => {
-  for (const key of ["csharp", "typescript-react", "security"]) {
+  for (const key of ["csharp", "typescript-react", "security", "node", "angular", "python", "go", "java"]) {
     const j = JSON.parse(readFileSync(join(WF, "lenses", `${key}.json`), "utf8"));
     assert.ok(Array.isArray(j.rules) && j.rules.length > 0, `${key} has rules`);
     for (const r of j.rules) {

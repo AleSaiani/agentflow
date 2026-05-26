@@ -1,0 +1,13 @@
+{
+  "lens": "go",
+  "override": false,
+  "rules": [
+    { "id": "go-err-ignored", "severity": "major", "guidance": "Don't ignore returned errors (`_ =` or unchecked); handle or wrap with context (`fmt.Errorf(\"...: %w\", err)`)." },
+    { "id": "go-defer-close", "severity": "major", "guidance": "`defer` Close/Unlock right after acquiring a resource so it's released on every return path; check the deferred Close error where it matters." },
+    { "id": "go-context", "severity": "minor", "guidance": "Plumb `context.Context` through I/O calls for cancellation/timeouts; don't store a Context in a struct." },
+    { "id": "go-goroutine-leak", "severity": "major", "guidance": "Every goroutine has a clear exit (context/done channel); a goroutine blocked on a channel forever is a leak." },
+    { "id": "go-loopvar-capture", "severity": "minor", "guidance": "Be careful capturing the loop variable in a goroutine/closure (pre-1.22 semantics); capture a copy." },
+    { "id": "go-data-race", "severity": "major", "guidance": "Shared mutable state across goroutines needs a mutex or channels; flag obvious unsynchronized access." },
+    { "id": "go-nil-map-write", "severity": "minor", "guidance": "Writing to a nil map panics — initialize with `make` before writing." }
+  ]
+}

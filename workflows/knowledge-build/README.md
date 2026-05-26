@@ -31,12 +31,13 @@ relations (all structured + written to disk); **code** guarantees coverage and d
 index.md          architecture map + entity index (links)
 schema.json       the LLM-proposed doc schema for this repo
 entities.json     the materialized entity census
-relations.md / .json   the relationship graph (json = graph-DB seed)
+relations.md / .json   the relationship graph (human + machine)
+graph.json / .dot / .cypher   the graph in three portable formats (Graphviz, Neo4j) — the graph-DB seed
 manifest.json     ref commit + per-entity hashes + doc paths (drives update)
 <area>/<entity>.md     one structured doc per entity
 ```
 
 ## Roadmap
-- v2: export `relations.json` + the docs into a **graph DB**.
+- v2: import `graph.cypher` / `graph.json` into a **graph DB** and query the knowledge graph.
 - Feeds **Dreaming** — an idle/autonomous agent reads this md tree to answer questions, flag drift, and
   propose work without re-scanning the repo.

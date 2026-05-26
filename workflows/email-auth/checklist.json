@@ -1,0 +1,15 @@
+{
+  "standard": "Email authentication best practice (RFC 7208 SPF · RFC 7489 DMARC · RFC 8461 MTA-STS · RFC 8460 TLS-RPT · RFC 6376 DKIM · BIMI)",
+  "checks": [
+    { "id": "spf-present", "title": "SPF record published", "severity": "major" },
+    { "id": "spf-hardfail", "title": "SPF ends with a hard/soft fail (not +all)", "severity": "major" },
+    { "id": "dmarc-present", "title": "DMARC record published", "severity": "major" },
+    { "id": "dmarc-enforced", "title": "DMARC policy enforced (quarantine or reject, not none)", "severity": "major" },
+    { "id": "dmarc-rua", "title": "DMARC aggregate reporting (rua) configured", "severity": "minor" },
+    { "id": "mx-present", "title": "MX records present", "severity": "info" },
+    { "id": "dkim-selector", "title": "At least one DKIM selector resolves", "severity": "major" },
+    { "id": "mta-sts", "title": "MTA-STS published (enforced TLS for inbound mail)", "severity": "minor" },
+    { "id": "tls-rpt", "title": "TLS reporting (TLS-RPT) configured", "severity": "info" },
+    { "id": "bimi", "title": "BIMI record published", "severity": "info" }
+  ]
+}

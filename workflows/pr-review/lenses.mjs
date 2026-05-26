@@ -23,16 +23,18 @@ export const SEVERITY_RANK = { info: 0, minor: 1, major: 2, critical: 3 };
 // step, not here). Unknown extensions get no stack lens — only `security` + team rules apply.
 const EXT_STACK = {
   ".cs": "csharp",
-  ".ts": "typescript-react",
   ".tsx": "typescript-react",
   ".jsx": "typescript-react",
+  ".ts": "node", // refined to typescript-react/angular by content (see refineStack)
   ".js": "node",
   ".mjs": "node",
   ".cjs": "node",
+  ".vue": "node",
+  ".svelte": "node",
   ".py": "python",
   ".go": "go",
-  ".rb": "ruby",
   ".java": "java",
+  ".rb": "ruby",
   ".kt": "kotlin",
   ".rs": "rust",
   ".php": "php",
@@ -40,6 +42,15 @@ const EXT_STACK = {
 
 export function detectStack(relPath) {
   return EXT_STACK[extname(relPath).toLowerCase()] ?? null;
+}
+
+/** Refine an ambiguous JS/TS-family stack by sniffing the file head: Angular vs React vs plain Node. */
+export function refineStack(base, head) {
+  if (base !== "node" && base !== "typescript-react") return base;
+  if (typeof head !== "string") return base;
+  if (/['"]@angular\//.test(head)) return "angular";
+  if (/from\s+['"]react['"]|require\(\s*['"]react['"]\s*\)|['"]react-dom['"]/.test(head)) return "typescript-react";
+  return base;
 }
 
 /** Normalize a parsed lens file into { override, rules[] }. Accepts {rules:[…]} or a bare [ … ]. */

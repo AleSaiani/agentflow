@@ -1,0 +1,13 @@
+{
+  "lens": "python",
+  "override": false,
+  "rules": [
+    { "id": "py-mutable-default", "severity": "major", "guidance": "Don't use a mutable default argument (`def f(x=[])`) — it's shared across calls. Use `None` + create inside." },
+    { "id": "py-bare-except", "severity": "minor", "guidance": "Avoid bare `except:` / `except Exception` that swallows; catch specific exceptions or re-raise with context." },
+    { "id": "py-resource-context", "severity": "major", "guidance": "Open files/sockets/locks with a `with` context manager so they're closed on every path." },
+    { "id": "py-fstring-sql", "severity": "critical", "guidance": "Never build SQL/shell with f-strings/`%` from untrusted input — use parameterized queries / `subprocess` lists." },
+    { "id": "py-type-hints", "severity": "info", "guidance": "Public functions carry type hints; avoid `Any` where a concrete type is known." },
+    { "id": "py-blocking-async", "severity": "major", "guidance": "In async code, don't call blocking I/O/CPU work directly — use `await`/executors so the loop isn't blocked." },
+    { "id": "py-no-assert-validation", "severity": "minor", "guidance": "Don't use `assert` for runtime validation (stripped with -O); raise explicit errors." }
+  ]
+}

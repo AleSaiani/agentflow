@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { detectStack, resolveLens, loadRuleFile } from "./lenses.mjs";
+import { detectStack, refineStack, resolveLens, loadRuleFile } from "./lenses.mjs";
 
 const itemsPath = process.env.PRREVIEW_ITEMS;
 if (!itemsPath || !existsSync(itemsPath)) {
@@ -47,7 +47,15 @@ function stackRules(key) {
 const items = JSON.parse(readFileSync(itemsPath, "utf8"));
 const out = items.map((it) => {
   const rel = it.data?.rel_path || it.id;
-  const stack = detectStack(rel);
+  let stack = detectStack(rel);
+  // Refine JS/TS-family files (node|react|angular) by sniffing the file head.
+  if ((stack === "node" || stack === "typescript-react") && it.data?.path && existsSync(it.data.path)) {
+    try {
+      stack = refineStack(stack, readFileSync(it.data.path, "utf8").slice(0, 2000));
+    } catch {
+      /* keep base */
+    }
+  }
   const lenses = [];
   const rules = [];
   if (stack) {

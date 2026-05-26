@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`remediate` workflow** — closes the loop after a review/checklist: `load` (findings JSON or an open
+  `- [ ]` checklist → one fix item each, severity-filtered) → `fix` (foreach, one minimal edit per item,
+  serialized) → `verify` (an `iterate`/until loop that re-runs a verify command and fixes the rest until
+  it's green). The development-cycle complement to `pr-review`.
+- **`email-auth` workflow** — fully-deterministic email-authentication posture of a domain (SPF, DMARC,
+  MX, DKIM common selectors, MTA-STS, TLS-RPT, BIMI), DNS-only: `scan` (resolve records) → `evaluate`
+  (decide every checklist check in code) → `report` (markdown). Same input → same verdicts, no LLM.
+- **pr-review lens library expanded** — added shipped lenses `node`, `angular`, `python`, `go`, `java`
+  (with `csharp`, `typescript-react`, `security` → 8). Stack detection now refines the JS/TS family by
+  content (`@angular` → angular, `react` import → typescript-react, else node), so `.ts` files get the
+  right lens.
+- **`knowledge-build` graph export** — `finalize` now also emits the LLM-derived relations as a portable
+  graph in three formats: `graph.json`, Graphviz `graph.dot`, and Neo4j `graph.cypher` — the seed for a
+  graph-DB import (v2).
 - **`knowledge-build` workflow** — turn a repo into **structured markdown documentation** (a folder tree
   the team owns). `resolve` (mode + git ref) → `walk` (every code file, the deterministic coverage
   baseline) → `plan` (LLM proposes a doc schema + groups every file into code/domain entities) →

@@ -123,6 +123,16 @@ test("finalize: writes index.md + relations + a manifest with the ref and entiti
   assert.ok(existsSync(join(out, "index.md")));
   assert.match(readFileSync(join(out, "index.md"), "utf8"), /\[foo\]\(src\/foo\.md\)/);
   assert.ok(existsSync(join(out, "relations.md")));
+
+  // graph export (the graph-DB seed): json + Graphviz + Cypher
+  assert.equal(summary.graph.nodes, 1);
+  assert.equal(summary.graph.edges, 1);
+  const graph = JSON.parse(readFileSync(join(out, "graph.json"), "utf8"));
+  assert.deepEqual(graph.nodes[0].id, "src/foo");
+  assert.equal(graph.edges[0].kind, "depends-on");
+  assert.match(readFileSync(join(out, "graph.dot"), "utf8"), /digraph knowledge/);
+  assert.match(readFileSync(join(out, "graph.cypher"), "utf8"), /MERGE \(n:Entity/);
+  assert.match(readFileSync(join(out, "graph.cypher"), "utf8"), /\[:DEPENDS_ON\]/);
   const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
   assert.equal(manifest.ref, "deadbeef");
   assert.equal(manifest.entities.length, 1);
