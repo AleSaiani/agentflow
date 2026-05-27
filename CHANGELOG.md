@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.3] - 2026-05-26
+
 ### Added
 - **`remediate` workflow** (coverage-integrity remediation) — closes the loop after a review/checklist and
   defends the "nothing dropped without a reason / the report doesn't lie" guarantee that a per-item
