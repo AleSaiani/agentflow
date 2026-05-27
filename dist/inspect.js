@@ -365,7 +365,8 @@ function cmdBoard(args) {
         lines.push(`ACTIVE (${active.length}):`);
         for (const e of active) {
             const parent = e["parent_run_id"] ? ` [child of ${e["parent_run_id"]}]` : "";
-            lines.push(`  [${String(e["cmd"]).padEnd(10)}] ${String(e["run_id"]).padEnd(42)} ${String(e["progress"]).padEnd(22)} updated ${e["updated_at"]}${parent}`);
+            const cost = Number(e["usd"]) > 0 ? ` ~$${Number(e["usd"]).toFixed(2)}` : "";
+            lines.push(`  [${String(e["cmd"]).padEnd(10)}] ${String(e["run_id"]).padEnd(42)} ${String(e["progress"]).padEnd(22)}${cost.padEnd(9)} updated ${e["updated_at"]}${parent}`);
         }
         lines.push("");
     }

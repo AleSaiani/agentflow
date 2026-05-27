@@ -1,24 +1,46 @@
 #!/usr/bin/env node
 /**
  * Stage-1 load for the remediate workflow. Normalizes a fix source into a /foreach items array — one
- * item per thing to fix. Sources (first present wins): a findings JSON array (e.g. from a review), or a
- * markdown `- [ ]` checklist. Deterministic; the LLM only applies the fixes downstream. Node builtins only.
+ * item per thing to fix — and **types** each finding (code | test | sample | doc) so a code-fix run
+ * doesn't pay tokens to read items it would skip. Sources (first present wins): a findings JSON array,
+ * or a markdown `- [ ]` checklist. Deterministic; the LLM only applies the fixes downstream. Node only.
  *
- * Env: REMEDIATE_FINDINGS (json array of {file, rule_id?, severity?, note?, suggestion?}),
+ * Env: REMEDIATE_FINDINGS (json array of {file, rule_id?, severity?, note?, suggestion?, type?}),
  *   REMEDIATE_CHECKLIST (markdown checklist path), REMEDIATE_MIN_SEVERITY (info|minor|major|critical,
- *   default minor — filters findings).
+ *   default minor), REMEDIATE_TYPES (comma list to keep; default "code" — set "" to keep all).
  */
 import { existsSync, readFileSync } from "node:fs";
 
 const RANK = { info: 0, minor: 1, major: 2, critical: 3 };
 const minSev = (process.env.REMEDIATE_MIN_SEVERITY || "minor").toLowerCase();
 const minRank = RANK[minSev] ?? RANK.minor;
+const typesRaw = process.env.REMEDIATE_TYPES ?? "code";
+const keepTypes = typesRaw.trim() ? new Set(typesRaw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)) : null; // null = keep all
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "item";
 
-const items = [];
+/** Classify a finding by its file path: test | sample | doc | code (the default). */
+function classifyType(file) {
+  if (!file) return "code";
+  const f = String(file).toLowerCase();
+  if (/(^|\/)(tests?|__tests__|spec)\//.test(f) || /\.(test|spec)\.[a-z]+$/.test(f) || /tests?\.[a-z]+$/.test(f)) return "test";
+  if (/(^|\/)(samples?|examples?|demos?|playground)\//.test(f)) return "sample";
+  if (/\.(md|mdx|rst|txt|adoc)$/.test(f) || /(^|\/)docs?\//.test(f)) return "doc";
+  return "code";
+}
 
+const items = [];
 const findingsPath = process.env.REMEDIATE_FINDINGS;
 const checklistPath = process.env.REMEDIATE_CHECKLIST;
+let skippedByType = 0;
+
+function push(id, data) {
+  const type = data.type || classifyType(data.file);
+  if (keepTypes && !keepTypes.has(type)) {
+    skippedByType++;
+    return;
+  }
+  items.push({ id, data: { ...data, type, disposition: "open" } });
+}
 
 if (findingsPath && existsSync(findingsPath)) {
   let arr = [];
@@ -33,7 +55,7 @@ if (findingsPath && existsSync(findingsPath)) {
     const sev = (f.severity || "minor").toLowerCase();
     if ((RANK[sev] ?? RANK.minor) < minRank) continue;
     const instruction = [f.note || f.message || "", f.suggestion ? `Suggested fix: ${f.suggestion}` : ""].filter(Boolean).join(" ");
-    items.push({ id: `${slug(f.file || "fix")}-${slug(f.rule_id || i)}`, data: { file: f.file ?? null, rule_id: f.rule_id ?? null, severity: sev, instruction } });
+    push(`${slug(f.file || "fix")}-${slug(f.rule_id || i)}`, { file: f.file ?? null, rule_id: f.rule_id ?? null, severity: sev, type: f.type, instruction });
     i++;
   }
 } else if (checklistPath && existsSync(checklistPath)) {
@@ -42,11 +64,13 @@ if (findingsPath && existsSync(findingsPath)) {
   for (const line of lines) {
     const m = /^\s*-\s*\[\s\]\s+(.*\S)\s*$/.exec(line); // unchecked items only
     if (!m) continue;
-    items.push({ id: `task-${i}-${slug(m[1])}`, data: { file: null, rule_id: null, severity: "minor", instruction: m[1] } });
+    const fileGuess = (m[1].match(/[\w./-]+\.[a-z]{1,5}\b/i) || [])[0] || null;
+    push(`task-${i}-${slug(m[1])}`, { file: fileGuess, rule_id: null, severity: "minor", instruction: m[1] });
     i++;
   }
 } else {
   process.stderr.write("load: provide REMEDIATE_FINDINGS or REMEDIATE_CHECKLIST\n");
 }
 
+if (skippedByType) process.stderr.write(`load: ${skippedByType} item(s) filtered out by type (keeping: ${[...(keepTypes ?? [])].join(",") || "all"})\n`);
 process.stdout.write(JSON.stringify(items, null, 2));

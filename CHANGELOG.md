@@ -8,10 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`remediate` workflow** — closes the loop after a review/checklist: `load` (findings JSON or an open
-  `- [ ]` checklist → one fix item each, severity-filtered) → `fix` (foreach, one minimal edit per item,
-  serialized) → `verify` (an `iterate`/until loop that re-runs a verify command and fixes the rest until
-  it's green). The development-cycle complement to `pr-review`.
+- **`remediate` workflow** (coverage-integrity remediation) — closes the loop after a review/checklist and
+  defends the "nothing dropped without a reason / the report doesn't lie" guarantee that a per-item
+  self-report model erodes. `load` (findings/checklist → **typed** fix items; `types` filter, default
+  `code`) → `fix` (foreach, minimal edit, **mandatory disposition** `fixed|deferred|skipped|failed`+reason,
+  refactors forbidden) → **`disposition`** (every item must have a disposition; a **bare** item — left with
+  no reason — is detected, not dropped) → **`reconcile`** (checks claims against **git ground truth**: flags
+  `fixed` items whose file wasn't changed / reverted, and scope creep beyond `max_files`/fix) → `verify`
+  (an `iterate`/until **integration gate** — the FULL build/test, looped until green). Born from a real
+  run's failure modes (88% bare items, trusted self-report, per-module "green" hiding integration breaks,
+  `[x]` surviving a revert).
+- **`board` shows per-run cost** — active runs now display `~$N` inline, so cost is visible during long
+  loops, not only in the cumulative total / `inspect budget`.
 - **`email-auth` workflow** — fully-deterministic email-authentication posture of a domain (SPF, DMARC,
   MX, DKIM common selectors, MTA-STS, TLS-RPT, BIMI), DNS-only: `scan` (resolve records) → `evaluate`
   (decide every checklist check in code) → `report` (markdown). Same input → same verdicts, no LLM.

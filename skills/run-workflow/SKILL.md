@@ -86,3 +86,7 @@ visible together — not just one or the other. `progress --json` is available f
 
 The Stop hook resumes an in-flight run across turns automatically — lead each resumed turn with the
 progress block above.
+
+**On long, many-turn runs, surface the dashboard periodically** (not only at the end):
+`node "${CLAUDE_PLUGIN_ROOT}/dist/inspect.js" board` shows what's in flight + the cumulative + per-run cost
+(active rows now show `~$N`). Don't make the user discover a runaway cost only when it finishes.
