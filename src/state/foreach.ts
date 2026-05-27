@@ -34,6 +34,7 @@ import {
   cacheLookup,
   cacheStore,
   die, isHelp, printUsage,
+  findWorkspaceRoot,
   isPaused,
   loadState,
   loadTaskKindTemplate,
@@ -47,6 +48,7 @@ import {
   statePath,
 } from "../common.js";
 import { loadSource, moveKanbanItem, writeChecklistView, writeFolderView } from "../source.js";
+import { runBash } from "../shell.js";
 
 const CMD = "foreach";
 
@@ -169,6 +171,8 @@ function cmdInit(args: string[]): void {
       execution: { type: "string", default: "subagent" },
       concurrency: { type: "string", default: "4" },
       "chunk-size": { type: "string", default: "auto" },
+      "gate-cmd": { type: "string" },
+      "gate-every": { type: "string", default: "0" },
       "max-retries": { type: "string", default: "1" },
       "auto-continue": { type: "boolean" },
       "no-auto-continue": { type: "boolean" },
@@ -268,6 +272,10 @@ function cmdInit(args: string[]): void {
       // so the check is cwd-independent.
       stop_file: values["stop-file"] ? resolve(values["stop-file"] as string) : null,
       budget_caps: parseBudgetCaps(values),
+      // Mid-run integration gate: run `gate_cmd` (a full build/test) after every `gate_every` completed
+      // items; a failure pauses the run so breaks surface early, not only at the end. Off by default.
+      gate_cmd: (values["gate-cmd"] as string) || null,
+      gate_every: parseInt((values["gate-every"] as string) || "0", 10) || 0,
       kind,
       cache: Boolean(values["cache"]),
       folder: folderBaseFromValues(values),
@@ -560,8 +568,32 @@ function cmdCompleteBatch(args: string[]): void {
     syncKanban(state, item); // project each item's new status onto the board
   }
   finalizeStatusIfTerminal(state);
+
+  // Mid-run integration gate (opt-in): after every `gate_every` completed items, run the full
+  // `gate_cmd` (build/test). On failure, PAUSE the run so an integration break is caught early —
+  // not only after the whole pass, when it's expensive and hard to attribute.
+  let gate: Record<string, unknown> | null = null;
+  const gateCmd = state["config"]?.["gate_cmd"];
+  const gateEvery = Number(state["config"]?.["gate_every"] ?? 0);
+  if (gateCmd && gateEvery > 0 && state["status"] !== STATUS_DONE && state["status"] !== STATUS_FAILED) {
+    const doneCount = (Object.values(state["items"]) as StateDict[]).filter((i) => i["status"] === STATUS_DONE).length;
+    const lastGate = Number(state["gate_last_done"] ?? 0);
+    if (doneCount - lastGate >= gateEvery) {
+      const r = runBash(String(gateCmd), findWorkspaceRoot(), { ...process.env });
+      state["gate_last_done"] = doneCount;
+      if (r.status === 0) {
+        state["gate_failure"] = null;
+        gate = { ran: true, passed: true, at_done: doneCount };
+      } else {
+        state["paused"] = true; // Stop hook skips paused runs; resume after fixing the break
+        state["gate_failure"] = { at: now(), done: doneCount, cmd: String(gateCmd), exit: r.status, tail: (r.stderr || r.stdout || "").slice(-400) };
+        gate = { ran: true, passed: false, at_done: doneCount, exit: r.status };
+      }
+    }
+  }
+
   save(runId, state);
-  print({ run_id: runId, ...counts, applied: payload.length, run_status: state["status"] });
+  print({ run_id: runId, ...counts, applied: payload.length, run_status: state["status"], paused: state["paused"] === true, gate });
 }
 
 /** View write-back: reflect current item statuses onto a checkbox markdown file. */

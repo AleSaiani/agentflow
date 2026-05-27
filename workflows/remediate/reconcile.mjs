@@ -66,6 +66,25 @@ const report = {
 };
 writeFileSync(join(outDir, "reconcile.json"), JSON.stringify(report, null, 2), "utf8");
 
+// De-tick the report (the real correction, not just a flag): downgrade fixed→reverted where git
+// disagrees, and write the corrected, TRUTHFUL report. This is the version to trust.
+const suspect = new Set(suspectNoChange);
+const counts = { fixed: 0, deferred: 0, skipped: 0, failed: 0, reverted: 0 };
+const corrected = dispositions.map((d) => {
+  if (d.disposition === "fixed" && suspect.has(d.id)) {
+    counts.reverted++;
+    return { ...d, disposition: "reverted", reason: `${d.reason ? d.reason + " — " : ""}reconcile: claimed fixed but ${norm(d.file)} was not changed`, bare: false };
+  }
+  counts[d.disposition] = (counts[d.disposition] ?? 0) + 1;
+  return d;
+});
+writeFileSync(join(outDir, "reconciled.json"), JSON.stringify({ total: corrected.length, counts, reconciled: ok, corrected_from_fixed: suspectNoChange.length, dispositions: corrected }, null, 2), "utf8");
+const md = ["# Reconciled dispositions (verified against git)", "", `Total ${corrected.length} · fixed ${counts.fixed} · reverted ${counts.reverted} · deferred ${counts.deferred} · skipped ${counts.skipped} · failed ${counts.failed}`, "", "| Item | Disposition | Reason |", "|---|---|---|"];
+for (const d of corrected) md.push(`| ${d.id} | ${d.disposition}${d.disposition === "reverted" ? " ⟲" : ""} | ${String(d.reason ?? "").replace(/\|/g, "\\|").slice(0, 120)} |`);
+writeFileSync(join(outDir, "reconciled.md"), md.join("\n") + "\n", "utf8");
+report.corrected_from_fixed = suspectNoChange.length;
+report.reconciled_report = join(outDir, "reconciled.md").split("\\").join("/");
+
 if (!gitAvailable) process.stderr.write("reconcile: not a git repo — cannot verify against ground truth\n");
 if (suspectNoChange.length) process.stderr.write(`reconcile: ⚠ ${suspectNoChange.length} item(s) marked fixed but their file was not changed (ticked-but-not-changed / reverted): ${suspectNoChange.slice(0, 10).join(", ")}\n`);
 if (!scopeOk) process.stderr.write(`reconcile: ⚠ scope — ${changed.size} files changed for ${fixed.length} fixes (> ${maxFiles}/fix)\n`);

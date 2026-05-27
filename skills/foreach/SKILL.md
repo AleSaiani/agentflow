@@ -74,6 +74,10 @@ runs each item; per-item override via `{subagent:…}` in a checklist), `--execu
 - `--max-usd N` (also `--max-tokens N`, `--max-agents N`) — a **cost cap**: once the run's recorded
   budget exceeds it, the run pauses exactly like `--stop-file` (`status` shows `paused`, the Stop hook
   won't resume). Record spend with `budget-add` so the cap is real; raise the cap to continue.
+- `--gate-cmd "<cmd>" --gate-every N` — a **mid-run integration gate**: after every N completed items,
+  `complete-batch` runs the full `<cmd>` (e.g. a build); if it fails, the run **pauses** with a
+  `gate_failure` so an integration break surfaces EARLY, not only after the whole pass. Off by default.
+  (`complete-batch` returns `gate` + `paused`; fix the break and resume.)
 
 **Invoked with natural language?** (e.g. `/agentflow:foreach review every .cs file in src/ for bugs`) —
 translate the user's words into a source + `--prompt`, don't ask them for flags. If they name files you

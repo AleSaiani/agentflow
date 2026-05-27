@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (an `iterate`/until **integration gate** — the FULL build/test, looped until green). Born from a real
   run's failure modes (88% bare items, trusted self-report, per-module "green" hiding integration breaks,
   `[x]` surviving a revert).
+- **`foreach --gate-cmd "<cmd>" --gate-every N`** — a **mid-run integration gate**: after every N
+  completed items, `complete-batch` runs the full command (e.g. a build); on failure the run **pauses**
+  with a `gate_failure`, so an integration break is caught early instead of only at the end (the
+  per-module-"green"-hides-the-break failure mode). Opt-in (off by default → no behavior change).
+  `remediate` exposes it as `--param gate_every`.
+- **`remediate reconcile` now de-ticks the report** — beyond flagging, it writes a corrected, truthful
+  `reconciled.json` / `reconciled.md` where a `fixed` item git can't confirm is downgraded to `reverted`
+  with a reason. The report no longer lies after a revert.
 - **`board` shows per-run cost** — active runs now display `~$N` inline, so cost is visible during long
   loops, not only in the cumulative total / `inspect budget`.
 - **`email-auth` workflow** — fully-deterministic email-authentication posture of a domain (SPF, DMARC,

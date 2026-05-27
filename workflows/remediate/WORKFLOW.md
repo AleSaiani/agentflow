@@ -13,6 +13,7 @@ params:
   types:        { default: "code", description: "Finding types to fix (comma): code,test,sample,doc — '' = all" }
   min_severity: { default: "major", description: "Only fix findings at/above: info|minor|major|critical" }
   verify_cmd:   { default: "npm test", description: "Verify/build command; the gate loops until it exits 0" }
+  gate_every:   { default: "0", description: "Mid-run integration gate: run verify_cmd every N fixes (0 = off, only the final gate)" }
   max_rounds:   { default: "5", description: "Max verify/fix rounds" }
   max_files:    { default: "3", description: "Scope leash: flag if changed files exceed fixes × this" }
   base:         { default: "HEAD", description: "Git ref remediation started from (reconcile diffs against it)" }
@@ -37,6 +38,8 @@ Apply each fix with a minimal edit and report a MANDATORY disposition (serialize
 - items: {{stages.load.result_pointer}}
 - task-prompt: "Apply the fix for this item. Edit ONLY the file at `data.file` (or, if null, the single file the instruction clearly points to) with the SMALLEST correct change — do NOT refactor, reformat, or touch unrelated code or other files. Resolve `data.instruction` (rule `data.rule_id`). Return JSON {\"disposition\":\"fixed|deferred|skipped|failed\",\"reason\":\"<why — REQUIRED>\",\"file\":\"<the file you changed>\"}: use `fixed` only if you actually edited the file, `deferred` if it's out of this pass's scope, `skipped` if it should not be changed, `failed` if you tried but couldn't. A disposition AND a reason are mandatory."
 - serial: true
+- gate-cmd: {{params.verify_cmd}}
+- gate-every: {{params.gate_every}}
 - max-retries: 1
 - max-auto-continues: 30
 

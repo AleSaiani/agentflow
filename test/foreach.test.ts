@@ -231,3 +231,32 @@ test("foreach CLI: --kind resolves task-kinds.md WITHOUT CLAUDE_PLUGIN_ROOT (roo
   assert.equal(v.valid, true);
   assert.equal(v.kind, "code-review");
 });
+
+test("foreach mid-run gate: a failing gate-cmd every N pauses the run; a passing one does not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "enum-cli-"));
+  const items = join(dir, "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }]), "utf8");
+
+  // gate fails after the first completion → run paused
+  run(dir, ["init", "g1", "--items", items, "--gate-cmd", "exit 1", "--gate-every", "1"]);
+  run(dir, ["claim", "g1", "--count", "1"]);
+  const res1 = join(dir, "r1.json");
+  writeFileSync(res1, JSON.stringify([{ id: "a", result: { ok: 1 } }]));
+  const out1 = run(dir, ["complete-batch", "g1", "--results", res1]);
+  assert.equal(out1.gate.ran, true);
+  assert.equal(out1.gate.passed, false);
+  assert.equal(out1.paused, true);
+  // the Stop-hook pause contract is satisfied via the per-run paused flag
+  const st1 = JSON.parse(readFileSync(join(dir, "g1", "state.json"), "utf8"));
+  assert.equal(st1.paused, true);
+  assert.ok(st1.gate_failure && st1.gate_failure.exit !== 0);
+
+  // a passing gate does not pause
+  run(dir, ["init", "g2", "--items", items, "--gate-cmd", "exit 0", "--gate-every", "1"]);
+  run(dir, ["claim", "g2", "--count", "1"]);
+  const res2 = join(dir, "r2.json");
+  writeFileSync(res2, JSON.stringify([{ id: "a", result: { ok: 1 } }]));
+  const out2 = run(dir, ["complete-batch", "g2", "--results", res2]);
+  assert.equal(out2.gate.passed, true);
+  assert.equal(out2.paused, false);
+});
