@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.4] - 2026-05-26
+
+### Fixed (from a real Pragmatic.Design run)
+- **`remediate load` typed-checklist mode** — when the checklist has any `<!-- deferred: <type> -->` /
+  `<!-- skipped: ... -->` markers (the disposition annotations a reconciliation pass writes), only
+  `- [ ]` lines whose `deferred: <type>` matches `types` are loaded. Bare `- [ ]` without a marker are
+  skipped. Untyped checklists keep the legacy behavior (back-compat).
+- **`remediate` default `min_severity` was too strict** (was `major` → filtered out real `minor`
+  findings). Lowered to `minor` so the floor matches the documented `info|minor|major|critical` ladder.
+- **`remediate reconcile` suffix-match for paths** — a report path `src/X/Y.cs` now also matches a git
+  path `Module/src/X/Y.cs` (common when reports use module-relative paths and git shows repo-relative).
+  Closes a class of false `fixed_without_change` flags.
+- **`remediate` stage 5 was misusing `iterate`** (`--stage` is a bash command, not an agent prompt → it
+  exited non-zero every time). Replaced with a single-shot bash `verify` — the foreach `gate-cmd` /
+  `gate-every` already catches integration breaks mid-flight (the real mid-run gate).
+- **`remediate reconcile --param ignore_paths`** — comma-list of patterns (prefix `docs/`, exact
+  `Makefile`, glob `*.xlsx`) excluded from scope-creep and the leash, so untracked docs/marketplace
+  files don't pollute the integrity signal. `reconcile.json` now reports `changed_files` (post-filter)
+  + `changed_files_total` + `ignored_paths`.
+
 ## [1.0.0-beta.3] - 2026-05-26
 
 ### Added

@@ -60,12 +60,24 @@ if (findingsPath && existsSync(findingsPath)) {
   }
 } else if (checklistPath && existsSync(checklistPath)) {
   const lines = readFileSync(checklistPath, "utf8").split(/\r?\n/);
+  // Typed-marker mode: if ANY line carries a `<!-- deferred: <type> -->` or `<!-- skipped: ... -->`
+  // comment (the disposition annotations a reconciliation pass writes), treat the file as typed —
+  // only keep `- [ ]` lines that have `<!-- deferred: <type> -->` whose <type> is in keepTypes.
+  // Untyped checklists (no markers anywhere) keep the legacy "every `- [ ]` is fair game" behavior.
+  const hasTypedMarkers = lines.some((l) => /<!--\s*(deferred|skipped):/i.test(l));
   let i = 0;
   for (const line of lines) {
-    const m = /^\s*-\s*\[\s\]\s+(.*\S)\s*$/.exec(line); // unchecked items only
+    const m = /^\s*-\s*\[\s\]\s+(.*\S)\s*$/.exec(line);
     if (!m) continue;
-    const fileGuess = (m[1].match(/[\w./-]+\.[a-z]{1,5}\b/i) || [])[0] || null;
-    push(`task-${i}-${slug(m[1])}`, { file: fileGuess, rule_id: null, severity: "minor", instruction: m[1] });
+    let explicitType = null;
+    if (hasTypedMarkers) {
+      const tag = /<!--\s*deferred:\s*([a-z]+)/i.exec(line);
+      if (!tag) continue; // skip "- [ ]" without a deferred marker (skipped/reconcile/no-marker)
+      explicitType = tag[1].toLowerCase();
+    }
+    const text = m[1].replace(/<!--.*?-->/g, "").trim();
+    const fileGuess = (text.match(/[\w./-]+\.[a-z]{1,5}\b/i) || [])[0] || null;
+    push(`task-${i}-${slug(text)}`, { file: fileGuess, rule_id: null, severity: "minor", type: explicitType, instruction: text });
     i++;
   }
 } else {

@@ -11,12 +11,12 @@ params:
   findings:     { default: "", description: "Findings JSON array ({file, rule_id?, severity?, note?, suggestion?, type?})" }
   checklist:    { default: "", description: "Markdown `- [ ]` checklist path (alternative source)" }
   types:        { default: "code", description: "Finding types to fix (comma): code,test,sample,doc — '' = all" }
-  min_severity: { default: "major", description: "Only fix findings at/above: info|minor|major|critical" }
+  min_severity: { default: "minor", description: "Only fix findings at/above: info|minor|major|critical" }
   verify_cmd:   { default: "npm test", description: "Verify/build command; the gate loops until it exits 0" }
   gate_every:   { default: "0", description: "Mid-run integration gate: run verify_cmd every N fixes (0 = off, only the final gate)" }
-  max_rounds:   { default: "5", description: "Max verify/fix rounds" }
   max_files:    { default: "3", description: "Scope leash: flag if changed files exceed fixes × this" }
   base:         { default: "HEAD", description: "Git ref remediation started from (reconcile diffs against it)" }
+  ignore_paths: { default: "", description: "Comma-list of path patterns excluded from reconcile (e.g. `docs/,marketplace/,*.xlsx`)" }
   out_dir:      { default: ".agentflow/remediate", description: "Where disposition + reconcile reports are written" }
 config: { context_policy: summary, max_auto_continues: 60, max_stages: 20, stop_on_failure: true }
 ---
@@ -53,14 +53,15 @@ REMEDIATE_ITEMS="{{stages.load.result_pointer}}" REMEDIATE_FIX_RUN="{{stages.fix
 ## 4. reconcile · bash
 Check the claims against git ground truth: flag `fixed` items whose file wasn't changed, and scope creep.
 ```sh
-RECONCILE_DISPOSITIONS="{{params.out_dir}}/dispositions.json" RECONCILE_REPO="." RECONCILE_BASE={{params.base|shell}} RECONCILE_MAX_FILES={{params.max_files|shell}} RECONCILE_OUT_DIR={{params.out_dir|shell}} node "{{workflow.dir}}/reconcile.mjs" > "$PIPE_OUTPUT_PATH"
+RECONCILE_DISPOSITIONS="{{params.out_dir}}/dispositions.json" RECONCILE_REPO="." RECONCILE_BASE={{params.base|shell}} RECONCILE_MAX_FILES={{params.max_files|shell}} RECONCILE_IGNORE_PATHS={{params.ignore_paths|shell}} RECONCILE_OUT_DIR={{params.out_dir|shell}} node "{{workflow.dir}}/reconcile.mjs" > "$PIPE_OUTPUT_PATH"
 ```
 - output_path: {{run.dir}}/reconcile-summary.json
 
-## 5. verify · iterate
-The integration gate: run the full verify command; if it fails, fix the rest and repeat — until green or max rounds.
-- stage: "Run the project's verify command (`{{params.verify_cmd}}`) — the FULL build/test, not a single module. If it FAILS, read the failure output and make the minimal edits needed to fix the remaining issues (including any integration breaks), then it will be re-checked. If it PASSES, stop — do nothing."
-- stop: {{params.verify_cmd}}
-- mode: until
-- max-iterations: {{params.max_rounds}}
-- max-auto-continues: 30
+## 5. verify · bash
+Final gate: run the verify command once. A non-zero exit fails the workflow; the caller fixes any
+remaining breaks in a subsequent run (no agent loop here — the foreach `gate-cmd` already catches
+integration breaks every N items, mid-flight).
+```sh
+{{params.verify_cmd}} > "$PIPE_OUTPUT_PATH" 2>&1
+```
+- output_path: {{run.dir}}/verify.log

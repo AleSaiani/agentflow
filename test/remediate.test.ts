@@ -82,6 +82,70 @@ test("remediate disposition: every item gets a disposition; missing → failed; 
   assert.equal(dj.dispositions.find((d: any) => d.id === "z").disposition, "failed");
 });
 
+test("remediate load: typed checklist mode keeps only `<!-- deferred: <type> -->` lines matching types", () => {
+  const dir = tmp();
+  const cl = join(dir, "cl.md");
+  // A reconciliation pass annotates items with `<!-- deferred: code|test|doc -->`. With markers
+  // present, untagged `[ ]` are skipped (e.g. previously-resolved items) and the type filter applies.
+  writeFileSync(cl, [
+    "- [ ] Fix the login redirect <!-- deferred: code -->",
+    "- [ ] Refactor docs <!-- deferred: doc -->",
+    "- [ ] Untagged item",
+    "- [ ] Add parser tests <!-- deferred: test -->",
+  ].join("\n"));
+  const items = load({ REMEDIATE_CHECKLIST: cl, REMEDIATE_TYPES: "code" });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].data.type, "code");
+  assert.match(items[0].data.instruction, /login redirect/);
+});
+
+test("remediate reconcile: suffix-match — report's `src/X.cs` matches git's `Module/src/X.cs`", () => {
+  const dir = tmp();
+  const r = join(dir, "repo");
+  mkdirSync(join(r, "Module", "src"), { recursive: true });
+  const g = (...a: string[]) => execFileSync("git", a, { cwd: r, encoding: "utf8" });
+  g("init", "-q");
+  g("config", "user.email", "a@b.c");
+  g("config", "user.name", "t");
+  writeFileSync(join(r, "Module", "src", "Foo.cs"), "a\n");
+  g("add", "-A");
+  g("commit", "-qm", "base");
+  writeFileSync(join(r, "Module", "src", "Foo.cs"), "a fixed\n");
+
+  const out = join(dir, "out");
+  mkdirSync(out, { recursive: true });
+  // The report uses a module-relative path; git's path includes the module dir. Should still match.
+  writeFileSync(join(out, "dispositions.json"), JSON.stringify({ dispositions: [{ id: "x", file: "src/Foo.cs", disposition: "fixed" }] }));
+  const rep = node(RECONCILE, { RECONCILE_DISPOSITIONS: join(out, "dispositions.json"), RECONCILE_REPO: r, RECONCILE_BASE: "HEAD", RECONCILE_OUT_DIR: out });
+  assert.equal(rep.reconciled, true); // suffix matched → no false flag
+  assert.deepEqual(rep.fixed_without_change, []);
+});
+
+test("remediate reconcile: ignore_paths filters docs/* from scope creep", () => {
+  const dir = tmp();
+  const r = join(dir, "repo");
+  mkdirSync(join(r, "src"), { recursive: true });
+  mkdirSync(join(r, "docs"), { recursive: true });
+  const g = (...a: string[]) => execFileSync("git", a, { cwd: r, encoding: "utf8" });
+  g("init", "-q");
+  g("config", "user.email", "a@b.c");
+  g("config", "user.name", "t");
+  writeFileSync(join(r, "src", "a.ts"), "a\n");
+  writeFileSync(join(r, "docs", "z.md"), "z\n");
+  g("add", "-A");
+  g("commit", "-qm", "base");
+  writeFileSync(join(r, "src", "a.ts"), "a fixed\n");
+  writeFileSync(join(r, "docs", "z.md"), "z edited\n"); // collateral; should be ignored
+
+  const out = join(dir, "out");
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "dispositions.json"), JSON.stringify({ dispositions: [{ id: "x", file: "src/a.ts", disposition: "fixed" }] }));
+  const rep = node(RECONCILE, { RECONCILE_DISPOSITIONS: join(out, "dispositions.json"), RECONCILE_REPO: r, RECONCILE_BASE: "HEAD", RECONCILE_OUT_DIR: out, RECONCILE_IGNORE_PATHS: "docs/" });
+  assert.deepEqual(rep.scope_creep_files, []); // docs/z.md filtered out
+  assert.equal(rep.changed_files, 1); // post-filter count
+  assert.equal(rep.changed_files_total, 2); // raw, pre-filter
+});
+
 test("remediate reconcile: flags a fixed item whose file was not actually changed (git truth)", () => {
   const dir = tmp();
   const r = join(dir, "repo");

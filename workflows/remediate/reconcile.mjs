@@ -40,16 +40,41 @@ const gitAvailable = git(["rev-parse", "HEAD"]) !== null;
 const dispositions = disp.dispositions ?? [];
 const fixed = dispositions.filter((d) => d.disposition === "fixed");
 const norm = (f) => String(f || "").split("\\").join("/").replace(/^\.\//, "");
+const changedArr = [...changed].map(norm);
+
+// Optional ignore list: prefix (`docs/`), exact (`Makefile`), or extension glob (`*.xlsx`). Filters
+// scope-creep + scope leash so untracked docs/marketplace/etc. don't pollute the integrity signal.
+const ignorePatterns = (process.env.RECONCILE_IGNORE_PATHS || "").split(",").map((s) => s.trim()).filter(Boolean);
+function ignored(f) {
+  return ignorePatterns.some((p) => (p.endsWith("/") ? f.startsWith(p) : p.startsWith("*.") ? f.endsWith(p.slice(1)) : f === p || f.startsWith(p + "/")));
+}
+const changedArrFiltered = changedArr.filter((f) => !ignored(f));
+
+// Match item.file against git's changed paths: exact OR git path ends with `/` + item.file —
+// covers the common case where a report says `src/X/Y.cs` but git shows `Module/src/X/Y.cs`.
+function matchesChanged(itemFile) {
+  const n = norm(itemFile);
+  if (!n) return false;
+  if (changed.has(n)) return true;
+  return changedArr.some((c) => c === n || c.endsWith("/" + n));
+}
 
 // Items claimed fixed whose file was NOT actually changed → ticked-but-not-changed / reverted.
-const suspectNoChange = fixed.filter((d) => d.file && !changed.has(norm(d.file))).map((d) => d.id);
+const suspectNoChange = fixed.filter((d) => d.file && !matchesChanged(d.file)).map((d) => d.id);
 
-// Scope: files changed that no (fixed) item referenced — possible scope creep / collateral edits.
-const referenced = new Set(fixed.map((d) => norm(d.file)).filter(Boolean));
-const scopeCreepFiles = [...changed].filter((f) => !referenced.has(norm(f)));
+// Build the referenced set as git-path-normalized so scope-creep computation aligns with the
+// suffix match above (the git path is the source of truth, not the report path).
+const referenced = new Set();
+for (const d of fixed) {
+  if (!d.file) continue;
+  const n = norm(d.file);
+  const hit = changedArr.find((c) => c === n || c.endsWith("/" + n));
+  if (hit) referenced.add(hit);
+}
+const scopeCreepFiles = changedArrFiltered.filter((f) => !referenced.has(f));
 
-// Coarse per-fix leash: more changed files than fixed-items × maxFiles is suspicious.
-const scopeOk = maxFiles <= 0 || fixed.length === 0 ? true : changed.size <= fixed.length * maxFiles;
+// Coarse per-fix leash on the (filtered) changed set.
+const scopeOk = maxFiles <= 0 || fixed.length === 0 ? true : changedArrFiltered.length <= fixed.length * maxFiles;
 
 const ok = gitAvailable && suspectNoChange.length === 0 && scopeOk && scopeCreepFiles.length === 0;
 
@@ -57,7 +82,9 @@ mkdirSync(outDir, { recursive: true });
 const report = {
   git_available: gitAvailable,
   base,
-  changed_files: changed.size,
+  changed_files: changedArrFiltered.length,
+  changed_files_total: changed.size,
+  ignored_paths: ignorePatterns,
   fixed_claimed: fixed.length,
   fixed_without_change: suspectNoChange,
   scope_ok: scopeOk,
