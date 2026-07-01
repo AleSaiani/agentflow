@@ -32,7 +32,7 @@
     "validate": "claude plugin validate ."
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^22.20.0",
     "typescript": "^6.0.0"
   }
 }
