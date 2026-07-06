@@ -54,3 +54,15 @@ test("step: extractResult parses claude json (.result), codex jsonl, and raw fal
   assert.equal(extractResult(jsonl), "final answer");
   assert.equal(extractResult("just plain text"), "just plain text");
 });
+
+test("step: --validate-only short-circuits before reading a (still-templated) prompt-file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "step-"));
+  // Regression: pipe's preflight (validatePrimitiveStage) calls `step init --validate-only` with
+  // dummy-resolved templates, so a `{{workflow.dir}}`-based prompt-file path does not exist yet.
+  // Validation must be shape-only and NOT touch the filesystem — it must return {valid:true}, not die.
+  const r = run(dir, ["init", "v", "--prompt-file", join(dir, "__unresolved__/assess-prompt.md"), "--validate-only"]);
+  assert.equal(r.valid, true);
+  assert.equal(r.runtime, "subagent");
+  // Sanity: without --validate-only, a real init still fails loudly on a missing prompt-file.
+  assert.throws(() => run(dir, ["init", "v2", "--prompt-file", join(dir, "nope.md")]));
+});

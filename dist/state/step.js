@@ -61,14 +61,17 @@ function cmdInit(args) {
     const promptFile = values["prompt-file"];
     if (promptFile && values["prompt"] !== undefined)
         die("error: --prompt and --prompt-file are mutually exclusive");
+    // Shape-only preflight: the prompt-file path may still be a dummy-resolved {{template}} at validate
+    // time (validatePrimitiveStage passes dummy-resolved init_args), so short-circuit BEFORE touching the
+    // filesystem — mirrors pipe's --validate-only. Real path resolution happens at dispatch (pipe tick).
+    if (values["validate-only"])
+        return print({ valid: true, runtime });
     let prompt = values["prompt"] ?? "";
     if (promptFile) {
         if (!existsSync(promptFile))
             die(`error: --prompt-file not found at ${promptFile}`);
         prompt = readFileSync(promptFile, "utf8").trim();
     }
-    if (values["validate-only"])
-        return print({ valid: true, runtime });
     if (!prompt)
         die("error: --prompt or --prompt-file is required");
     const p = pathFor(runId);

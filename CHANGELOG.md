@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.5] - 2026-07-06
+
+### Fixed
+- **`step --validate-only` no longer touches the filesystem.** Pipe's preflight
+  (`validatePrimitiveStage`) validates a `step` stage by calling `step init --validate-only` with
+  *dummy-resolved* templates, so a `{{workflow.dir}}`-based `prompt-file` path doesn't exist yet. The
+  validate-only guard now short-circuits **before** `existsSync`/`readFileSync` (mirroring the `pipe`
+  primitive), so a workflow whose `step` stage references its prompt via `{{workflow.dir}}` — e.g.
+  `gdpr-domain`'s `assess` — validates and runs instead of failing init with "prompt-file not found".
+  Regression test added.
+
+### Changed
+- **Dependency bumps** (dev/CI only — zero runtime deps): `@types/node` 22.20.0; CI actions
+  `checkout` v7, `configure-pages` v6, `deploy-pages` v5, `upload-pages-artifact` v5.
+
 ## [1.0.0-beta.4] - 2026-05-26
 
 ### Fixed (from a real Pragmatic.Design run)
