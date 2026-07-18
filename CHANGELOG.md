@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.6] - 2026-07-06
+
+### Fixed
+- **preserve-chat no longer creates `.agentflow/` in workspaces that don't use Agent Flow.** The
+  `PreCompact`/`SessionEnd` hooks fire in *every* project when the plugin is installed globally, and
+  the hook copied the full transcript unconditionally — littering unrelated repos with multi-MB
+  snapshots (observed: ~184 MB across 12 projects that had never run a flow). It now writes only where
+  `.agentflow/` already exists, which a run's `init` always creates first.
+
+### Added
+- **Chat snapshot retention.** `.agentflow/chat/` keeps only the most recent **5** sessions, pruning
+  older `<session>.jsonl`/`.md` pairs so it can't grow without bound. Override with
+  `$AGENTFLOW_CHAT_KEEP`. The snapshot just written is always kept.
+
 ## [1.0.0-beta.5] - 2026-07-06
 
 ### Fixed

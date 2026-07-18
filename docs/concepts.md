@@ -33,6 +33,12 @@ Agent Flow copies the session transcript to `.agentflow/chat/<session>.jsonl` an
 `<session>.md` — so the full chat survives compaction on disk, independent of what's in context. It's
 automatic and best-effort (never blocks or fails the turn).
 
+Two guards keep it from littering your disk. It only writes **where `.agentflow/` already exists** —
+the plugin is installed globally, so these hooks fire in *every* project, and a repo that never ran
+Agent Flow must not get a `.agentflow/` as a side effect. And it keeps only the **most recent 5
+sessions**, pruning older `<session>.jsonl`/`.md` pairs so `chat/` can't grow without bound
+(override with `$AGENTFLOW_CHAT_KEEP`).
+
 ## The determinism boundary
 
 Agent Flow is deterministic where it matters and fuzzy only where it must be:

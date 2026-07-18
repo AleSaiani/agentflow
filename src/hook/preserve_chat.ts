@@ -6,10 +6,40 @@
  * and `session_id` / `cwd`. We copy the raw transcript to `<cwd>/.agentflow/chat/<session>.jsonl` and
  * render a human-readable `<session>.md` beside it. Never blocks or fails the turn — exits 0 no matter
  * what (a snapshot must not break the session).
+ *
+ * Two guards keep this from littering the disk: it only writes where `.agentflow/` already exists
+ * (the plugin is installed globally, so these hooks fire in every project), and it keeps only the
+ * most recent `AGENTFLOW_CHAT_KEEP` sessions (default 5).
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+/** How many session snapshots to keep; override with AGENTFLOW_CHAT_KEEP. */
+const DEFAULT_KEEP = 5;
+
+/**
+ * Retention: keep only the N most recent sessions (each is a `<session>.jsonl` + `<session>.md` pair)
+ * and prune the rest, so `.agentflow/chat/` can't grow without bound. The snapshot just written is
+ * always the newest, so it is never pruned. Best-effort — never fails the turn.
+ */
+function pruneOldSnapshots(dir: string, keep: number): void {
+  try {
+    const newest = new Map<string, number>(); // session id → newest mtime across its files
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".jsonl") && !f.endsWith(".md")) continue;
+      const id = f.replace(/\.(jsonl|md)$/, "");
+      newest.set(id, Math.max(newest.get(id) ?? 0, statSync(join(dir, f)).mtimeMs));
+    }
+    const stale = [...newest.entries()]
+      .sort((a, b) => b[1] - a[1]) // newest first
+      .slice(keep) // everything past the keep window
+      .map(([id]) => id);
+    for (const id of stale) for (const ext of [".jsonl", ".md"]) rmSync(join(dir, id + ext), { force: true });
+  } catch {
+    /* pruning is best-effort; a full disk or a locked file must not break the session */
+  }
+}
 
 function readStdin(): Promise<string> {
   return new Promise((resolve) => {
@@ -71,12 +101,19 @@ async function main(): Promise<void> {
   const transcriptPath = payload["transcript_path"] as string | undefined;
   const cwd = (payload["cwd"] as string) || process.cwd();
   const session = String(payload["session_id"] ?? "session").replace(/[^A-Za-z0-9._-]+/g, "-");
-  if (transcriptPath && existsSync(transcriptPath)) {
+  // Only snapshot in a workspace that ACTUALLY uses Agent Flow. With the plugin installed globally
+  // these hooks fire in every project, so creating `.agentflow/` here would litter unrelated repos
+  // with multi-MB transcript copies. A run's `init` always creates `.agentflow/` before compaction
+  // could matter, so "the directory already exists" is the correct in-use signal.
+  const base = join(cwd, ".agentflow");
+  if (transcriptPath && existsSync(transcriptPath) && existsSync(base)) {
     try {
-      const dir = join(cwd, ".agentflow", "chat");
+      const dir = join(base, "chat");
       mkdirSync(dir, { recursive: true });
       copyFileSync(transcriptPath, join(dir, `${session}.jsonl`));
       writeFileSync(join(dir, `${session}.md`), renderMarkdown(readFileSync(transcriptPath, "utf8")), "utf8");
+      const keep = Math.max(1, parseInt(process.env["AGENTFLOW_CHAT_KEEP"] ?? "", 10) || DEFAULT_KEEP);
+      pruneOldSnapshots(dir, keep);
     } catch {
       /* snapshot is best-effort; never fail the turn */
     }
