@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.13] - 2026-07-24
+
+### Added
+- **`gdpr-domain` reads notices published as PDFs.** The collector used to call `r.text()` on every
+  response, which decodes a PDF as UTF-8 and destroys it — the judging model received raw `%PDF-1.4`
+  binary, so **every check that reads the notice returned `not_observable`**. It now keeps the bytes and
+  extracts the text (`pdf.mjs`, Node `zlib` only, still zero dependencies).
+  - Glyph codes are mapped through the fonts' **`/ToUnicode` CMaps** — without them a subset font
+    yields mojibake, which is what a first naive attempt produced.
+  - Word and line breaks are decided from the **text position** (Tm/Td/TD/T\* geometry plus exact TJ
+    kerning), never from a generator's operator habits: rules like "a `Td` means a space" or "an `ET`
+    means a line break" fit one document and break the next. Validated on two unrelated toolchains
+    (Word/InDesign and LaTeX/pdfTeX).
+  - **`looksLikeProse` refuses a garbled extraction**, returning no text at all. For a compliance audit
+    a silently mangled notice is far worse than none: it turns "I cannot read this" into a confident
+    verdict on nonsense. A scanned PDF therefore stays `not_observable`, which is the honest answer.
+  - Known limit: glyph widths are estimated (no font metrics), so an occasional spurious space can
+    appear inside a word. Harmless for judging prose, and preferable to tuning against one sample.
+
+  Effect on the real zupit.it audit: `not_observable` **11 → 0**, and a **major** finding surfaced that
+  was previously invisible — the notice denies any extra-EU transfer while four US providers are
+  observed loading on the site (Art. 13(1)(f)). The verdict moved from *NEEDS ATTENTION* to
+  *SIGNIFICANT GAPS*: the audit had been under-reporting because it could not read the notice.
+
 ## [1.0.0-beta.12] - 2026-07-24
 
 ### Fixed

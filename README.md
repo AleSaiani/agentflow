@@ -5,7 +5,7 @@
 **Agent workflows that survive the session.** Durable and deterministic, described in plain English — run inside Claude Code, with zero runtime dependencies.
 
 [![CI](https://github.com/AleSaiani/agentflow/actions/workflows/ci.yml/badge.svg)](https://github.com/AleSaiani/agentflow/actions/workflows/ci.yml)
-[![version](https://img.shields.io/badge/version-1.0.0--beta.12-blue)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-1.0.0--beta.13-blue)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
 [![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](https://nodejs.org)
@@ -265,9 +265,9 @@ npm run build && npm test`) and the PR workflow. Security reports go through the
 
 ## Status
 
-`1.0.0-beta.12`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation, stage
+`1.0.0-beta.13`. Primitives, the workflow layer (WORKFLOW.md, params, fork, schema validation, stage
 retry/timeout, approval gate, on-failure), `queue`/`mailbox`/`step`, inspect/board, and the hooks
-(cross-turn resume + preserve-chat) are implemented and covered by an automated suite (**130 tests**, run
+(cross-turn resume + preserve-chat) are implemented and covered by an automated suite (**136 tests**, run
 in CI) including a simulated cross-turn loop. The recommended final check before production is a **live
 multi-turn Claude Code session smoke test**. Roadmap and deferred items live in [CHANGELOG.md](CHANGELOG.md).
 

@@ -13,6 +13,7 @@
  * Env: GDPR_DOMAIN (required, e.g. "example.com" or "https://example.com"),
  *      GDPR_TIMEOUT_MS (default 15000), GDPR_MAX_POLICY_CHARS (default 60000).
  */
+import { pdfToText } from "./pdf.mjs";
 import tls from "node:tls";
 
 const rawDomain = process.env.GDPR_DOMAIN;
@@ -149,12 +150,28 @@ async function get(url, redirect = "follow") {
   try {
     const r = await fetch(url, { redirect, signal: ac.signal, headers: { "user-agent": UA, accept: "text/html,*/*" } });
     let body = "";
+    let pdf = false;
+    let pdfText = "";
     try {
-      body = await r.text();
+      // Read bytes, not text: `r.text()` decodes a PDF as UTF-8 and destroys it, which is how notices
+      // published as PDFs used to reach the judge as `%PDF-1.4` binary.
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ctype = r.headers.get("content-type") || "";
+      pdf = /application\/pdf/i.test(ctype) || buf.subarray(0, 5).toString("latin1") === "%PDF-";
+      if (pdf) {
+        pdfText = pdfToText(buf); // "" when not extractable (scanned/encrypted) — never a guess
+      } else {
+        const m = /charset=([^;]+)/i.exec(ctype);
+        try {
+          body = new TextDecoder((m ? m[1] : "utf-8").trim()).decode(buf);
+        } catch {
+          body = buf.toString("utf8");
+        }
+      }
     } catch {
       /* non-text */
     }
-    return { ok: true, status: r.status, url: r.url, redirected: r.redirected, headers: headersToObj(r.headers), setCookie: getSetCookie(r.headers), body };
+    return { ok: true, status: r.status, url: r.url, redirected: r.redirected, headers: headersToObj(r.headers), setCookie: getSetCookie(r.headers), body, pdf, pdfText };
   } catch (e) {
     return { ok: false, error: String(e?.message || e) };
   } finally {
@@ -336,12 +353,16 @@ const cookieLink = pick(evidence.privacy.links, /cookie/i);
 if (privacyLink) {
   const r = await get(privacyLink.url, "follow");
   if (r.ok && r.status < 400) {
-    const text = htmlToText(r.body || "");
+    const text = r.pdf ? r.pdfText : htmlToText(r.body || "");
     evidence.privacy.policy_url = r.url;
     evidence.privacy.policy_status = r.status;
+    evidence.privacy.policy_format = r.pdf ? "pdf" : "html";
     evidence.privacy.policy_text_chars = text.length;
     evidence.privacy.policy_text = text.slice(0, MAX_POLICY);
     evidence.privacy.policy_truncated = text.length > MAX_POLICY;
+    // A PDF we cannot extract must stay visibly unreadable: the checks that read the notice then
+    // report not_observable, which is the honest answer — not a verdict on an empty string.
+    if (r.pdf && !text) evidence.privacy.policy_error = "notice is a PDF whose text could not be extracted (likely scanned); no readable text";
   } else {
     evidence.privacy.policy_url = privacyLink.url;
     evidence.privacy.policy_status = r.ok ? r.status : null;
