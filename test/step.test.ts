@@ -40,9 +40,13 @@ test("step: buildArgv shapes the sessionless CLI command per runtime", () => {
   const [cbin, cargs] = buildArgv("claude-cli", "do it", "opus");
   assert.match(cbin, /claude/);
   assert.deepEqual(cargs, ["-p", "do it", "--output-format", "json", "--model", "opus"]);
-  const [xbin, xargs] = buildArgv("codex-cli", "do it", "inherit");
+  const [xbin, xargs, xstdin] = buildArgv("codex-cli", "do it", "inherit");
   assert.match(xbin, /codex/);
-  assert.deepEqual(xargs, ["exec", "do it", "--json"]); // inherit → no --model
+  assert.deepEqual(xargs, ["exec", "--json"]); // inherit → no --model
+  // codex takes the prompt on stdin: it blocks waiting for stdin anyway, and keeping the prompt out of
+  // argv is what makes the `shell: true` fallback for Windows' .cmd shim safe.
+  assert.equal(xstdin, "do it");
+  assert.equal(buildArgv("claude-cli", "do it", "inherit")[2], "", "claude takes argv; stdin just closes");
 });
 
 test("step: extractResult parses claude json (.result), codex jsonl, and raw fallback", () => {
@@ -53,6 +57,18 @@ test("step: extractResult parses claude json (.result), codex jsonl, and raw fal
   ].join("\n");
   assert.equal(extractResult(jsonl), "final answer");
   assert.equal(extractResult("just plain text"), "just plain text");
+});
+
+test("step: extractResult handles the REAL `codex exec --json` event stream", () => {
+  // Captured verbatim from codex-cli 0.144.6 on 2026-07-24. The previous test above asserted an
+  // invented shape, which is why this never failed while the real thing returned the whole blob.
+  const real = [
+    '{"type":"thread.started","thread_id":"019f9434-b440-7d30-a2ba-8995824f6635"}',
+    '{"type":"turn.started"}',
+    '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"PONG"}}',
+    '{"type":"turn.completed","usage":{"input_tokens":17007,"output_tokens":6}}',
+  ].join("\n");
+  assert.equal(extractResult(real), "PONG");
 });
 
 test("step: --validate-only short-circuits before reading a (still-templated) prompt-file", () => {

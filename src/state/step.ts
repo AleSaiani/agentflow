@@ -18,7 +18,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from "node:child_process";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 
@@ -112,18 +112,23 @@ function cmdInit(args: string[]): void {
   print({ run_id: runId, runtime, engine_runnable: runtime.endsWith("-cli"), path: p });
 }
 
-/** Build the sessionless CLI argv for a `claude-cli` / `codex-cli` runtime. */
-function buildArgv(runtime: string, prompt: string, model: string): [string, string[]] {
+/**
+ * Build the sessionless CLI invocation for a `claude-cli` / `codex-cli` runtime.
+ * Returns `[bin, argv, stdin]` — `stdin` is the text to feed the child ("" simply closes it).
+ * `codex exec` takes the prompt on **stdin**: it keeps the prompt out of argv (and therefore out of
+ * the shell we need for the Windows `.cmd` shim), and codex blocks waiting on stdin regardless.
+ */
+function buildArgv(runtime: string, prompt: string, model: string): [string, string[], string] {
   if (runtime === "claude-cli") {
     const bin = process.env["STEP_CLAUDE_BIN"] || "claude";
     const args = ["-p", prompt, "--output-format", "json"];
     if (model && model !== "inherit") args.push("--model", model);
-    return [bin, args];
+    return [bin, args, ""];
   }
   const bin = process.env["STEP_CODEX_BIN"] || "codex"; // codex-cli
-  const args = ["exec", prompt, "--json"];
+  const args = ["exec", "--json"];
   if (model && model !== "inherit") args.push("--model", model);
-  return [bin, args];
+  return [bin, args, prompt];
 }
 
 /** Extract a result string from a CLI's stdout: Claude `--output-format json` → .result; codex jsonl
@@ -142,6 +147,12 @@ function extractResult(stdout: string): string {
     if (!line.trim()) continue;
     try {
       const e = JSON.parse(line) as Record<string, unknown>;
+      // codex exec --json: {"type":"item.completed","item":{"type":"agent_message","text":"…"}}
+      const item = e["item"] as Record<string, unknown> | undefined;
+      if (item && item["type"] === "agent_message" && typeof item["text"] === "string" && item["text"]) {
+        last = item["text"] as string;
+        continue;
+      }
       const msg = (e["message"] as Record<string, unknown>) ?? {};
       const content = msg["content"] ?? e["content"] ?? e["text"];
       if (typeof content === "string") last = content;
@@ -154,6 +165,30 @@ function extractResult(stdout: string): string {
     }
   }
   return last || trimmed;
+}
+
+/**
+ * Spawn a CLI, tolerating Windows' npm shims. `codex`/`claude` installed via npm are `<bin>.cmd` on
+ * Windows, and Node's spawn does NOT apply PATHEXT — a bare name ENOENTs. We retry with the usual
+ * extensions rather than using `shell: true`, which would send the prompt through a shell.
+ */
+function spawnCli(
+  bin: string,
+  argv: string[],
+  opts: SpawnSyncOptionsWithStringEncoding,
+): SpawnSyncReturns<string> {
+  const win = process.platform === "win32";
+  const candidates = win && !/\.(cmd|bat|exe)$/i.test(bin) ? [bin, `${bin}.cmd`, `${bin}.exe`] : [bin];
+  // Node refuses to exec a .cmd/.bat without a shell (CVE-2024-27980), so those need `shell: true`.
+  // That is only safe because the prompt travels on stdin, never through argv — see buildArgv.
+  const optsFor = (c: string): SpawnSyncOptionsWithStringEncoding =>
+    /\.(cmd|bat)$/i.test(c) ? { ...opts, shell: true } : opts;
+  let r = spawnSync(candidates[0] as string, argv, optsFor(candidates[0] as string));
+  for (let i = 1; i < candidates.length; i++) {
+    if (!(r.error && (r.error as NodeJS.ErrnoException).code === "ENOENT")) return r;
+    r = spawnSync(candidates[i] as string, argv, optsFor(candidates[i] as string));
+  }
+  return r;
 }
 
 /** Engine-driven execution for the CLI runtimes: spawn the binary, capture + extract, mark terminal. */
@@ -175,13 +210,15 @@ function cmdRun(args: string[]): void {
   markInProgress(state);
   save(runId, state);
 
-  const [bin, argv] = buildArgv(runtime, prompt, String(cfg["model"] ?? "inherit"));
+  const [bin, argv, stdinPrompt] = buildArgv(runtime, prompt, String(cfg["model"] ?? "inherit"));
   // Isolate the child session: it inherits our environment and (plugin installed globally) our hooks,
   // so it must not be able to see — or drive — the very run that spawned it. AGENTFLOW_CHILD makes the
   // Stop hook a no-op there; dropping the *_STATE_DIR overrides keeps it out of our state entirely.
   const childEnv: NodeJS.ProcessEnv = { ...process.env, AGENTFLOW_CHILD: "1" };
   for (const k of Object.keys(childEnv)) if (k.endsWith("_STATE_DIR")) delete childEnv[k];
-  const r = spawnSync(bin, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: childEnv });
+  // `input: ""` closes the child's stdin immediately. `codex exec` otherwise prints "Reading additional
+  // input from stdin..." and blocks forever even though the prompt came in as an argument.
+  const r = spawnCli(bin, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: childEnv, input: stdinPrompt });
   if (r.error || r.status !== 0) {
     const err = (r.error?.message || r.stderr || `${bin} exited ${r.status}`).slice(0, 500);
     markFailed(state, err);

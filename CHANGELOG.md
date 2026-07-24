@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.9] - 2026-07-24
+
+### Fixed
+First live validation of `step --runtime codex-cli` (previously only unit-tested against stub
+binaries, and against an **invented** output shape — which is why none of this ever failed). Three
+real defects, all of them blockers:
+- **`codex exec` hung forever.** It prints *"Reading additional input from stdin…"* and blocks waiting
+  on stdin even when the prompt is passed as an argument. The engine now always closes/feeds the
+  child's stdin.
+- **`spawnSync codex ENOENT`, then `codex.cmd EINVAL` on Windows.** npm shims are `<bin>.cmd` and
+  Node applies no `PATHEXT`; Node also refuses to exec a `.cmd` without a shell (CVE-2024-27980). The
+  engine now retries `<bin>.cmd`/`.exe` and uses `shell: true` only for `.cmd`/`.bat`. That stays safe
+  because **codex now receives the prompt on stdin**, so it never travels through a shell.
+- **`extractResult` couldn't read codex's real output.** codex emits
+  `{"type":"item.completed","item":{"type":"agent_message","text":"…"}}`; the parser only looked at
+  top-level `message`/`content`/`text`, so a run "succeeded" while returning the entire JSONL dump
+  instead of the answer. Now parsed correctly, and the unit test uses a **verbatim capture** from
+  codex-cli 0.144.6 instead of a fabricated shape.
+
+Verified end to end on both runtimes: `codex-cli` → `PONG`, `claude-cli` → `PING`, ~8-11 s each.
+Cross-model steps (`claude-cli` ↔ `codex-cli`) are therefore usable for the first time.
+
 ## [1.0.0-beta.8] - 2026-07-24
 
 ### Fixed
