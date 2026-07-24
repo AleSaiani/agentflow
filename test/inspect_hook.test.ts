@@ -49,6 +49,24 @@ test("Stop hook blocks on an active foreach run and pre-increments auto_continue
   assert.equal(state.auto_continues, 1);
 });
 
+test("Stop hook never self-drives inside an engine-spawned child session", () => {
+  const { env } = freshEnv();
+  const items = join(env["FOREACH_STATE_DIR"]!, "..", "items.json");
+  writeFileSync(items, JSON.stringify([{ id: "a" }, { id: "b" }]), "utf8");
+  run(ENUM, env, ["init", "rc", "--items", items]); // genuine residual work is present
+
+  // Regression: `step --runtime claude-cli` spawns a real Claude Code session that inherits both our
+  // env and (plugin installed globally) our hooks. Without this guard the child's Stop hook found the
+  // PARENT's in-flight run and drove it — burning the parent's auto-continues and returning
+  // meta-commentary instead of the prompt's answer (observed live: 296s and 1029 bytes, vs 11s/"PONG").
+  const out = run(HOOK, { ...env, AGENTFLOW_CHILD: "1" }, [], "{}");
+  assert.equal(out.trim(), "", "a child session must emit no continue decision");
+
+  // …and it must not have touched the parent's state
+  const state = JSON.parse(readFileSync(join(env["FOREACH_STATE_DIR"]!, "rc", "state.json"), "utf8"));
+  assert.equal(state.auto_continues, 0);
+});
+
 test("Stop hook is silent when no run has residual work", () => {
   const { env } = freshEnv();
   const items = join(env["FOREACH_STATE_DIR"]!, "..", "items.json");

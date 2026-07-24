@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.8] - 2026-07-24
+
+### Fixed
+- **`step --runtime claude-cli/codex-cli` no longer recurses into its own parent run.** The child is a
+  real Claude Code session that inherits our environment and — with the plugin installed globally — our
+  hooks. Its Stop hook therefore discovered the **parent's** in-flight run and started driving it,
+  burning the parent's auto-continue budget and returning meta-commentary about the run instead of the
+  prompt's answer. The engine now marks children with `AGENTFLOW_CHILD` (the Stop hook is a no-op
+  there) and strips `*_STATE_DIR` overrides from the child environment.
+  Measured on the same prompt: **296 s → 11 s**, output `1029 bytes of commentary` → `PONG`.
+  Found by the first live validation of the CLI runtimes, which until now were only unit-tested
+  against stub binaries.
+
 ## [1.0.0-beta.7] - 2026-07-24
 
 ### Fixed

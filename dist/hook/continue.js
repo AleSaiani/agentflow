@@ -133,6 +133,12 @@ function drainStdin() {
 }
 async function main() {
     await drainStdin();
+    // A `step --runtime claude-cli/codex-cli` child is itself a Claude Code session, and the plugin is
+    // installed globally — so without this guard the child's Stop hook finds the PARENT's in-flight run
+    // and starts driving it, burning the parent's auto-continues and returning meta-commentary instead
+    // of the prompt's answer. The engine marks its children with AGENTFLOW_CHILD; they never self-drive.
+    if (process.env["AGENTFLOW_CHILD"])
+        process.exit(0);
     const active = findActiveRun();
     if (active === null) {
         process.exit(0);

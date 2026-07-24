@@ -176,7 +176,12 @@ function cmdRun(args: string[]): void {
   save(runId, state);
 
   const [bin, argv] = buildArgv(runtime, prompt, String(cfg["model"] ?? "inherit"));
-  const r = spawnSync(bin, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  // Isolate the child session: it inherits our environment and (plugin installed globally) our hooks,
+  // so it must not be able to see — or drive — the very run that spawned it. AGENTFLOW_CHILD makes the
+  // Stop hook a no-op there; dropping the *_STATE_DIR overrides keeps it out of our state entirely.
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, AGENTFLOW_CHILD: "1" };
+  for (const k of Object.keys(childEnv)) if (k.endsWith("_STATE_DIR")) delete childEnv[k];
+  const r = spawnSync(bin, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: childEnv });
   if (r.error || r.status !== 0) {
     const err = (r.error?.message || r.stderr || `${bin} exited ${r.status}`).slice(0, 500);
     markFailed(state, err);
