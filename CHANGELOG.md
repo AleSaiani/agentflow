@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0-beta.7] - 2026-07-06
+## [1.0.0-beta.7] - 2026-07-24
 
 ### Fixed
 - **The plugin manifest version was stuck at `1.0.0-beta.4`.** Claude Code's marketplace reads
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same version (plus that `marketplace.json` lists the plugin). `release.yml` gates the tagged release
   on `npm test`, so a release with drifting versions can no longer ship.
 
-## [1.0.0-beta.6] - 2026-07-06
+## [1.0.0-beta.6] - 2026-07-18
 
 ### Fixed
 - **preserve-chat no longer creates `.agentflow/` in workspaces that don't use Agent Flow.** The

@@ -21,6 +21,27 @@ test("manifest: package.json and .claude-plugin/plugin.json declare the same ver
   );
 });
 
+test("manifest: the newest CHANGELOG entry is the declared version", () => {
+  const version = read("package.json")["version"];
+  const changelog = readFileSync(resolve("CHANGELOG.md"), "utf8");
+  // Every `## [x.y.z] - date` heading, skipping the standing `## [Unreleased]` section.
+  const entries = [...changelog.matchAll(/^## \[([^\]]+)\]/gm)].map((m) => m[1]).filter((v) => v !== "Unreleased");
+  assert.equal(
+    entries[0],
+    version,
+    `CHANGELOG's newest entry is ${entries[0]} but package.json says ${version} — every release needs its own entry, newest first`,
+  );
+});
+
+test("manifest: the README version badge matches the declared version", () => {
+  const version = read("package.json")["version"];
+  const readme = readFileSync(resolve("README.md"), "utf8");
+  const badge = readme.match(/img\.shields\.io\/badge\/version-(.+?)-blue/);
+  assert.ok(badge, "README must carry a shields.io version badge");
+  const shown = badge[1].replace(/--/g, "-"); // shields.io escapes '-' as '--'
+  assert.equal(shown, version, `README badge shows ${shown} but package.json says ${version}`);
+});
+
 test("manifest: plugin and marketplace agree on the plugin name", () => {
   const plugin = read(".claude-plugin/plugin.json");
   const market = read(".claude-plugin/marketplace.json");
