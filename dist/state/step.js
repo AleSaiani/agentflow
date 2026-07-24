@@ -103,7 +103,11 @@ function buildArgv(runtime, prompt, model) {
         return [bin, args, ""];
     }
     const bin = process.env["STEP_CODEX_BIN"] || "codex"; // codex-cli
-    const args = ["exec", "--json"];
+    // `--skip-git-repo-check`: without it codex aborts with "Not inside a trusted directory" whenever the
+    // cwd isn't a git repo, so the runtime would silently work only inside repos. A `step` is an
+    // explicitly requested, engine-driven invocation, so we opt out of codex's own workspace guard —
+    // the caller chose to run it here.
+    const args = ["exec", "--json", "--skip-git-repo-check"];
     if (model && model !== "inherit")
         args.push("--model", model);
     return [bin, args, prompt];

@@ -42,7 +42,7 @@ test("step: buildArgv shapes the sessionless CLI command per runtime", () => {
   assert.deepEqual(cargs, ["-p", "do it", "--output-format", "json", "--model", "opus"]);
   const [xbin, xargs, xstdin] = buildArgv("codex-cli", "do it", "inherit");
   assert.match(xbin, /codex/);
-  assert.deepEqual(xargs, ["exec", "--json"]); // inherit → no --model
+  assert.deepEqual(xargs, ["exec", "--json", "--skip-git-repo-check"]); // inherit → no --model
   // codex takes the prompt on stdin: it blocks waiting for stdin anyway, and keeping the prompt out of
   // argv is what makes the `shell: true` fallback for Windows' .cmd shim safe.
   assert.equal(xstdin, "do it");

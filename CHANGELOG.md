@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.10] - 2026-07-24
+
+### Fixed
+- **`codex-cli` only worked inside a git repository.** `codex exec` aborts with *"Not inside a trusted
+  directory and --skip-git-repo-check was not specified"* whenever the cwd isn't a git repo — so the
+  runtime silently worked in a repo and failed with a confusing message anywhere else. The engine now
+  passes `--skip-git-repo-check`: a `step` is an explicitly requested, engine-driven invocation, so it
+  opts out of codex's own workspace guard. Found while running a cross-model loop from a neutral
+  working directory (the beta.9 validation happened to run inside this repo, which hid it).
+
 ## [1.0.0-beta.9] - 2026-07-24
 
 ### Fixed
