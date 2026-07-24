@@ -37,16 +37,19 @@ test("step: a CLI runtime with a missing binary fails gracefully (no crash)", ()
 });
 
 test("step: buildArgv shapes the sessionless CLI command per runtime", () => {
-  const [cbin, cargs] = buildArgv("claude-cli", "do it", "opus");
+  const [cbin, cargs, cstdin] = buildArgv("claude-cli", "do it", "opus");
   assert.match(cbin, /claude/);
-  assert.deepEqual(cargs, ["-p", "do it", "--output-format", "json", "--model", "opus"]);
+  assert.deepEqual(cargs, ["-p", "--output-format", "json", "--model", "opus"]);
+  assert.equal(cstdin, "do it");
   const [xbin, xargs, xstdin] = buildArgv("codex-cli", "do it", "inherit");
   assert.match(xbin, /codex/);
   assert.deepEqual(xargs, ["exec", "--json", "--skip-git-repo-check"]); // inherit → no --model
   // codex takes the prompt on stdin: it blocks waiting for stdin anyway, and keeping the prompt out of
   // argv is what makes the `shell: true` fallback for Windows' .cmd shim safe.
   assert.equal(xstdin, "do it");
-  assert.equal(buildArgv("claude-cli", "do it", "inherit")[2], "", "claude takes argv; stdin just closes");
+  // Both runtimes send the prompt on stdin: argv has an OS length limit (~32 KB on Windows) and a
+  // real step prompt carries its <input> — a ~100 KB privacy notice died with ENAMETOOLONG.
+  assert.equal(buildArgv("claude-cli", "do it", "inherit")[2], "do it");
 });
 
 test("step: extractResult parses claude json (.result), codex jsonl, and raw fallback", () => {

@@ -90,17 +90,20 @@ function cmdInit(args) {
 }
 /**
  * Build the sessionless CLI invocation for a `claude-cli` / `codex-cli` runtime.
- * Returns `[bin, argv, stdin]` — `stdin` is the text to feed the child ("" simply closes it).
- * `codex exec` takes the prompt on **stdin**: it keeps the prompt out of argv (and therefore out of
- * the shell we need for the Windows `.cmd` shim), and codex blocks waiting on stdin regardless.
+ * Returns `[bin, argv, stdin]` — the prompt always travels on **stdin**, never in argv, for both
+ * runtimes. Three reasons, each learned the hard way:
+ *   1. argv has an OS length limit (~32 KB on Windows). A workflow step's prompt carries its `<input>`
+ *      — a privacy notice is ~100 KB — so an argv prompt dies with ENAMETOOLONG on any real input.
+ *   2. it keeps the prompt out of the shell we need for the Windows `.cmd` shim (see spawnCli).
+ *   3. `codex exec` blocks waiting on stdin regardless.
  */
 function buildArgv(runtime, prompt, model) {
     if (runtime === "claude-cli") {
         const bin = process.env["STEP_CLAUDE_BIN"] || "claude";
-        const args = ["-p", prompt, "--output-format", "json"];
+        const args = ["-p", "--output-format", "json"];
         if (model && model !== "inherit")
             args.push("--model", model);
-        return [bin, args, ""];
+        return [bin, args, prompt];
     }
     const bin = process.env["STEP_CODEX_BIN"] || "codex"; // codex-cli
     // `--skip-git-repo-check`: without it codex aborts with "Not inside a trusted directory" whenever the

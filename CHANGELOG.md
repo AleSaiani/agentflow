@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.12] - 2026-07-24
+
+### Fixed
+- **CLI runtimes died with `ENAMETOOLONG` on any realistic prompt.** `claude -p` received the prompt as
+  an **argv argument**, and argv has an OS length limit (~32 KB on Windows). A workflow step's prompt
+  carries its `<input>` — `gdpr-domain`'s assess input is ~109 KB — so the runtime worked for toy
+  prompts and failed for every real one. Both runtimes now send the prompt on **stdin** (codex already
+  did), which also keeps it out of the shell needed for the Windows `.cmd` shim.
+  Found on the first end-to-end run of the dual-mode pilot; the earlier `PONG` validations were 4 bytes
+  long and could never have surfaced it.
+
 ## [1.0.0-beta.11] - 2026-07-24
 
 ### Added
