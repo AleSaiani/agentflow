@@ -5,6 +5,7 @@ params:
   domain: { required: true, description: "Domain to audit, e.g. example.com" }
   report_out: { default: "", description: "HTML report path (default ./gdpr-report-<domain>-<date>.html in cwd)" }
   browser: { default: "auto", description: "Live-browser pass for runtime banner checks: auto (use a Vercel/Playwright-MCP browser tool if available, else stay manual) | none (skip)" }
+  dual: { default: "auto", description: "Adversarial second opinion on the LLM-judged checks: auto (use codex if installed, else skip) | none (skip) | codex-cli | claude-cli" }
 config: { context_policy: summary, max_auto_continues: 30, max_stages: 12, stop_on_failure: true }
 ---
 
@@ -47,7 +48,26 @@ The prompt fixes the output to a strict JSON array (one verdict per check id); r
 - prompt-file: {{workflow.dir}}/assess-prompt.md
 - max-auto-continues: 3
 
-## 5. build-browser-assess · bash
+## 5. build-dual-assess · bash
+Assemble the input for the optional adversarial second opinion: the same evidence plus the first
+model's verdicts, so a second model can dispute them. Skipped when `dual=none` or codex is absent.
+- when: test {{params.dual|shell}} != none && { test {{params.dual|shell}} != auto || command -v codex >/dev/null 2>&1; }
+```sh
+GDPR_EVIDENCE="{{stages.collect.result_pointer}}" GDPR_CHECKLIST="{{workflow.dir}}/checklist.json" GDPR_LLM_VERDICTS="{{stages.assess.result_pointer}}" node "{{workflow.dir}}/build-dual-assess.mjs" > "$PIPE_OUTPUT_PATH"
+```
+- output_path: {{run.dir}}/dual-input.json
+
+## 6. dual-assess · step
+An INDEPENDENT model re-judges the same checks and agrees or disputes each first verdict. Runs
+sessionlessly through the engine, so it is genuinely a different model — not the same one grading
+itself. Skipped when `dual=none` or codex is absent.
+- when: test {{params.dual|shell}} != none && { test {{params.dual|shell}} != auto || command -v codex >/dev/null 2>&1; }
+- runtime: codex-cli
+- input: {{stages.build-dual-assess.result_pointer}}
+- prompt-file: {{workflow.dir}}/dual-prompt.md
+- max-auto-continues: 3
+
+## 7. build-browser-assess · bash
 Assemble the input for the optional live-browser pass: the runtime banner/dark-pattern checks a static
 fetch can't judge. Skipped when `browser=none`.
 - when: test {{params.browser|shell}} != none
@@ -56,7 +76,7 @@ GDPR_EVIDENCE="{{stages.collect.result_pointer}}" GDPR_CHECKLIST="{{workflow.dir
 ```
 - output_path: {{run.dir}}/browser-input.json
 
-## 6. browser-assess · step
+## 8. browser-assess · step
 Drive a real browser to decide the runtime checks. The agent prefers a Vercel/agent browser CLI, falls
 back to Playwright MCP, and degrades to manual_review if neither is available. Skipped when `browser=none`.
 - when: test {{params.browser|shell}} != none
@@ -67,10 +87,10 @@ back to Playwright MCP, and degrades to manual_review if neither is available. S
 - prompt-file: {{workflow.dir}}/browser-prompt.md
 - max-auto-continues: 3
 
-## 7. report · bash
+## 9. report · bash
 Merge code + LLM + browser + manual verdicts, validate completeness (no check may be silently dropped),
 compute the rollup verdict, and write the self-contained HTML report + a machine-readable summary.
 ```sh
-GDPR_DOMAIN={{params.domain|shell}} GDPR_CHECKLIST="{{workflow.dir}}/checklist.json" GDPR_EVIDENCE="{{stages.collect.result_pointer}}" GDPR_CODE_VERDICTS="{{stages.evaluate.result_pointer}}" GDPR_LLM_VERDICTS="{{stages.assess.result_pointer}}" GDPR_BROWSER_VERDICTS="{{stages.browser-assess.result_pointer}}" GDPR_REPORT_OUT="{{params.report_out}}" node "{{workflow.dir}}/report.mjs" > "$PIPE_OUTPUT_PATH"
+GDPR_DOMAIN={{params.domain|shell}} GDPR_CHECKLIST="{{workflow.dir}}/checklist.json" GDPR_EVIDENCE="{{stages.collect.result_pointer}}" GDPR_CODE_VERDICTS="{{stages.evaluate.result_pointer}}" GDPR_LLM_VERDICTS="{{stages.assess.result_pointer}}" GDPR_DUAL_VERDICTS="{{stages.dual-assess.result_pointer}}" GDPR_BROWSER_VERDICTS="{{stages.browser-assess.result_pointer}}" GDPR_REPORT_OUT="{{params.report_out}}" node "{{workflow.dir}}/report.mjs" > "$PIPE_OUTPUT_PATH"
 ```
 - output_path: {{run.dir}}/report-summary.json

@@ -26,6 +26,35 @@ The LLM only ever produces *structured data*; every pass/fail rollup and the rep
 code. `report.mjs` validates that **every** checklist id has a legal verdict — a flaky LLM step can
 never silently drop a check (missing verdicts are backfilled as `not_observable`).
 
+## Dual mode — an adversarial second opinion (optional)
+
+The 17 `llm` checks are the only judged ones, so they are the only place a second model can add
+anything. With `dual` (default `auto`) an **independent model** re-judges them and agrees or disputes
+each verdict. It runs sessionlessly through `step --runtime codex-cli`, so it is genuinely a different
+model — not the same one grading itself.
+
+```
+/agentflow:run-workflow workflows/gdpr-domain/WORKFLOW.md --param domain=example.com --param dual=none
+```
+
+| `dual` | behaviour |
+|---|---|
+| `auto` *(default)* | run it if `codex` is installed, otherwise skip silently |
+| `none` | skip entirely — the report is **bit-for-bit** what it was before this feature |
+| `codex-cli` / `claude-cli` | force a specific second model |
+
+Each check carries a `confidence_mode`:
+
+- **`single-model`** — one judgment only (all `auto`/`manual` checks, and every `llm` check when dual is off)
+- **`dual-confirmed`** — two independent models reached the same status
+- **`disputed`** — **they disagreed**
+
+`disputed` is the point of the feature. The output is not "a more correct answer" — it is a map of
+where two independent judges diverge on the same evidence, which is exactly where a human should look.
+A dispute **keeps both verdicts** (`status` + `dual_status`), is surfaced at the top of the report, and
+**never changes the score or the rollup verdict**: a contested pass must not read as a clean pass.
+Cost: roughly doubles the LLM spend on the judged checks — cap it with `--max-usd`.
+
 ## Legal grounding
 
 `checklist.json` is mapped to specific articles of the **GDPR (Regulation (EU) 2016/679)** and the

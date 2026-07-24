@@ -41,6 +41,10 @@ function readJsonArray(path, { stripFences = false } = {}) {
 const codeVerdicts = readJsonArray(process.env.GDPR_CODE_VERDICTS) || [];
 const llmVerdicts = readJsonArray(process.env.GDPR_LLM_VERDICTS, { stripFences: true });
 const browserVerdicts = readJsonArray(process.env.GDPR_BROWSER_VERDICTS, { stripFences: true });
+// Optional adversarial second opinion on the `llm` checks. Its job is NOT to overwrite the first
+// verdict — it is to mark where two independent judges disagree, so a human looks there.
+const dualVerdicts = readJsonArray(process.env.GDPR_DUAL_VERDICTS, { stripFences: true });
+const dualById = new Map((dualVerdicts || []).filter((v) => v && v.id).map((v) => [v.id, v]));
 const byId = new Map();
 for (const v of codeVerdicts) byId.set(v.id, { ...v, decided_by: "code" });
 if (llmVerdicts) for (const v of llmVerdicts) byId.set(v.id, { ...v, decided_by: "llm" });
@@ -60,6 +64,11 @@ for (const c of checklist.checks) {
     gaps.push(c.id);
     v = { status: "not_observable", decided_by: v?.decided_by || c.decision_mode, rationale: v ? `Verdict had an invalid status ('${v.status}')` : "No verdict was produced for this check (assessment step incomplete or invalid).", evidence: [] };
   }
+  // Dual mode applies only where a model actually judged. A second opinion on a code-decided check
+  // would be noise: that verdict is already reproducible.
+  const d = v.decided_by === "llm" ? dualById.get(c.id) : undefined;
+  let confidence_mode = "single-model";
+  if (d && STATUSES.has(d.status)) confidence_mode = d.status === v.status ? "dual-confirmed" : "disputed";
   results.push({
     id: c.id,
     title: c.title,
@@ -74,6 +83,12 @@ for (const c of checklist.checks) {
     rationale: v.rationale || "",
     evidence: Array.isArray(v.evidence) ? v.evidence : v.evidence ? [String(v.evidence)] : [],
     references: c.references || [],
+    confidence_mode,
+    // On a dispute we keep BOTH verdicts. Silently picking one would throw away the only thing the
+    // second model produced that the first could not: the disagreement itself.
+    ...(confidence_mode === "disputed"
+      ? { dual_status: d.status, dual_rationale: d.rationale || "", dual_evidence: Array.isArray(d.evidence) ? d.evidence : [] }
+      : {}),
   });
 }
 
@@ -85,6 +100,18 @@ const failsMajor = count((r) => r.status === "fail" && r.severity === "major");
 const warnsBlocking = count((r) => r.status === "warn" && (r.severity === "critical" || r.severity === "major"));
 const observable = byStatus.pass + byStatus.fail + byStatus.warn;
 const score = observable ? Math.round(((byStatus.pass + 0.5 * byStatus.warn) / observable) * 100) : null;
+// Dual-mode rollup. `disputed` is the payload of the whole feature: two independent judges reached
+// different conclusions on the same evidence, so that check is exactly where a human should look.
+// It is reported alongside the score, never folded into it — a contested pass is not a clean pass.
+const dualMode = dualVerdicts ? "on" : "off";
+const byConfidence = {
+  single_model: count((r) => r.confidence_mode === "single-model"),
+  dual_confirmed: count((r) => r.confidence_mode === "dual-confirmed"),
+  disputed: count((r) => r.confidence_mode === "disputed"),
+};
+const disputedChecks = results
+  .filter((r) => r.confidence_mode === "disputed")
+  .map((r) => ({ id: r.id, title: r.title, severity: r.severity, first: r.status, second: r.dual_status }));
 
 let verdict, verdictClass;
 if (failsCritical) {
@@ -141,7 +168,8 @@ const catSections = cats
         <td><span class="sev sev-${r.severity}">${r.severity}</span></td>
         <td>
           <div class="title">${esc(r.title)}</div>
-          <div class="meta">${esc(r.id)} · ${esc(r.gdpr_articles.join(", "))} · <span class="by">${esc(r.decided_by)}</span> · confidence: ${esc(r.confidence)}</div>
+          <div class="meta">${esc(r.id)} · ${esc(r.gdpr_articles.join(", "))} · <span class="by">${esc(r.decided_by)}</span> · confidence: ${esc(r.confidence)}${r.confidence_mode !== "single-model" ? ` · <span class="by">${esc(r.confidence_mode)}</span>` : ""}</div>
+          ${r.confidence_mode === "disputed" ? `<div class="disputed-note"><b>Contested.</b> A second, independent model judged this <b>${esc(r.dual_status)}</b> instead: ${esc(r.dual_rationale)}</div>` : ""}
           <div class="rationale">${esc(r.rationale)}</div>
           ${ev}
         </td>
@@ -186,7 +214,10 @@ const html = `<!doctype html>
   .s-na{background:#eef1f4;color:#667085}.s-man{background:#eaeafe;color:#3538cd}
   .row-s-fail{background:#fffafa}.row-s-warn{background:#fffdf6}
   .sev{font-size:11px;font-weight:600;text-transform:uppercase} .sev-critical{color:#b42318}.sev-major{color:#b54708}.sev-minor{color:#667085}
-  .title{font-weight:600} .meta{font-size:12px;color:var(--mut);margin:2px 0 4px} .by{font-variant:small-caps;font-weight:600}
+  .title{font-weight:600} .meta{font-size:12px;color:var(--mut);margin:2px 0 4px} .disputed-box{border:1px solid #d97706;background:#fffbeb;padding:12px 16px;border-radius:6px;margin:14px 0;font-size:14px}
+    .disputed-box ul{margin:8px 0 0 18px}
+    .disputed-note{border-left:3px solid #d97706;background:#fffbeb;padding:6px 10px;margin:6px 0;font-size:13px}
+    .by{font-variant:small-caps;font-weight:600}
   .rationale{font-size:13.5px} ul.ev{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:#3a4250}
   ul.ev li{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:2px 0}
   footer{color:var(--mut);font-size:12px;margin-top:24px;line-height:1.6}
@@ -198,6 +229,7 @@ const html = `<!doctype html>
     <h1>GDPR external compliance audit</h1>
     <div class="sub">Domain <b>${esc(domain)}</b> · generated ${esc(new Date().toISOString())} · ${results.length} checks · external static observation</div>
     <div class="verdict ${verdictClass}">${esc(verdict)}</div>
+    ${disputedChecks.length ? `<div class="disputed-box"><b>${disputedChecks.length} check contested by a second model.</b> Two independent models reached different conclusions on the same evidence — these are the checks a human should review first. They do not change the score above.<ul>${disputedChecks.map((d) => `<li><code>${esc(d.id)}</code> — ${esc(d.title)}: first said <b>${esc(d.first)}</b>, second said <b>${esc(d.second)}</b></li>`).join("")}</ul></div>` : ""}
     <div class="cards">
       <div class="c c-pass"><b>${byStatus.pass}</b><span>Pass</span></div>
       <div class="c c-fail"><b>${byStatus.fail}</b><span>Fail</span></div>
@@ -225,11 +257,11 @@ const html = `<!doctype html>
 const stamp = new Date().toISOString().slice(0, 10);
 const outPath = resolve(process.env.GDPR_REPORT_OUT || `./gdpr-report-${domain.replace(/[^a-z0-9.-]/gi, "_")}-${stamp}.html`);
 writeFileSync(outPath, html, "utf8");
-const summary = { domain, generated_at: new Date().toISOString(), verdict, score, counts: byStatus, fails_critical: failsCritical, fails_major: failsMajor, report_html: outPath, results };
+const summary = { domain, generated_at: new Date().toISOString(), verdict, score, counts: byStatus, fails_critical: failsCritical, fails_major: failsMajor, dual_mode: dualMode, confidence: byConfidence, disputed: disputedChecks, report_html: outPath, results };
 const summaryPath = (outPath.endsWith(".html") ? outPath.slice(0, -5) : outPath) + ".summary.json";
 writeFileSync(summaryPath, JSON.stringify(summary, null, 2), "utf8");
 
-process.stdout.write(JSON.stringify({ domain, verdict, score, counts: byStatus, gaps_backfilled: gaps, report_html: outPath, summary_json: summaryPath }, null, 2));
+process.stdout.write(JSON.stringify({ domain, verdict, score, counts: byStatus, gaps_backfilled: gaps, dual_mode: dualMode, confidence: byConfidence, disputed: disputedChecks, report_html: outPath, summary_json: summaryPath }, null, 2));
 // Structural integrity: every checklist check must be represented exactly once.
 if (results.length !== checklist.checks.length) {
   process.stderr.write(`\nreport: integrity error — ${results.length} verdicts for ${checklist.checks.length} checks\n`);

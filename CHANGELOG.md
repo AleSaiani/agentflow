@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.11] - 2026-07-24
+
+### Added
+- **`gdpr-domain` dual mode — an adversarial second opinion, opt-out by default.** A `dual` param
+  (`auto` | `none` | `codex-cli` | `claude-cli`) adds two `when`-guarded stages in which an
+  **independent** model re-judges the 17 `llm` checks and agrees or disputes each verdict. It runs
+  sessionlessly via `step`, so it is genuinely a second model rather than the same one grading itself.
+  With `auto` it runs only if `codex` is installed; with `none` the report is **bit-for-bit** what it
+  was before.
+  - Each check now carries a `confidence_mode`: `single-model` · `dual-confirmed` · **`disputed`**.
+  - **`disputed` is the payload**, not a by-product: the feature's output is a map of where two
+    independent judges diverge on the same evidence — precisely where a human should look. A dispute
+    keeps **both** verdicts (`status` + `dual_status`) and is surfaced at the top of the report.
+  - **A dispute never moves the score, the verdict or the counts** — a contested pass must not read as
+    a clean pass, and equally must not be silently downgraded. It is reported *alongside* the rollup.
+    Pinned by regression tests.
+  - Dual applies only where a model actually judged. The `auto` checks are decided by code and already
+    reproducible; a second opinion there would be noise — which is the determinism boundary telling us
+    where the feature belongs.
+
 ## [1.0.0-beta.10] - 2026-07-24
 
 ### Fixed
