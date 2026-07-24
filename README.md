@@ -2,7 +2,7 @@
 
 # Agent Flow
 
-**Durable, deterministic LLM agent workflows — described in plain English, run inside Claude Code, with zero runtime dependencies.**
+**Agent workflows that survive the session.** Durable and deterministic, described in plain English — run inside Claude Code, with zero runtime dependencies.
 
 [![CI](https://github.com/AleSaiani/agentflow/actions/workflows/ci.yml/badge.svg)](https://github.com/AleSaiani/agentflow/actions/workflows/ci.yml)
 [![version](https://img.shields.io/badge/version-1.0.0--beta.7-blue)](CHANGELOG.md)
@@ -19,9 +19,13 @@
 ## The problem
 
 You kick off a long, multi-step agent job in Claude Code — *review 200 files*, *draft every chapter of an
-outline*, *drain a work queue from three terminals*. Then context **compaction** hits, or you close the
-session, and the in-flight sub-agents take their state with them. There's no checkpoint to resume from.
-Hours of work, gone — and stitching sub-agents together by hand is fragile long before that happens.
+outline*, *drain a work queue from three terminals*. Claude Code's **native Workflows** will happily fan
+that out for you.
+
+Then context **compaction** hits, or you close the laptop. And the run doesn't come back: native resume
+is scoped to the **session**, so in-flight background agents are terminated and their uncommitted work
+goes with them — with no completion signal to tell you it happened. There's no checkpoint to resume
+from. Hours of work, gone.
 
 ## The fix
 
@@ -132,14 +136,26 @@ plain-English goal  →  WORKFLOW.md (deterministic spec)  →  state.json on di
 
 ## Why Agent Flow
 
-It earns its keep when work **fans out** (many items), **loops** (until a condition holds), or runs long
-enough to **risk interruption**. If your task is a single prompt, you don't need it — just ask Claude.
+Agent Flow is a **plugin, not a platform**. It earns its keep on exactly one axis: work that must
+**outlive the session** it started in. If your task is a single prompt, just ask Claude. If your fan-out
+finishes inside one sitting, Claude Code's **native Workflows** are simpler — use those.
+
+Where it still pays off: work that **fans out** over many items, **loops** until a condition holds, or
+runs long enough to **risk interruption** — and that you need to be able to *audit* afterwards.
 
 | Instead of… | Agent Flow gives you |
 |---|---|
+| **Claude Code's native Workflows** | Not a replacement — they're the better tool for fan-out *within* a session. Agent Flow adds what happens **after** it: native resume is same-session only (pausing a session kills in-flight background agents, and their uncommitted work goes with them), while an Agent Flow run is a `state.json` a Stop hook picks up next turn — or tomorrow |
 | **Plain Claude Code sub-agents** | The same agents, but with durable state — they resume across turns and survive compaction, composed with a real vocabulary instead of ad-hoc prompting |
 | **LangGraph / LangChain** | No Python service, no runtime deps, no separate process — workflows live in your Claude Code session as readable, diffable markdown |
 | **Airflow / Prefect / Temporal** | No server, no scheduler, no infra — durability is a `state.json` on disk, not a database |
+
+### What it doesn't do
+
+Stated plainly, so you can rule it out fast: **no git-worktree isolation** for parallel agents (native
+Workflows have it), **no true background execution** — progress is made per turn, driven by the Stop
+hook — and **no completion notification** beyond the opt-in `notify` webhook. It is a session-scoped
+plugin that happens to survive sessions, not a scheduler.
 
 ## Examples
 

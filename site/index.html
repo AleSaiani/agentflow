@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Flow — durable, deterministic LLM agent workflows for Claude Code</title>
+<title>Agent Flow — agent workflows that survive the session, for Claude Code</title>
 <meta name="description" content="Open-source Claude Code plugin. Describe a workflow in plain English; Agent Flow builds it, runs it, and keeps it running across turns. As simple as a skill — no external tools, zero runtime dependencies.">
 <meta property="og:title" content="Agent Flow">
 <meta property="og:description" content="Durable, deterministic LLM agent workflows — as simple as a Claude Code skill, with zero runtime dependencies. Open source.">
@@ -190,7 +190,7 @@
     <div class="wrap herogrid">
       <div>
         <span class="eyebrow"><span class="pulse" aria-hidden="true"></span> Open source · Claude Code plugin</span>
-        <h1>Agent workflows that <span class="hl">survive the context window.</span></h1>
+        <h1>Agent workflows that <span class="hl">survive the session.</span></h1>
         <p class="lede"><strong>Durable, deterministic LLM agent workflows</strong> — described in plain English, run inside Claude Code, with zero runtime dependencies.</p>
         <p class="lede">A long, fan-out agent job dies on context compaction or when you close the session. Agent Flow makes every run a <span class="mono" style="color:var(--mint)">state.json</span> on disk that a Stop hook resumes across turns — nothing lost, nothing redone.</p>
         <p class="lede">Authored as plain markdown — the <strong>same idea as a Claude Code skill</strong>, run right in your session. <span style="color:var(--mint)">No server, no Python, no extra services</span> — just the Node that Claude Code already runs on.</p>
@@ -243,7 +243,7 @@
       <div class="split reveal">
         <div class="panel bad">
           <h3><span class="tag mono">// before</span></h3>
-          <p>You kick off a 200-file review, a multi-chapter draft, a queue drained from three terminals. Then compaction hits at item 142 — the in-flight sub-agents take their state with them. No checkpoint, no resume. Hours gone.</p>
+          <p>You kick off a 200-file review, a multi-chapter draft, a queue drained from three terminals — and native Workflows fan it out fine. Then compaction hits at item 142, or you close the laptop. Native resume is scoped to the session: in-flight background agents are terminated, their uncommitted work goes with them, and nothing tells you it happened. No checkpoint, no resume. Hours gone.</p>
         </div>
         <div class="panel good">
           <h3><span class="tag mono">// with agent flow</span></h3>
@@ -283,9 +283,10 @@
       <div class="sec-head reveal">
         <span class="kicker">Why Agent Flow</span>
         <h2>It earns its keep when work fans out, loops, or runs long enough to risk interruption.</h2>
-        <p>If your task is a single prompt, you don't need it — just ask Claude. Here's the honest comparison.</p>
+        <p>A plugin, not a platform. If your task is a single prompt, just ask Claude — and if your fan-out finishes in one sitting, native Workflows are simpler. Here's the honest comparison.</p>
       </div>
       <div class="why">
+        <div class="card reveal"><span class="vs">alongside <b>native Workflows</b></span><p style="margin-top:12px">Not a replacement — they're the better tool for fan-out <em>within</em> a session. Agent Flow adds what comes after: native resume is same-session only, so pausing a session kills in-flight background agents and their uncommitted work. An Agent Flow run is a <code>state.json</code> the Stop hook picks up next turn — or tomorrow.</p></div>
         <div class="card reveal"><span class="vs">instead of <b>plain sub-agents</b></span><p style="margin-top:12px">The same agents, but with durable state — they resume across turns and survive compaction, composed with a real vocabulary instead of ad-hoc prompting.</p></div>
         <div class="card reveal"><span class="vs">instead of <b>LangGraph / LangChain</b></span><p style="margin-top:12px">No Python service, no runtime deps, no separate process — workflows live in your Claude Code session as readable, diffable markdown.</p></div>
         <div class="card reveal"><span class="vs">instead of <b>Airflow / Prefect / Temporal</b></span><p style="margin-top:12px">No server, no scheduler, no infra — durability is a <code>state.json</code> on disk, not a database.</p></div>
