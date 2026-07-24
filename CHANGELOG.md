@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta.7] - 2026-07-06
+
+### Fixed
+- **The plugin manifest version was stuck at `1.0.0-beta.4`.** Claude Code's marketplace reads
+  `.claude-plugin/plugin.json`, not `package.json` — so beta.5 and beta.6 bumped only the latter and
+  the marketplace kept reporting beta.4 as the latest, never offering the update (which meant the
+  preserve-chat littering fix couldn't actually reach anyone). Both files now declare beta.7.
+
+### Added
+- **Version-drift gate.** A test asserts `package.json` and `.claude-plugin/plugin.json` declare the
+  same version (plus that `marketplace.json` lists the plugin). `release.yml` gates the tagged release
+  on `npm test`, so a release with drifting versions can no longer ship.
+
 ## [1.0.0-beta.6] - 2026-07-06
 
 ### Fixed
